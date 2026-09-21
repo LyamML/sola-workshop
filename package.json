@@ -4,12 +4,15 @@
   "version": "0.1.0",
   "description": "Sola — systeme de sante embarque du vaisseau Meridien (workshop Horizon 2080)",
   "workspaces": [
-    "web/*"
+    "web/*",
+    "server"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=web/console",
     "dev:borne": "npm run dev --workspace=web/borne",
     "dev:console": "npm run dev --workspace=web/console",
+    "dev:server": "npm run dev --workspace=server",
+    "db:load": "node --env-file=server/.env scripts/db-load.mjs",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },

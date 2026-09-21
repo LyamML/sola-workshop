@@ -4,3 +4,12 @@ dist/
 .pio/
 .vscode/
 .DS_Store
+
+# Secrets : jamais versionnes. Le modele est dans server/.env.example
+.env
+.env.local
+
+# Base locale de la borne (verbatim des conversations)
+*.db
+*.db-wal
+*.db-shm

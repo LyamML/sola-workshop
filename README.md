@@ -39,8 +39,10 @@ Les transcriptions n'arrivent jamais à la console médicale parce qu'elles **n'
 | `web/console` | **Écrans 02 et 03** — santé de l'équipage et fiche résident, pour le médecin de bord |
 | `firmware/bracelet-i2c` | Firmware ESP32 **principal** : MAX30102 (FC, RR, RMSSD, SpO₂) + MPU6050 (activité, chutes, sommeil) |
 | `firmware/bracelet` | Firmware ESP32 de **repli** : PPG analogique KY-039, FC + RR + RMSSD seuls |
+| `server` | Service d'ingestion + API de lecture du serveur de bord |
+| `db` | Les deux schémas : MySQL côté serveur, SQLite côté cabine — [pourquoi deux](db/README.md) |
 
-**Stack** — React 18 · TypeScript 5 · Vite 5 (espaces de travail npm) · ESP32 Arduino + NimBLE · Web Bluetooth.
+**Stack** — React 18 · TypeScript 5 · Vite 5 (espaces de travail npm) · Express + MySQL 8 · ESP32 Arduino + NimBLE · Web Bluetooth.
 
 Aucune ressource n'est chargée depuis un CDN : les polices sont empaquetées avec l'application. Le vaisseau n'a pas Internet ; le prototype non plus.
 
@@ -59,7 +61,19 @@ npm run dev:console
 ```
 
 La borne écoute sur <http://localhost:5173>, la console sur <http://localhost:5174>.
-`npm run build` et `npm run typecheck` traversent les deux espaces de travail.
+`npm run build` et `npm run typecheck` traversent tous les espaces de travail.
+
+Le serveur de bord est optionnel pour la démonstration : les deux interfaces
+tournent sur leurs jeux de données locaux. Pour le lancer (MySQL 8 et Node 20.6
+ou plus requis) :
+
+```bash
+cp server/.env.example server/.env && npm run db:load
+```
+
+```bash
+npm run dev:server
+```
 
 ### Les trois scénarios de la borne
 
@@ -133,7 +147,33 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 - **La SpO₂ n'est pas calibrée.** Le rapport des rapports est appliqué avec les coefficients génériques de la littérature, sans oxymètre de référence. La valeur montre une tendance, elle ne pose pas un diagnostic.
 - **Le PPG au poignet est difficile.** Le MAX30102 mesure par réflexion : le signal y est 5 à 10 fois plus faible qu'au doigt, et le moindre mouvement fait perdre le contact. C'est la contrainte matérielle la plus lourde du prototype.
 - **Le LLM embarqué n'est pas implémenté.** La borne rejoue des scénarios scriptés : l'architecture réserve sa place et garantit son isolement, mais le modèle reste à intégrer.
-- **Pas encore de persistance.** Les deux applications lisent des jeux de données locaux ; le service d'ingestion et les deux schémas (SQLite sur la borne, PostgreSQL côté console) sont spécifiés mais pas écrits.
+- **Les interfaces ne lisent pas encore la base.** Le schéma, le service d'ingestion et les requêtes de lecture existent et sont testés ; les trois écrans affichent toujours leurs jeux de données locaux. Le branchement est le prochain chantier, fichier par fichier.
+- **Le serveur de bord n'a pas été exécuté contre un vrai MySQL.** Les routes, la validation et le refus de transcription sont vérifiés ; les requêtes SQL elles-mêmes attendent leur première exécution.
+
+## Le serveur de bord
+
+`server/` fait deux choses : recevoir ce que les bornes envoient, et servir ce que la console lit.
+
+| Route | Qui appelle | Rôle |
+|---|---|---|
+| `POST /ingest/mesure` | la borne | lot de constantes, jusqu'à 1 440 minutes d'un coup après une coupure |
+| `POST /ingest/nuit` | la borne | durée de sommeil estimée de la nuit |
+| `POST /ingest/conversation` | la borne | **résumé** clinique — voir ci-dessous |
+| `POST /ingest/evenement` | la borne | chute, secousse, bouton d'urgence |
+| `GET /api/crew` | la console | écran 02 : indicateurs, courbes, file de triage |
+| `GET /api/residents/:code` | la console | écran 03 : la fiche complète |
+
+L'écriture demande un jeton porteur, comparé à temps constant. Toutes les requêtes sont préparées avec des paramètres nommés — aucune concaténation SQL nulle part.
+
+**Le serveur refuse les transcriptions.** `POST /ingest/conversation` inspecte toute la charge utile, à n'importe quelle profondeur, et rejette en `422` tout champ de verbatim :
+
+```
+$ curl -X POST .../ingest/conversation -d '{"...","transcript":[…]}'
+{"erreur":"Transcription refusee.","champ":"transcript",
+ "detail":"Le serveur de bord n'accepte que des resumes. …"}
+```
+
+C'est la promesse du projet rendue exécutable : l'architecture ne se contente pas de ne pas transmettre le verbatim, elle est incapable de l'accepter.
 
 ## Licence
 
