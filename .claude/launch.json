@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "borne",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:borne"],
+      "port": 5173
+    },
+    {
+      "name": "console",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:console"],
+      "port": 5174
+    }
+  ]
+}

@@ -1,0 +1,667 @@
+/* =============================================================================
+   Sola — borne de cabine (écran 01)
+   Palette assumée en monochrome sombre : c'est un appareil mural qui éclaire
+   une cabine, il garde le même rendu quel que soit le thème de la machine.
+   Styles portés tels quels depuis la maquette de référence.
+   ========================================================================== */
+
+:root {
+  --ui: "Manrope Variable", "Manrope", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: #0d1618;
+  color: #e8f2f0;
+  font-family: var(--ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 600;
+}
+p {
+  margin: 0;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+:focus-visible {
+  outline: 2px solid var(--b-glow, #4fd1bc);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ------------------------------------------------------------------ écran -- */
+.borne {
+  --b-bg: #0d1618;
+  --b-ink: #e8f2f0;
+  --b-ink2: #93a9ab;
+  --b-ink3: #65797c;
+  --b-line: rgba(255, 255, 255, 0.09);
+  --b-card: rgba(255, 255, 255, 0.045);
+  --b-glow: #4fd1bc;
+  --b-warm: #e8c48a;
+  --b-crit: #e2776a;
+
+  position: relative;
+  /* La borne est un mur : pas de défilement horizontal, et un défilement
+     vertical qui ne sert que lorsqu'une carte dépasse la hauteur de l'écran. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 26px 20px 44px;
+  color: var(--b-ink);
+  background: var(--b-bg);
+  transition: background 0.8s ease;
+}
+.borne::before {
+  content: "";
+  /* Fixe plutôt qu'absolu : la lueur reste centrée sur l'écran même quand le
+     contenu défile. */
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    64% 52% at 50% 40%,
+    rgba(79, 209, 188, 0.16) 0%,
+    rgba(79, 209, 188, 0) 70%
+  );
+  transition: opacity 0.8s ease, background 0.8s ease;
+}
+.borne.mode-alerte {
+  --b-glow: var(--b-crit);
+  background: #180f0e;
+}
+.borne.mode-alerte::before {
+  background: radial-gradient(
+    64% 52% at 50% 40%,
+    rgba(226, 119, 106, 0.2) 0%,
+    rgba(226, 119, 106, 0) 70%
+  );
+}
+.borne.mode-calme {
+  --b-glow: var(--b-warm);
+  background: #16130d;
+}
+.borne.mode-calme::before {
+  background: radial-gradient(
+    64% 52% at 50% 40%,
+    rgba(232, 196, 138, 0.17) 0%,
+    rgba(232, 196, 138, 0) 70%
+  );
+}
+.borne > * {
+  position: relative;
+  z-index: 1;
+}
+
+.b-status {
+  display: flex;
+  align-items: center;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--b-ink3);
+  margin-bottom: auto;
+}
+.b-status span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.b-status .d {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--b-glow);
+  opacity: 0.8;
+}
+.b-status .warn {
+  color: var(--b-warm);
+}
+
+/* ------------------------------------------------------------ compagnon --- */
+.b-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  padding-block: 30px;
+  width: 100%;
+}
+.sola-wrap {
+  position: relative;
+  width: min(300px, 62vw);
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+}
+.aura {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--b-glow) 26%, transparent) 0%,
+    transparent 66%
+  );
+  animation: auraBreathe 5.4s ease-in-out infinite;
+  transition: transform 1s ease-in-out;
+}
+.ring {
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--b-glow) 34%, transparent);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.ring.r2 {
+  inset: -4%;
+}
+@keyframes auraBreathe {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+@keyframes ringPulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.22);
+    opacity: 0;
+  }
+}
+.is-listening .ring {
+  opacity: 1;
+  animation: ringPulse 2.2s ease-out infinite;
+}
+.is-listening .ring.r2 {
+  animation-delay: 1.1s;
+}
+.is-speaking .aura {
+  animation: auraBreathe 1.5s ease-in-out infinite;
+}
+.mode-calme .aura {
+  animation: auraBreathe 9.5s ease-in-out infinite;
+}
+
+.cat {
+  position: relative;
+  width: 76%;
+  height: 76%;
+  display: block;
+  animation: catBreathe 4.6s ease-in-out infinite;
+}
+@keyframes catBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.025);
+  }
+}
+.is-thinking .cat {
+  animation: catTilt 1.1s ease-in-out infinite;
+}
+@keyframes catTilt {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+.cat .eyes {
+  animation: blink 5.2s ease-in-out infinite;
+  transform-origin: 100px 96px;
+}
+@keyframes blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.06);
+  }
+}
+.is-speaking .cat .eyes {
+  animation: blink 2.6s ease-in-out infinite;
+}
+.cat .tail {
+  transform-origin: 138px 150px;
+  animation: tail 3.4s ease-in-out infinite;
+}
+@keyframes tail {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+.is-listening .cat .tail {
+  animation-duration: 1.5s;
+}
+.cat .ear-l {
+  transform-origin: 70px 62px;
+}
+.cat .ear-r {
+  transform-origin: 130px 62px;
+}
+.is-listening .cat .ear-l {
+  animation: earL 1.8s ease-in-out infinite;
+}
+.is-listening .cat .ear-r {
+  animation: earR 1.8s ease-in-out infinite;
+}
+@keyframes earL {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(-9deg);
+  }
+}
+@keyframes earR {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(9deg);
+  }
+}
+.cat .mouth-open {
+  opacity: 0;
+  transform-origin: 100px 116px;
+}
+.is-speaking .cat .mouth-open {
+  opacity: 1;
+  animation: talk 0.42s ease-in-out infinite alternate;
+}
+.is-speaking .cat .mouth-shut {
+  opacity: 0;
+}
+@keyframes talk {
+  from {
+    transform: scaleY(0.45);
+  }
+  to {
+    transform: scaleY(1.1);
+  }
+}
+
+/* ---------------------------------------------------------- onde vocale --- */
+.wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 30px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.is-listening .wave {
+  opacity: 1;
+}
+.wave i {
+  width: 3px;
+  border-radius: 99px;
+  background: var(--b-glow);
+  height: 5px;
+  animation: waveBar 1s ease-in-out infinite;
+  opacity: 0.85;
+}
+@keyframes waveBar {
+  0%,
+  100% {
+    height: 5px;
+  }
+  50% {
+    height: var(--h, 20px);
+  }
+}
+
+/* -------------------------------------------------------------- parole ---- */
+.b-speech {
+  min-height: 118px;
+  max-width: 660px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.b-who {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--b-ink3);
+  transition: color 0.3s;
+}
+.is-listening .b-who {
+  color: var(--b-glow);
+}
+.b-line {
+  font-size: clamp(19px, 3.1vw, 26px);
+  font-weight: 300;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.b-line.out {
+  opacity: 0;
+  transform: translateY(7px);
+}
+.b-line.user {
+  color: var(--b-ink2);
+  font-weight: 400;
+  font-size: clamp(16px, 2.4vw, 20px);
+}
+.b-hint {
+  font-size: 12.5px;
+  color: var(--b-ink3);
+}
+
+/* --------------------------------------------------------- bouton micro --- */
+.b-mic {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--b-glow) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--b-glow) 40%, transparent);
+  transition: 0.22s;
+  flex: none;
+}
+.b-mic:hover {
+  background: color-mix(in srgb, var(--b-glow) 26%, transparent);
+  transform: scale(1.04);
+}
+.b-mic svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: var(--b-glow);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+.is-listening .b-mic {
+  background: var(--b-glow);
+  border-color: var(--b-glow);
+}
+.is-listening .b-mic svg {
+  stroke: #0d1618;
+}
+
+/* ------------------------------------------------- carte contextuelle ----- */
+.b-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+.b-card {
+  width: min(560px, 100%);
+  border-radius: 20px;
+  padding: 18px 20px;
+  background: var(--b-card);
+  border: 1px solid var(--b-line);
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: cardIn 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.b-card .tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--b-glow);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.b-card .tag::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--b-glow);
+}
+.b-person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+.b-person .av {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--b-glow) 22%, transparent);
+  color: var(--b-ink);
+  font-family: var(--mono);
+  font-size: 14px;
+}
+.b-person .nm {
+  font-size: 15px;
+  font-weight: 600;
+}
+.b-person .mt {
+  font-size: 13px;
+  color: var(--b-ink2);
+}
+.b-card p {
+  font-size: 14px;
+  color: var(--b-ink2);
+  line-height: 1.6;
+  text-align: left;
+}
+.b-card p b {
+  color: var(--b-ink);
+}
+.b-card.warm {
+  border-color: color-mix(in srgb, var(--b-warm) 36%, transparent);
+}
+.b-card.warm .tag {
+  color: var(--b-warm);
+}
+.b-card.warm .tag::before {
+  background: var(--b-warm);
+}
+.b-acts {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.b-acts button {
+  padding: 9px 17px;
+  border-radius: 99px;
+  font-size: 13.5px;
+  font-weight: 500;
+  border: 1px solid color-mix(in srgb, var(--b-glow) 40%, transparent);
+  color: var(--b-glow);
+  transition: 0.18s;
+}
+.b-acts button:hover {
+  background: color-mix(in srgb, var(--b-glow) 18%, transparent);
+}
+.b-acts button.ghost {
+  border-color: var(--b-line);
+  color: var(--b-ink3);
+}
+.b-acts button.ghost:hover {
+  background: var(--b-card);
+  color: var(--b-ink2);
+}
+.b-acts button.done {
+  background: var(--b-glow);
+  color: #0d1618;
+  border-color: var(--b-glow);
+}
+
+/* ------------------------------------------------------- pied de borne ---- */
+.b-foot {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-inline: 16px;
+  margin-top: 28px;
+}
+.b-foot button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--b-line);
+  background: var(--b-card);
+  color: var(--b-ink2);
+  font-size: 13px;
+  transition: 0.18s;
+  backdrop-filter: blur(10px);
+}
+.b-foot button:hover {
+  color: var(--b-ink);
+  border-color: color-mix(in srgb, var(--b-glow) 40%, transparent);
+}
+.b-foot svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* -------------------------------------------------- sélecteur scénario ---- */
+.b-scenes {
+  position: absolute;
+  top: 22px;
+  right: 20px;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 99px;
+  border: 1px solid var(--b-line);
+  background: var(--b-card);
+  backdrop-filter: blur(10px);
+  z-index: 2;
+}
+.b-scenes button {
+  padding: 6px 13px;
+  border-radius: 99px;
+  font-size: 12px;
+  color: var(--b-ink3);
+  transition: 0.16s;
+}
+.b-scenes button:hover {
+  color: var(--b-ink2);
+}
+.b-scenes button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--b-glow) 20%, transparent);
+  color: var(--b-ink);
+}
+@media (max-width: 720px) {
+  .b-scenes {
+    position: static;
+    margin-bottom: 18px;
+    align-self: center;
+  }
+  .b-status {
+    margin-bottom: 14px;
+  }
+}
+
+/* ------------------------------------------------- respiration guidée ----- */
+.breath {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.breath .num {
+  font-family: var(--mono);
+  font-size: 30px;
+  color: var(--b-warm);
+}
+.breath .st {
+  font-size: 14px;
+  color: var(--b-ink2);
+  letter-spacing: 0.04em;
+}

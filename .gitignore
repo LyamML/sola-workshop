@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.pio/
+.vscode/
+.DS_Store

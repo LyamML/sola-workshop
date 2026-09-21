@@ -1,0 +1,9 @@
+# Fins de ligne normalisees en LF dans le depot : l equipe est sur Windows et
+# macOS, et le firmware passe par PlatformIO.
+* text=auto eol=lf
+
+# Binaires : jamais de conversion.
+*.woff  binary
+*.woff2 binary
+*.png   binary
+*.jpg   binary
