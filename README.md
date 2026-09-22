@@ -65,15 +65,23 @@ La borne écoute sur <http://localhost:5173>, la console sur <http://localhost:5
 
 Le serveur de bord est optionnel pour la démonstration : les deux interfaces
 tournent sur leurs jeux de données locaux. Pour le lancer (MySQL 8 et Node 20.6
-ou plus requis) :
+ou plus requis), copiez le modèle de configuration et renseignez vos
+identifiants MySQL :
 
 ```bash
-cp server/.env.example server/.env && npm run db:load
+cp server/.env.example server/.env
+```
+
+```bash
+npm run db:load
 ```
 
 ```bash
 npm run dev:server
 ```
+
+Une commande par bloc : l'équipe est sous Windows PowerShell, qui ne connaît
+pas l'enchaînement `&&`.
 
 ### Les trois scénarios de la borne
 
