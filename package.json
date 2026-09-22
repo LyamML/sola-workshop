@@ -14,7 +14,12 @@
     "dev:server": "npm run dev --workspace=server",
     "db:load": "node --env-file=server/.env scripts/db-load.mjs",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:rollup": "node --env-file=server/.env scripts/db-rollup.mjs",
+    "db:demo": "node --env-file=server/.env scripts/db-demo.mjs",
+    "db:reset": "npm run db:load && npm run db:demo",
+    "dev:backoffice": "npm run dev --workspace=web/backoffice",
+    "db:sql": "node --env-file=server/.env scripts/db-sql.mjs"
   },
   "allowScripts": {
     "esbuild": true

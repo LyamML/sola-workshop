@@ -1,15 +1,17 @@
 import express from "express";
-import { authBorne } from "./auth.js";
+import { authAdmin, authBorne } from "./auth.js";
 import { config } from "./config.js";
 import { ping } from "./db.js";
+import { adminApi } from "./routes/admin.js";
 import { consoleApi } from "./routes/console.js";
 import { ingest } from "./routes/ingest.js";
 
 /**
  * Serveur de bord de Sola.
  *
- *   POST /ingest/*   ecrit par les bornes de cabine   (jeton requis)
+ *   POST /ingest/*   ecrit par les bornes de cabine     (jeton borne)
  *   GET  /api/*      lu par la console medicale
+ *   /admin/*         backoffice : lecture et correction (jeton admin)
  *   GET  /health     supervision
  *
  * Le service ne sert pas les interfaces : la borne et la console restent deux
@@ -23,11 +25,18 @@ app.disable("x-powered-by");
 // coupure ; 2 Mo couvrent largement 1 440 lignes.
 app.use(express.json({ limit: "2mb" }));
 
-// La console est servie depuis un autre port : sans cela, le navigateur bloque
-// la lecture. Une seule origine est autorisee, pas `*`.
+// La console et le backoffice sont servis depuis d'autres ports : sans cela,
+// le navigateur bloque la lecture. Deux origines nommees, jamais `*` — avec
+// `*` n'importe quelle page ouverte a bord pourrait lire les dossiers.
+const ORIGINES = new Set([config.consoleOrigin, config.backofficeOrigin]);
+
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", config.consoleOrigin);
+  const origine = req.header("origin");
+  if (origine && ORIGINES.has(origine)) {
+    res.header("Access-Control-Allow-Origin", origine);
+  }
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.header("Vary", "Origin");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
@@ -47,17 +56,32 @@ app.get("/", (_req, res) => {
       "POST /ingest/nuit": "duree de sommeil estimee (jeton requis)",
       "POST /ingest/conversation": "resume clinique, jamais de verbatim (jeton requis)",
       "POST /ingest/evenement": "chute, secousse, bouton d'urgence (jeton requis)",
+      "POST /api/residents/:code/particularites":
+        "note de particularite ecrite depuis la fiche (ouvert, en attente de la session medecin)",
     },
     lecture: {
       "GET /api/crew": "ecran 02 — sante de l'equipage",
       "GET /api/residents/:code": "ecran 03 — fiche resident, ex. /api/residents/R-0448",
+      "GET /api/equipage": "ecran 04 — registre des residents, triable et pagine",
+      "GET /api/signaux": "ecran 04 — registre des signaux, triable et pagine",
+    },
+    backoffice: {
+      "GET /admin/apercu": "compteurs par table et fraicheur des flux",
+      "GET /admin/ecrans": "correspondance bloc d'interface <-> requete",
+      "GET /admin/residents": "recherche, filtres module et statut",
+      "PATCH /admin/residents/:code": "statut, poste, cabine",
+      "GET /admin/signaux": "file de triage complete",
+      "PATCH /admin/signaux/:id": "assigner ou clore",
+      "POST /admin/residents/:code/particularites": "ajouter une allergie ou un antecedent",
+      "DELETE /admin/particularites/:id": "retirer une particularite",
+      "GET /admin/tables/:nom": "lecture brute d'une table",
     },
     supervision: { "GET /health": "etat du service et de la base" },
   });
 });
 
-app.get("/health", async (_req, res) => {
-  const base = await ping();
+app.get("/health", (_req, res) => {
+  const base = ping();
   res.status(base ? 200 : 503).json({
     service: "sola-server",
     base: base ? "ok" : "injoignable",
@@ -67,6 +91,7 @@ app.get("/health", async (_req, res) => {
 
 app.use("/ingest", authBorne, ingest);
 app.use("/api", consoleApi);
+app.use("/admin", authAdmin, adminApi);
 
 app.use((_req, res) => {
   res.status(404).json({ erreur: "Route inconnue." });
@@ -88,5 +113,5 @@ app.use(
 
 app.listen(config.port, () => {
   console.log(`[sola] serveur de bord sur http://localhost:${config.port}`);
-  console.log(`[sola] console autorisee : ${config.consoleOrigin}`);
+  console.log(`[sola] origines autorisees : ${[...ORIGINES].join(", ")}`);
 });

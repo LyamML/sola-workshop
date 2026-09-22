@@ -1,0 +1,657 @@
+<title>Les comptes qui manquent</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f4f7f5;
+    --card: #ffffff;
+    --card-2: #eef3f0;
+    --ink: #0e1a1c;
+    --ink-2: #56686b;
+    --ink-3: #8a9a9c;
+    --line: #e4ebe7;
+    --line-2: #d3ddd8;
+    --accent: #0f9e8c;
+    --accent-soft: #e0f4f0;
+    --watch: #a8820a;
+    --watch-soft: #f9f0d9;
+    --crit: #c0362f;
+    --crit-soft: #fae6e3;
+    --ui: "Manrope", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #090f11;
+      --card: #121c1f;
+      --card-2: #182427;
+      --ink: #ebf2f0;
+      --ink-2: #9cafb1;
+      --ink-3: #6e8184;
+      --line: #223034;
+      --line-2: #2d3e43;
+      --accent: #35c7b2;
+      --accent-soft: #0f2e2c;
+      --watch: #c79b2a;
+      --watch-soft: #2e2718;
+      --crit: #dc5f55;
+      --crit-soft: #331c1b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #090f11;
+    --card: #121c1f;
+    --card-2: #182427;
+    --ink: #ebf2f0;
+    --ink-2: #9cafb1;
+    --ink-3: #6e8184;
+    --line: #223034;
+    --line-2: #2d3e43;
+    --accent: #35c7b2;
+    --accent-soft: #0f2e2c;
+    --watch: #c79b2a;
+    --watch-soft: #2e2718;
+    --crit: #dc5f55;
+    --crit-soft: #331c1b;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 44px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  h1 {
+    font-size: clamp(27px, 4.6vw, 38px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+  }
+  h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 16px;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+  p { margin: 0; }
+  .lede {
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin-top: 12px;
+  }
+  .meta {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    letter-spacing: 0.02em;
+    margin-top: 18px;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.87em;
+    color: var(--ink);
+  }
+
+  /* ---------------------------------------------------------- légende -- */
+  .legende {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    margin-bottom: 18px;
+  }
+  .legende span { display: inline-flex; align-items: center; gap: 7px; }
+  .pt {
+    width: 8px;
+    height: 8px;
+    border-radius: 99px;
+    flex: none;
+    background: var(--ink-3);
+  }
+  .pt.cle { background: var(--accent); }
+  .pt.secret { background: var(--crit); }
+
+  /* ------------------------------------------------------ les manques -- */
+  .manques { display: flex; flex-direction: column; gap: 12px; }
+  .manque {
+    display: flex;
+    gap: 14px;
+    background: var(--crit-soft);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .manque .marq {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--crit);
+    flex: none;
+  }
+  .manque b { color: var(--ink); font-weight: 600; }
+
+  /* ----------------------------------------------------- deux tables -- */
+  .cote {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 720px) { .cote { grid-template-columns: 1fr; } }
+
+  .panneau {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .panneau > header { display: flex; align-items: baseline; gap: 10px; }
+  .panneau > header .n {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+  .panneau > p { font-size: 13.5px; color: var(--ink-2); }
+  .tbl > .nom {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .col {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: var(--card-2);
+    color: var(--ink-2);
+  }
+  .col.cle { background: var(--accent-soft); color: var(--accent); }
+  .col.secret { background: var(--crit-soft); color: var(--crit); }
+
+  /* ---------------------------------------------------------- étapes -- */
+  .etapes {
+    list-style: none;
+    counter-reset: e;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .etapes li {
+    counter-increment: e;
+    display: flex;
+    gap: 12px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .etapes li::before {
+    content: counter(e);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    flex: none;
+    width: 16px;
+    padding-top: 2px;
+  }
+  .etapes b { color: var(--ink); font-weight: 600; }
+
+  /* ---------------------------------------------------- l'existant --- */
+  .scroll { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    min-width: 560px;
+  }
+  th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 0 12px 8px 0;
+    border-bottom: 1px solid var(--line-2);
+  }
+  td {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    color: var(--ink-2);
+  }
+  td.src, td.dst { font-family: var(--mono); font-size: 11.5px; }
+  td.dst { color: var(--ink); }
+
+  /* ------------------------------------------------------ partis pris -- */
+  .pris {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 720px) { .pris { grid-template-columns: 1fr; } }
+  .parti {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .parti p { font-size: 13.5px; color: var(--ink-2); }
+  .parti .ex {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    padding-top: 6px;
+    border-top: 1px solid var(--line);
+    margin-top: 2px;
+  }
+  .parti .ex b { color: var(--crit); font-weight: 500; }
+  .parti .ex i { color: var(--accent); font-style: normal; }
+
+  /* ------------------------------------------------------------- sql -- */
+  pre {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.75;
+    color: var(--ink-2);
+    tab-size: 2;
+  }
+  pre b { color: var(--ink); font-weight: 500; }
+  pre i { color: var(--ink-3); font-style: normal; }
+  pre u { color: var(--crit); text-decoration: none; }
+
+  /* -------------------------------------------------------- à trancher -- */
+  .questions { display: flex; flex-direction: column; gap: 10px; }
+  .question {
+    background: var(--watch-soft);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .question b { color: var(--ink); font-weight: 600; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    max-width: 66ch;
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <h1>Les comptes qui manquent</h1>
+    <p class="lede">
+      Le schéma actuel sait tout d'un résident et rien de celui qui le soigne.
+      Douze tables décrivent des corps, aucune ne décrit un soignant — donc
+      aucune écriture n'est signée. Voici les trois tables à ajouter et les deux
+      colonnes à poser dans l'existant.
+    </p>
+    <p class="meta">Sola · Horizon 2080 · suite de « Du template au schéma » · proposition, rien n'est écrit en base</p>
+  </header>
+
+  <section>
+    <h2>Ce que personne ne signe</h2>
+    <div class="manques">
+      <div class="manque">
+        <span class="marq">01</span>
+        <span>
+          <b>La console écrit sans auteur.</b> Depuis qu'on a retiré le jeton du
+          formulaire de note, n'importe qui atteignant le serveur peut ajouter
+          une ligne au dossier d'un résident. La note est horodatée ; elle n'est
+          attribuée à personne.
+        </span>
+      </div>
+      <div class="manque">
+        <span class="marq">02</span>
+        <span>
+          <b>Le backoffice s'ouvre avec un jeton unique.</b> Une clé partagée par
+          toute l'équipe, rangée dans le <code>sessionStorage</code> du
+          navigateur. Elle prouve qu'on connaît la clé, pas qu'on est
+          quelqu'un — et un script injecté dans la page la lit.
+        </span>
+      </div>
+      <div class="manque">
+        <span class="marq">03</span>
+        <span>
+          <b><code>signaux.assigne_a</code> est du texte libre.</b> Six valeurs
+          distinctes dans le jeu actuel — <code>Dr. Oyelaran</code>,
+          <code>Inf. Bakker</code>, <code>Équipe d'intervention</code>… — qui ne
+          pointent sur rien. Une faute de frappe crée un septième soignant.
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Les deux tables de comptes</h2>
+    <div class="legende">
+      <span><i class="pt cle"></i> clé ou contrainte d'unicité</span>
+      <span><i class="pt secret"></i> secret — jamais en clair</span>
+      <span><i class="pt"></i> colonne ordinaire</span>
+    </div>
+
+    <div class="cote">
+      <div class="panneau">
+        <header>
+          <h3>medecins</h3>
+          <span class="n">la console</span>
+        </header>
+        <p>
+          Ceux qui soignent. Tous la même autorité : pas de colonne de rôle,
+          donc pas de droit à vérifier. Être dans la table, c'est le droit.
+        </p>
+        <div class="tbl">
+          <div class="cols">
+            <span class="col cle">id</span>
+            <span class="col cle">code · M-007</span>
+            <span class="col">prenom</span>
+            <span class="col">nom</span>
+            <span class="col">titre · Dr. / Inf.</span>
+            <span class="col cle">email · unique</span>
+            <span class="col secret">mdp_hash</span>
+            <span class="col">actif · 0/1</span>
+            <span class="col">cree_le</span>
+            <span class="col">derniere_connexion</span>
+          </div>
+        </div>
+        <p>
+          <code>titre</code> est une étiquette d'affichage, pour que la fiche
+          continue d'écrire « Dr. Nakamura ». Ce n'est pas un droit : un
+          infirmier et un médecin ouvrent exactement les mêmes écrans.
+        </p>
+      </div>
+
+      <div class="panneau">
+        <header>
+          <h3>admins</h3>
+          <span class="n">le backoffice</span>
+        </header>
+        <p>
+          Ceux qui exploitent : corriger une donnée, réassigner un signal,
+          regarder les tables brutes. Même forme, table séparée.
+        </p>
+        <div class="tbl">
+          <div class="cols">
+            <span class="col cle">id</span>
+            <span class="col">prenom</span>
+            <span class="col">nom</span>
+            <span class="col cle">email · unique</span>
+            <span class="col secret">mdp_hash</span>
+            <span class="col">actif · 0/1</span>
+            <span class="col">cree_le</span>
+            <span class="col">derniere_connexion</span>
+          </div>
+        </div>
+        <p>
+          Pas de <code>code</code> : un administrateur n'apparaît nulle part
+          dans une interface de soin. Il agit, il ne signe pas de note.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>La troisième table : les sessions</h2>
+    <div class="cote">
+      <div class="panneau">
+        <header>
+          <h3>sessions</h3>
+          <span class="n">les deux</span>
+        </header>
+        <div class="tbl">
+          <div class="cols">
+            <span class="col cle">id · sha256 du cookie</span>
+            <span class="col cle">medecin_id</span>
+            <span class="col cle">admin_id</span>
+            <span class="col">ouverte_at</span>
+            <span class="col">expire_at</span>
+          </div>
+        </div>
+        <p>
+          Deux clés étrangères dont une seule est remplie, garanties par un
+          <code>CHECK</code>. C'est ce qui rend impossible une session à cheval
+          sur les deux tables, et ce qui fait disparaître les sessions d'un
+          compte quand ce compte disparaît.
+        </p>
+      </div>
+
+      <div class="panneau">
+        <header><h3>Ce que fait une connexion</h3></header>
+        <ol class="etapes">
+          <li><b>Le navigateur envoie</b> l'e-mail et le mot de passe, une seule fois, à <code>POST /api/connexion</code>.</li>
+          <li><b>Le serveur recalcule le hachage</b> et le compare à <code>mdp_hash</code>, en temps constant, comme il compare déjà les jetons.</li>
+          <li><b>Il tire 32 octets au hasard</b>, en range l'empreinte dans <code>sessions</code>, et renvoie la valeur brute dans un cookie <code>httpOnly</code> · <code>SameSite=Strict</code>.</li>
+          <li><b>Le navigateur ne voit jamais rien</b> : aucun script de la page ne peut lire ce cookie, contrairement au jeton d'aujourd'hui.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Les deux colonnes à poser dans l'existant</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Table</th>
+            <th>Aujourd'hui</th>
+            <th>À ajouter</th>
+            <th>Pourquoi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="src">particularites</td>
+            <td>rien</td>
+            <td class="dst">auteur_id → medecins</td>
+            <td>
+              La raison d'être de tout ce document : une note de dossier dit
+              enfin qui l'a écrite. Nullable, parce que les six notes du jeu de
+              démonstration n'ont pas d'auteur et n'en auront jamais.
+            </td>
+          </tr>
+          <tr>
+            <td class="src">signaux</td>
+            <td class="src">assigne_a TEXT</td>
+            <td class="dst">assigne_id → medecins</td>
+            <td>
+              Le texte libre devient une référence. <code>assigne_a</code> reste,
+              mais pour le seul cas qui n'est pas une personne :
+              « Équipe d'intervention », 45 signaux sur 281.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Les partis pris</h2>
+    <div class="pris">
+      <div class="parti">
+        <h3>Deux tables plutôt qu'une colonne <code>role</code></h3>
+        <p>
+          Une table unique avec un rôle met la séparation dans une clause
+          <code>WHERE</code>, donc à portée d'un oubli. Deux tables la mettent
+          dans le schéma : un médecin ne peut pas devenir administrateur par
+          erreur de code, il n'est pas dans la bonne table.
+        </p>
+        <p class="ex">
+          <b>WHERE role = 'admin'</b> — une ligne à oublier<br>
+          <i>FROM admins</i> — rien à oublier
+        </p>
+      </div>
+
+      <div class="parti">
+        <h3>Le mot de passe n'est jamais stocké</h3>
+        <p>
+          Seulement son empreinte, par <code>scrypt</code> — fourni par Node 24,
+          rien à installer, comme SQLite. La colonne s'appelle
+          <code>mdp_hash</code> et non <code>pswd</code> : le nom rappelle ce
+          qu'on a le droit d'y mettre.
+        </p>
+        <p class="ex">
+          <b>pswd TEXT</b> — invite à écrire le mot de passe<br>
+          <i>mdp_hash TEXT</i> — n'invite à rien
+        </p>
+      </div>
+
+      <div class="parti">
+        <h3>On désactive, on ne supprime pas</h3>
+        <p>
+          <code>actif = 0</code> ferme le compte, la ligne reste. Sinon les notes
+          signées par un soignant parti perdraient leur auteur — or une note
+          non signée, c'est exactement le problème qu'on est en train de régler.
+        </p>
+        <p class="ex">
+          <i>pas d'ON DELETE sur auteur_id</i> : la base refuse la suppression
+        </p>
+      </div>
+
+      <div class="parti">
+        <h3>Les bornes gardent leur jeton</h3>
+        <p>
+          <code>BORNE_TOKEN</code> ne bouge pas. Une borne de cabine est une
+          machine : elle n'a pas de mot de passe à saisir ni de session à ouvrir.
+          Seul <code>ADMIN_TOKEN</code> disparaît, remplacé par la table
+          <code>admins</code>.
+        </p>
+        <p class="ex">
+          <i>machine</i> → jeton &nbsp;·&nbsp; <i>personne</i> → compte
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Le SQL, d'un bloc</h2>
+    <pre>
+<i>-- Ceux qui soignent. Tous la meme autorite : pas de colonne de role.</i>
+<b>CREATE TABLE medecins</b> (
+  id                 INTEGER PRIMARY KEY,
+  code               TEXT NOT NULL UNIQUE,          <i>-- M-007, affiche sur la note</i>
+  prenom             TEXT NOT NULL,
+  nom                TEXT NOT NULL,
+  titre              TEXT NOT NULL CHECK (titre IN ('Dr.','Inf.')),
+  email              TEXT NOT NULL UNIQUE,          <i>-- range en minuscules</i>
+  <u>mdp_hash</u>           TEXT NOT NULL,                 <i>-- scrypt, jamais le mot de passe</i>
+  actif              INTEGER NOT NULL DEFAULT 1 CHECK (actif IN (0,1)),
+  cree_le            TEXT NOT NULL DEFAULT (datetime('now')),
+  derniere_connexion TEXT
+) STRICT;
+
+<i>-- Ceux qui exploitent. Meme forme, table separee : la separation est</i>
+<i>-- dans le schema, pas dans une clause WHERE.</i>
+<b>CREATE TABLE admins</b> (
+  id                 INTEGER PRIMARY KEY,
+  prenom             TEXT NOT NULL,
+  nom                TEXT NOT NULL,
+  email              TEXT NOT NULL UNIQUE,
+  <u>mdp_hash</u>           TEXT NOT NULL,
+  actif              INTEGER NOT NULL DEFAULT 1 CHECK (actif IN (0,1)),
+  cree_le            TEXT NOT NULL DEFAULT (datetime('now')),
+  derniere_connexion TEXT
+) STRICT;
+
+<i>-- L'id stocke est l'EMPREINTE du cookie, pas le cookie : une copie de la</i>
+<i>-- base ne donne aucune session ouverte. Le CHECK garantit qu'une session</i>
+<i>-- appartient a un medecin OU a un admin, jamais aux deux.</i>
+<b>CREATE TABLE sessions</b> (
+  id         TEXT PRIMARY KEY,                      <i>-- sha256 du jeton du cookie</i>
+  medecin_id INTEGER REFERENCES medecins (id) ON DELETE CASCADE,
+  admin_id   INTEGER REFERENCES admins   (id) ON DELETE CASCADE,
+  ouverte_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expire_at  TEXT NOT NULL,
+  CHECK ((medecin_id IS NULL) &lt;&gt; (admin_id IS NULL))
+) STRICT;
+
+CREATE INDEX idx_sessions_expire ON sessions (expire_at);
+
+<i>-- Les deux colonnes dans l'existant. Pas d'ON DELETE sur auteur_id :</i>
+<i>-- la base doit refuser d'effacer un medecin qui a signe des notes.</i>
+<b>ALTER TABLE particularites</b> ADD COLUMN auteur_id  INTEGER REFERENCES medecins (id);
+<b>ALTER TABLE signaux</b>        ADD COLUMN assigne_id INTEGER REFERENCES medecins (id);</pre>
+  </section>
+
+  <section>
+    <h2>Ce qui reste à trancher</h2>
+    <div class="questions">
+      <div class="question">
+        <b>Le premier compte.</b> Il faut un compte pour en créer un, et au
+        premier démarrage il n'y en a aucun. Le plus simple : une commande
+        <code>npm run compte:admin</code> qui en crée un depuis le terminal —
+        physiquement sur le vaisseau, donc pas exposée sur le réseau.
+      </div>
+      <div class="question">
+        <b>Le mot de passe oublié.</b> Sans messagerie à bord, pas de lien de
+        réinitialisation. Un administrateur remet un mot de passe provisoire, et
+        la session suivante oblige à le changer — reste à décider si on modélise
+        ce « provisoire » (une colonne) ou si on l'assume à l'oral.
+      </div>
+      <div class="question">
+        <b>Le nombre d'essais.</b> Rien ne ralentit aujourd'hui un essai de mots
+        de passe en rafale. Un compteur par compte, ou un délai par adresse :
+        les deux tiennent en quelques lignes, mais ce n'est pas la même colonne.
+      </div>
+      <div class="question">
+        <b>Le journal d'audit.</b> <code>auteur_id</code> signe les notes,
+        <code>assigne_id</code> signe les affectations. Tout le reste — un statut
+        corrigé, un signal clos — reste anonyme. Une table <code>journal</code>
+        le règlerait, mais c'est un autre lot.
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Proposition, pas encore appliquée : aucune de ces tables n'existe dans
+    <code>db/serveur/01-schema.sql</code>. Trois tables, deux colonnes, deux
+    routes de connexion — c'est le plus petit ensemble qui permette d'écrire, au
+    bas d'une note de dossier, le nom de la personne qui l'a écrite.
+  </footer>
+
+</div>

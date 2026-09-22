@@ -36,13 +36,17 @@ Les transcriptions n'arrivent jamais à la console médicale parce qu'elles **n'
 | Dossier | Rôle |
 |---|---|
 | `web/borne` | **Écran 01** — la borne de cabine, vocale. Client Web Bluetooth du bracelet |
-| `web/console` | **Écrans 02 et 03** — santé de l'équipage et fiche résident, pour le médecin de bord |
+| `web/console` | **Écrans 02 à 04** — santé de l'équipage, fiche résident, registre triable, pour le médecin de bord |
+| `web/backoffice` | Outil d'exploitation : état des tables, correction des dossiers, suivi des signaux, table des correspondances écran ↔ requête |
 | `firmware/bracelet-i2c` | Firmware ESP32 **principal** : MAX30102 (FC, RR, RMSSD, SpO₂) + MPU6050 (activité, chutes, sommeil) |
 | `firmware/bracelet` | Firmware ESP32 de **repli** : PPG analogique KY-039, FC + RR + RMSSD seuls |
 | `server` | Service d'ingestion + API de lecture du serveur de bord |
-| `db` | Les deux schémas : MySQL côté serveur, SQLite côté cabine — [pourquoi deux](db/README.md) |
+| `db` | Les deux schémas, tous deux SQLite : `db/serveur` et `db/borne` — [pourquoi deux bases](db/README.md) |
+| `scripts` | Chargement du schéma, génération du jeu de test, agrégation quotidienne |
 
-**Stack** — React 18 · TypeScript 5 · Vite 5 (espaces de travail npm) · Express + MySQL 8 · ESP32 Arduino + NimBLE · Web Bluetooth.
+**Stack** — React 18 · TypeScript 5 · Vite 5 (espaces de travail npm) · Express + SQLite (`node:sqlite`, Node 24) · ESP32 Arduino + NimBLE · Web Bluetooth.
+
+SQLite plutôt que MySQL : un vaisseau générationnel n'a pas d'administrateur de base de données de garde. Un fichier unique, sans serveur à maintenir ni mot de passe à faire tourner, est le choix qui survit à quatre-vingts ans de vol — et `node:sqlite` évite jusqu'à la dépendance externe.
 
 Aucune ressource n'est chargée depuis un CDN : les polices sont empaquetées avec l'application. Le vaisseau n'a pas Internet ; le prototype non plus.
 
@@ -63,25 +67,80 @@ npm run dev:console
 La borne écoute sur <http://localhost:5173>, la console sur <http://localhost:5174>.
 `npm run build` et `npm run typecheck` traversent tous les espaces de travail.
 
-Le serveur de bord est optionnel pour la démonstration : les deux interfaces
-tournent sur leurs jeux de données locaux. Pour le lancer (MySQL 8 et Node 20.6
-ou plus requis), copiez le modèle de configuration et renseignez vos
-identifiants MySQL :
+La console lit le serveur de bord quand il répond, et retombe sur son jeu de
+démonstration sinon — en le disant dans son en-tête. Pour la brancher sur la
+base (**Node 24 ou plus**, pour `node:sqlite`), copiez le modèle de
+configuration et renseignez les deux jetons :
 
 ```bash
 cp server/.env.example server/.env
 ```
 
 ```bash
-npm run db:load
+npm run db:reset
 ```
 
 ```bash
 npm run dev:server
 ```
 
+```bash
+npm run dev:backoffice
+```
+
+Le backoffice écoute sur <http://localhost:5176>, l'API sur <http://localhost:5175>.
+
 Une commande par bloc : l'équipe est sous Windows PowerShell, qui ne connaît
 pas l'enchaînement `&&`.
+
+### Les jetons
+
+`server/.env` en porte deux, et ils ne doivent jamais être le même :
+
+| Variable | Qui s'en sert | Ce qu'il permet |
+|---|---|---|
+| `BORNE_TOKEN` | les bornes de cabine | écrire des mesures, des nuits, des résumés |
+| `ADMIN_TOKEN` | le backoffice | lire et corriger les dossiers |
+
+Une borne écrit des constantes ; elle n'a aucune raison de pouvoir modifier un
+dossier médical. Le serveur refuse de démarrer si les deux jetons sont
+identiques ou font moins de 32 caractères. Pour en fabriquer un :
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### Le jeu de test
+
+`npm run db:load` charge le schéma, les vues et **13 résidents scriptés** — ceux
+des maquettes, dont R-0448 dont la fiche raconte toute l'histoire du projet.
+`npm run db:demo` complète jusqu'à **1 240 résidents** et environ 79 000 lignes :
+constantes quotidiennes, nuits, scores de dépistage, conversations, signaux
+ouverts et clos. `npm run db:reset` enchaîne les deux.
+
+Le générateur est **déterministe** (graine 4 128) : deux exécutions donnent la
+même base, donc la même soutenance. Et il est **calibré** — il tire une
+population plausible, puis corrige le nombre de résidents au-dessus de chaque
+seuil pour retomber exactement sur les chiffres des maquettes. Les 8,4 % de
+PHQ-9 ≥ 10 affichés par l'écran 02 sont donc calculés sur 1 240 lignes, pas
+écrits en dur quelque part.
+
+Pour regarder dedans sans rien installer :
+
+```bash
+npm run db:sql
+```
+
+liste les tables et leurs volumes ; `npm run db:sql "SELECT …"` exécute une
+requête, en lecture seule. Les autres chemins d'accès sont décrits dans
+[db/README.md](db/README.md).
+
+```bash
+npm run db:rollup 2026-09-20
+```
+
+agrège les mesures à la minute d'une journée en une ligne par résident, comme
+le ferait la tâche de nuit du serveur de bord.
 
 ### Les trois scénarios de la borne
 
@@ -155,8 +214,9 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 - **La SpO₂ n'est pas calibrée.** Le rapport des rapports est appliqué avec les coefficients génériques de la littérature, sans oxymètre de référence. La valeur montre une tendance, elle ne pose pas un diagnostic.
 - **Le PPG au poignet est difficile.** Le MAX30102 mesure par réflexion : le signal y est 5 à 10 fois plus faible qu'au doigt, et le moindre mouvement fait perdre le contact. C'est la contrainte matérielle la plus lourde du prototype.
 - **Le LLM embarqué n'est pas implémenté.** La borne rejoue des scénarios scriptés : l'architecture réserve sa place et garantit son isolement, mais le modèle reste à intégrer.
-- **Les interfaces ne lisent pas encore la base.** Le schéma, le service d'ingestion et les requêtes de lecture existent et sont testés ; les trois écrans affichent toujours leurs jeux de données locaux. Le branchement est le prochain chantier, fichier par fichier.
-- **Le serveur de bord n'a pas été exécuté contre un vrai MySQL.** Les routes, la validation et le refus de transcription sont vérifiés ; les requêtes SQL elles-mêmes attendent leur première exécution.
+- **La borne n'est pas branchée sur la base.** Les écrans 02 à 04 lisent le serveur de bord ; l'écran 01 rejoue encore ses scénarios scriptés, ce qui est cohérent avec le fait que son LLM n'est pas implémenté.
+- **Il n'y a pas encore de comptes.** Le backoffice s'ouvre avec un jeton unique qui vit dans le `sessionStorage` du navigateur, et la console écrit une note sans rien demander du tout. Dans les deux cas, personne ne sait qui a touché le dossier. Une table `medecins` et une session par soignant sont en cours de conception : c'est la **première** chose à finir, parce qu'un vaisseau où l'on ne sait pas qui a modifié un dossier médical n'est pas un vaisseau où l'on peut se soigner.
+- **Les données sont synthétiques.** Elles sont calibrées pour être vraisemblables et cohérentes entre elles, pas pour être vraies. Aucun chiffre de ce dépôt ne dit quoi que ce soit d'une population réelle.
 
 ## Le serveur de bord
 
@@ -170,8 +230,21 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 | `POST /ingest/evenement` | la borne | chute, secousse, bouton d'urgence |
 | `GET /api/crew` | la console | écran 02 : indicateurs, courbes, file de triage |
 | `GET /api/residents/:code` | la console | écran 03 : la fiche complète |
+| `GET /api/equipage` | la console | écran 04 : les 1 240 résidents, triés et filtrés par le serveur |
+| `GET /api/signaux` | la console | écran 04 : les signaux, de l'ouverture à la clôture |
+| `POST /api/residents/:code/particularites` | la console | écran 03 : une note de particularité écrite par le médecin |
+| `GET /admin/…` | le backoffice | lecture des tables, correction des dossiers, suivi des signaux |
 
-L'écriture demande un jeton porteur, comparé à temps constant. Toutes les requêtes sont préparées avec des paramètres nommés — aucune concaténation SQL nulle part.
+L'ingestion et le backoffice demandent un jeton porteur, comparé à temps constant. L'écriture d'une note par la console, elle, est **ouverte pour l'instant** : elle attend la session médecin, parce qu'un jeton partagé ne dit pas qui a écrit la note — voir les limites. Toutes les requêtes sont préparées avec des paramètres nommés — **aucune concaténation SQL nulle part**, y compris pour le tri : le nom de colonne envoyé par l'écran 04 passe par une table de correspondance, et une clé inconnue retombe sur le tri par défaut au lieu d'atteindre le SQL.
+
+Les filtres sont neutralisés *dans* la requête plutôt qu'en la recomposant :
+
+```sql
+WHERE (:q = '' OR r.nom LIKE '%' || :q || '%')
+  AND (:module = '' OR SUBSTR(r.cabine, 1, 1) = :module)
+```
+
+Une seule requête préparée sert tous les cas de figure, et il n'existe aucun chemin où un paramètre devient du code.
 
 **Le serveur refuse les transcriptions.** `POST /ingest/conversation` inspecte toute la charge utile, à n'importe quelle profondeur, et rejette en `422` tout champ de verbatim :
 
@@ -182,6 +255,30 @@ $ curl -X POST .../ingest/conversation -d '{"...","transcript":[…]}'
 ```
 
 C'est la promesse du projet rendue exécutable : l'architecture ne se contente pas de ne pas transmettre le verbatim, elle est incapable de l'accepter.
+
+## Le backoffice
+
+`web/backoffice` est l'outil d'exploitation, séparé de la console médicale
+parce qu'il ne répond pas à la même question. La console demande « comment va
+cette personne ? » ; le backoffice demande « est-ce que ce que l'écran affiche
+est bien ce que la base contient ? ».
+
+| Onglet | Ce qu'il montre |
+|---|---|
+| **Aperçu** | nombre de lignes par table, fraîcheur des données, indicateurs du jour |
+| **Équipage** | recherche, filtres, accès au dossier de n'importe quel résident |
+| **Signaux** | assignation et clôture — une clôture exige un motif |
+| **Écrans et sources** | chaque bloc de chaque écran, la requête qui l'alimente, et sa valeur actuelle |
+| **Tables** | les lignes brutes, pour vérifier sans passer par `sqlite3` |
+
+L'onglet **Écrans et sources** est le plus utile en soutenance : il met côte à
+côte le bloc affiché, la vue SQL qui le remplit et la valeur qu'elle renvoie à
+l'instant. La correspondance entre l'interface et la base devient vérifiable
+d'un coup d'œil, au lieu d'être promise dans un document.
+
+Une clôture de signal **exige un motif** parce que ce motif est la seule chose
+qui permettra plus tard de mesurer les faux positifs du moteur de règles. Sans
+lui, on sait qu'un signal a été fermé, jamais s'il aurait dû être ouvert.
 
 ## Licence
 

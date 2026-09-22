@@ -4,16 +4,11 @@ import { Bars, formatCount, formatPercent } from "../components/Bars";
 import { Seg } from "../components/Seg";
 import { Sparkline } from "../components/Sparkline";
 import { TriageQueue } from "../components/TriageQueue";
-import {
-  KPIS,
-  MODULE_BARS,
-  MOTIF_BARS,
-  PHYSIO_BARS,
-  SHIP,
-  TRIAGE,
-  WELLBEING,
-  type PeriodKey,
-} from "../data/crew";
+import { adapterCrew } from "../adapt";
+import { api } from "../api";
+import { type PeriodKey } from "../data/crew";
+import { REPLI_CREW } from "../repli";
+import { useSource } from "../useSource";
 
 const PERIODS: { value: PeriodKey; label: string }[] = [
   { value: "7", label: "7 jours" },
@@ -24,10 +19,13 @@ const PERIODS: { value: PeriodKey; label: string }[] = [
 /** Écran 02 — vue équipage : agrégat, tendance, puis file de triage. */
 export function CrewPage() {
   const [period, setPeriod] = useState<PeriodKey>("30");
-  const series = WELLBEING[period];
 
-  const criticals = TRIAGE.filter((s) => s.severity === "crit").length;
-  const unassigned = TRIAGE.filter((s) => s.unassigned).length;
+  // Les chiffres viennent du serveur de bord ; le jeu de démonstration prend
+  // le relais s'il ne répond pas, et l'en-tête dit lequel est affiché.
+  const { vue, source } = useSource(api.crew, adapterCrew, REPLI_CREW);
+
+  const series = vue.wellbeing[period];
+  const { ouverts, critiques, non_assignes } = vue.compteurs;
 
   return (
     <div className="app">
@@ -35,8 +33,13 @@ export function CrewPage() {
         <div>
           <h1>Santé de l'équipage</h1>
           <div className="sub">
-            Vaisseau {SHIP.name} · {SHIP.residents.toLocaleString("fr-FR")} résidents ·{" "}
-            {SHIP.flightDay} · synchro {SHIP.lastSync}
+            {vue.ship.residents.toLocaleString("fr-FR")} résidents ·{" "}
+            {vue.ship.flightDay} · synchro {vue.ship.lastSync}
+            {source === "demo" && (
+              <span className="chip watch" style={{ marginLeft: 8 }}>
+                jeu de démonstration
+              </span>
+            )}
           </div>
         </div>
         <div className="right">
@@ -45,7 +48,7 @@ export function CrewPage() {
       </div>
 
       <div className="row g4">
-        {KPIS.map((kpi) => (
+        {vue.kpis.map((kpi) => (
           <div className="card kpi" key={kpi.label}>
             <div className="lbl">{kpi.label}</div>
             <div className="btm">
@@ -58,7 +61,7 @@ export function CrewPage() {
               </div>
             </div>
             <div className="foot">
-              <span className={`chip ${kpi.deltaDirection}`}>{kpi.deltaLabel}</span> {kpi.footNote}
+              <span className={`chip ${kpi.deltaTone ?? kpi.deltaDirection}`}>{kpi.deltaLabel}</span> {kpi.footNote}
             </div>
           </div>
         ))}
@@ -103,7 +106,7 @@ export function CrewPage() {
             <h3>Signalements actifs</h3>
             <span className="sub">par module</span>
           </div>
-          <Bars rows={MODULE_BARS} max={16} format={formatPercent} />
+          <Bars rows={vue.modules} max={vue.maxModule} format={formatPercent} />
         </div>
       </div>
 
@@ -111,17 +114,20 @@ export function CrewPage() {
         <div className="card pad-lg">
           <div className="card-h">
             <h3>Motifs de signalement</h3>
-            <span className="sub">90 jours · 837 signalements</span>
+            <span className="sub">
+              30 jours ·{" "}
+              {vue.motifs.reduce((a, m) => a + m.value, 0).toLocaleString("fr-FR")} conversations
+            </span>
           </div>
-          <Bars rows={MOTIF_BARS} max={330} format={formatCount} />
+          <Bars rows={vue.motifs} max={vue.maxMotif} format={formatCount} />
         </div>
 
         <div className="card pad-lg">
           <div className="card-h">
             <h3>Marqueurs physiologiques hors norme</h3>
-            <span className="sub">% de l'équipage · 7 jours</span>
+            <span className="sub">% de l'équipage · la veille</span>
           </div>
-          <Bars rows={PHYSIO_BARS} max={14} format={formatPercent} />
+          <Bars rows={vue.physio} max={vue.maxPhysio} format={formatPercent} />
         </div>
       </div>
 
@@ -130,10 +136,10 @@ export function CrewPage() {
           <div className="card-h">
             <h3>File de triage</h3>
             <span className="sub">
-              {TRIAGE.length} signaux ouverts · {criticals} critiques · {unassigned} non assignés
+              {ouverts} signaux ouverts · {critiques} critiques · {non_assignes} non assignés
             </span>
           </div>
-          <TriageQueue signals={TRIAGE} />
+          <TriageQueue signals={vue.triage} />
           <p style={{ fontSize: 12, color: "var(--ink-3)" }}>
             Sélectionnez une ligne pour ouvrir la fiche individuelle.
           </p>
