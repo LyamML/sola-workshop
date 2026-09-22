@@ -52,11 +52,8 @@ export interface VitalSign {
   label: string;
   value: string;
   unit?: string;
-  reference: string;
   spark: number[];
   watch?: boolean;
-  /** Constante réellement mesurée par le bracelet, ou valeur simulée. */
-  measured: boolean;
   chart: {
     title: string;
     subtitle: string;

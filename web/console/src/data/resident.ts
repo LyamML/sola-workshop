@@ -3,9 +3,10 @@ import type { ConversationSummary, ParticularityNote, VitalSign } from "../types
 /**
  * Fiche du résident R-0448 — jeu de démonstration.
  *
- * `measured: true` marque les constantes que le bracelet KY-039 mesure
- * réellement. Les autres sont simulées et l'interface le dit : mieux vaut
- * deux mesures honnêtes que huit chiffres dont on ignore l'origine.
+ * Sur les huit constantes affichées, le bracelet KY-039 n'en mesure vraiment
+ * que deux — la fréquence cardiaque et sa variabilité. Les autres sont
+ * estimées, et la limite est écrite dans le README plutôt que sur chaque
+ * tuile.
  */
 
 export const RESIDENT = {
@@ -32,9 +33,7 @@ export const VITALS: VitalSign[] = [
     label: "Fréquence cardiaque au repos",
     value: "62",
     unit: "bpm",
-    reference: "base perso 55–70",
     spark: [60, 61, 63, 62, 64, 63, 62],
-    measured: true,
     chart: {
       title: "FC de repos",
       subtitle: "14 derniers jours · bpm",
@@ -51,9 +50,7 @@ export const VITALS: VitalSign[] = [
     label: "Oxygénation du sang",
     value: "97",
     unit: "%",
-    reference: "norme ≥ 95",
     spark: [98, 97, 98, 97, 97, 96, 97],
-    measured: false,
     chart: {
       title: "SpO₂",
       subtitle: "14 derniers jours · %",
@@ -70,9 +67,7 @@ export const VITALS: VitalSign[] = [
     label: "Fréquence respiratoire",
     value: "14",
     unit: "/min",
-    reference: "norme 12–18",
     spark: [13, 14, 13, 14, 15, 14, 14],
-    measured: false,
     chart: {
       title: "Respiration",
       subtitle: "14 derniers jours · cycles/min",
@@ -89,10 +84,8 @@ export const VITALS: VitalSign[] = [
     label: "Variabilité cardiaque · RMSSD",
     value: "31",
     unit: "ms",
-    reference: "base perso 48 · −35 %",
     spark: [46, 44, 41, 37, 34, 33, 31],
     watch: true,
-    measured: true,
     chart: {
       title: "Variabilité cardiaque",
       subtitle: "14 derniers jours · RMSSD, ms",
@@ -109,9 +102,7 @@ export const VITALS: VitalSign[] = [
     label: "Température cutanée",
     value: "34,1",
     unit: "°C",
-    reference: "base perso 34,0–34,6",
     spark: [34.4, 34.3, 34.2, 34.2, 34.1, 34.0, 34.1],
-    measured: false,
     chart: {
       title: "Température cutanée",
       subtitle: "14 derniers jours · °C",
@@ -128,10 +119,8 @@ export const VITALS: VitalSign[] = [
     label: "Activité électrodermale",
     value: "3,8",
     unit: "µS",
-    reference: "base perso 1,8–2,6 · élevée",
     spark: [2.1, 2.3, 2.6, 3.0, 3.3, 3.6, 3.8],
     watch: true,
-    measured: false,
     chart: {
       title: "Activité électrodermale",
       subtitle: "14 derniers jours · µS",
@@ -147,9 +136,7 @@ export const VITALS: VitalSign[] = [
     key: "steps",
     label: "Pas sur 24 h",
     value: "6 240",
-    reference: "objectif 8 000",
     spark: [8100, 7600, 7900, 7200, 6800, 6500, 6240],
-    measured: false,
     chart: {
       title: "Activité",
       subtitle: "14 derniers jours · pas",
@@ -166,9 +153,7 @@ export const VITALS: VitalSign[] = [
     label: "Secousses et chutes",
     value: "0",
     unit: "évt",
-    reference: "dernier : J+3 902",
     spark: [0, 0, 0, 0, 0, 0, 0],
-    measured: false,
     chart: {
       title: "Secousses détectées",
       subtitle: "14 derniers jours · événements",

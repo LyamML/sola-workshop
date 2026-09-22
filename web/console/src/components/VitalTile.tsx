@@ -17,16 +17,16 @@ export function VitalTile({ vital, selected, onSelect, liveValue }: Props) {
       aria-pressed={selected}
       onClick={onSelect}
     >
-      <span className="lbl">{vital.label}</span>
-      <span>
-        <span className="v">{liveValue ?? vital.value}</span>
-        {vital.unit && <span className="u">{vital.unit}</span>}
+      <span className="vital-h">
+        <span className="lbl">{vital.label}</span>
+        <span className="stat">
+          <span className="v">{liveValue ?? vital.value}</span>
+          {vital.unit && <span className="u">{vital.unit}</span>}
+        </span>
       </span>
-      <span className="ref">{vital.reference}</span>
-      <span className={`sim${liveValue ? " live" : ""}`}>
-        {liveValue ? "bracelet · direct" : vital.measured ? "bracelet" : "simulé"}
-      </span>
-      <Sparkline values={vital.spark} width={120} tone={vital.watch ? "watch" : undefined} />
+      {/* La courbe est posée en fond, sous le chiffre : elle donne la forme
+          des sept derniers jours d'un coup d'œil, sans prendre de ligne. */}
+      <Sparkline values={vital.spark} tone={vital.watch ? "watch" : undefined} fond />
     </button>
   );
 }
