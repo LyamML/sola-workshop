@@ -36,6 +36,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Racine : personne ne devrait l'appeler en fonctionnement, mais quelqu'un
+// finit toujours par ouvrir l'adresse du serveur dans un navigateur. Autant
+// qu'il y trouve la liste des routes plutot qu'une erreur.
+app.get("/", (_req, res) => {
+  res.json({
+    service: "sola-server",
+    ecriture: {
+      "POST /ingest/mesure": "lot de constantes du bracelet (jeton requis)",
+      "POST /ingest/nuit": "duree de sommeil estimee (jeton requis)",
+      "POST /ingest/conversation": "resume clinique, jamais de verbatim (jeton requis)",
+      "POST /ingest/evenement": "chute, secousse, bouton d'urgence (jeton requis)",
+    },
+    lecture: {
+      "GET /api/crew": "ecran 02 — sante de l'equipage",
+      "GET /api/residents/:code": "ecran 03 — fiche resident, ex. /api/residents/R-0448",
+    },
+    supervision: { "GET /health": "etat du service et de la base" },
+  });
+});
+
 app.get("/health", async (_req, res) => {
   const base = await ping();
   res.status(base ? 200 : 503).json({
