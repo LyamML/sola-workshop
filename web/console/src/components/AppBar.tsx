@@ -1,8 +1,9 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
 const NAV = [
   { to: "/", label: "Équipage", end: true },
-  { to: "/residents/R-0448", label: "Résidents", end: false },
+  { to: "/registre", label: "Résidents", end: false },
+  { to: "/signaux", label: "Signaux", end: false },
 ];
 
 export function AppBar() {
@@ -34,22 +35,19 @@ export function AppBar() {
                 {item.label}
               </NavLink>
             ))}
-            <a href="#signaux" onClick={(e) => e.preventDefault()}>
-              Signaux
-            </a>
             <a href="#protocoles" onClick={(e) => e.preventDefault()}>
               Protocoles
             </a>
           </nav>
 
           <div className="right">
-            <div className="searchbox">
+            <Link to="/registre" className="searchbox">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
                 <path d="M20 20l-4-4" />
               </svg>
               Rechercher un résident…
-            </div>
+            </Link>
             <div className="avatar" title="Dr. A. Ferreira">
               AF
             </div>

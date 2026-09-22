@@ -1,0 +1,626 @@
+<title>Du template au schéma</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f4f7f5;
+    --card: #ffffff;
+    --card-2: #eef3f0;
+    --ink: #0e1a1c;
+    --ink-2: #56686b;
+    --ink-3: #8a9a9c;
+    --line: #e4ebe7;
+    --line-2: #d3ddd8;
+    --accent: #0f9e8c;
+    --accent-soft: #e0f4f0;
+    --watch: #a8820a;
+    --watch-soft: #f9f0d9;
+    --crit: #c0362f;
+    --crit-soft: #fae6e3;
+    --ui: "Manrope", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #090f11;
+      --card: #121c1f;
+      --card-2: #182427;
+      --ink: #ebf2f0;
+      --ink-2: #9cafb1;
+      --ink-3: #6e8184;
+      --line: #223034;
+      --line-2: #2d3e43;
+      --accent: #35c7b2;
+      --accent-soft: #0f2e2c;
+      --watch: #c79b2a;
+      --watch-soft: #2e2718;
+      --crit: #dc5f55;
+      --crit-soft: #331c1b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #090f11;
+    --card: #121c1f;
+    --card-2: #182427;
+    --ink: #ebf2f0;
+    --ink-2: #9cafb1;
+    --ink-3: #6e8184;
+    --line: #223034;
+    --line-2: #2d3e43;
+    --accent: #35c7b2;
+    --accent-soft: #0f2e2c;
+    --watch: #c79b2a;
+    --watch-soft: #2e2718;
+    --crit: #dc5f55;
+    --crit-soft: #331c1b;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 44px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  h1 {
+    font-size: clamp(27px, 4.6vw, 38px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+  }
+  h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 16px;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+  p { margin: 0; }
+  .lede {
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin-top: 12px;
+  }
+  .meta {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    letter-spacing: 0.02em;
+    margin-top: 18px;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.87em;
+    color: var(--ink);
+  }
+
+  /* ---------------------------------------------------------- légende -- */
+  .legende {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    margin-bottom: 18px;
+  }
+  .legende span { display: inline-flex; align-items: center; gap: 7px; }
+  .pt {
+    width: 8px;
+    height: 8px;
+    border-radius: 99px;
+    flex: none;
+    background: var(--ink-3);
+  }
+  .pt.garde { background: var(--accent); }
+  .pt.transf { background: var(--watch); }
+  .pt.neuf {
+    background: transparent;
+    border: 1.5px dashed var(--ink-3);
+  }
+
+  /* ----------------------------------------------------- deux schémas -- */
+  .cote {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 720px) { .cote { grid-template-columns: 1fr; } }
+
+  .panneau {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .panneau > header { display: flex; align-items: baseline; gap: 10px; }
+  .panneau > header .n {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+  .famille {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .tbl { margin-bottom: 14px; }
+  .tbl:last-child { margin-bottom: 0; }
+  .tbl > .nom {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tbl > .nom .cnt {
+    margin-left: auto;
+    font-size: 10.5px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .col {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: var(--card-2);
+    color: var(--ink-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .col.garde { background: var(--accent-soft); color: var(--accent); }
+  .col.transf { background: var(--watch-soft); color: var(--watch); }
+
+  /* --------------------------------------------------- correspondance -- */
+  .scroll { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    min-width: 560px;
+  }
+  th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 0 12px 8px 0;
+    border-bottom: 1px solid var(--line-2);
+  }
+  td {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    color: var(--ink-2);
+  }
+  td.src, td.dst { font-family: var(--mono); font-size: 11.5px; }
+  td.dst { color: var(--ink); }
+  tr.bloc td {
+    border-bottom: none;
+    padding-top: 22px;
+    padding-bottom: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  tr.bloc:first-child td { padding-top: 6px; }
+
+  /* ------------------------------------------------------ partis pris -- */
+  .pris {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 720px) { .pris { grid-template-columns: 1fr; } }
+  .parti {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .parti p { font-size: 13.5px; color: var(--ink-2); }
+  .parti .ex {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    padding-top: 6px;
+    border-top: 1px solid var(--line);
+    margin-top: 2px;
+  }
+  .parti .ex b { color: var(--crit); font-weight: 500; }
+  .parti .ex i { color: var(--accent); font-style: normal; }
+
+  /* --------------------------------------------------------- défauts -- */
+  .defauts { display: flex; flex-direction: column; gap: 12px; }
+  .defaut {
+    display: flex;
+    gap: 14px;
+    background: var(--crit-soft);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .defaut .marq {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--crit);
+    flex: none;
+  }
+  .defaut b { color: var(--ink); font-weight: 600; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    max-width: 66ch;
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <h1>Du template au schéma</h1>
+    <p class="lede">
+      Ce que le modèle SQL de départ est devenu dans la base du serveur de bord,
+      et pourquoi chaque écart a été pris. Trois tables, douze aujourd'hui — mais
+      le découpage d'origine, <em>qui · le corps · la tête</em>, est resté la
+      colonne vertébrale.
+    </p>
+    <p class="meta">Sola · Horizon 2080 · SQLite, fichier unique · 1 240 résidents</p>
+  </header>
+
+  <section>
+    <h2>Les deux schémas</h2>
+    <div class="legende">
+      <span><i class="pt garde"></i> repris tel quel</span>
+      <span><i class="pt transf"></i> transformé</span>
+      <span><i class="pt neuf"></i> ajouté</span>
+    </div>
+
+    <div class="cote">
+      <div class="panneau">
+        <header>
+          <h3>Le template</h3>
+          <span class="n">3 tables</span>
+        </header>
+
+        <div>
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> users</div>
+            <div class="cols">
+              <span class="col transf">id</span>
+              <span class="col transf">user</span>
+              <span class="col garde">poste</span>
+              <span class="col transf">allergie</span>
+              <span class="col garde">groupeSanguin</span>
+              <span class="col garde">created_at</span>
+            </div>
+          </div>
+
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> donneesPhysique</div>
+            <div class="cols">
+              <span class="col transf">rythmeCardiaque</span>
+              <span class="col transf">respiration</span>
+              <span class="col transf">oxygénationDuSang</span>
+              <span class="col transf">transpiration</span>
+              <span class="col transf">HRV</span>
+              <span class="col transf">mouvementActivité</span>
+              <span class="col transf">secousses</span>
+              <span class="col transf">status</span>
+            </div>
+          </div>
+
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> etatMental</div>
+            <div class="cols">
+              <span class="col transf">statuts</span>
+              <span class="col garde">scoreMoral</span>
+              <span class="col transf">dureeDeSommeil</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panneau">
+        <header>
+          <h3>La base aujourd'hui</h3>
+          <span class="n">12 tables</span>
+        </header>
+
+        <div>
+          <div class="famille">Identité</div>
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> residents <span class="cnt">1 240</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt neuf"></i> bracelets <span class="cnt">1 240</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> particularites <span class="cnt">6</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt neuf"></i> suivis <span class="cnt">4</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="famille">Constantes</div>
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> mesures <span class="cnt">à la minute</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt neuf"></i> mesures_jour <span class="cnt">17 360</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="famille">Sommeil et état mental</div>
+          <div class="tbl">
+            <div class="nom"><i class="pt neuf"></i> nuits <span class="cnt">17 360</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> etat_mental <span class="cnt">37 200</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="famille">Conversations et triage</div>
+          <div class="tbl">
+            <div class="nom"><i class="pt neuf"></i> conversations <span class="cnt">826</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt neuf"></i> conversation_tags <span class="cnt">977</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt neuf"></i> signaux <span class="cnt">281</span></div>
+          </div>
+          <div class="tbl">
+            <div class="nom"><i class="pt transf"></i> evenements <span class="cnt">4</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ce que chaque colonne est devenue</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 27%">Template</th>
+            <th style="width: 30%">Aujourd'hui</th>
+            <th>Raison</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="bloc"><td colspan="3">Qui</td></tr>
+          <tr>
+            <td class="src">users.id</td>
+            <td class="dst">residents.id + .code</td>
+            <td><code>R-0448</code> s'affiche partout ; un entier ne se lit pas à l'oral</td>
+          </tr>
+          <tr>
+            <td class="src">users.user</td>
+            <td class="dst">prenom + nom</td>
+            <td>tri par nom, initiales de l'avatar</td>
+          </tr>
+          <tr>
+            <td class="src">users.poste</td>
+            <td class="dst">poste</td>
+            <td>identique</td>
+          </tr>
+          <tr>
+            <td class="src">users.groupeSanguin</td>
+            <td class="dst">groupe_sanguin</td>
+            <td>plus un <code>CHECK</code> sur les 8 valeurs possibles</td>
+          </tr>
+          <tr>
+            <td class="src">users.allergie <em>varchar</em></td>
+            <td class="dst">table particularites</td>
+            <td>R-0448 en a 6 : 2 allergies, 1 contre-indication, 2 antécédents, 1 info — chacune avec son niveau et son détail</td>
+          </tr>
+          <tr>
+            <td class="src">—</td>
+            <td class="dst">date_naissance</td>
+            <td>l'âge s'affiche ; stocker « 28 » serait faux dans un an</td>
+          </tr>
+          <tr>
+            <td class="src">—</td>
+            <td class="dst">cabine</td>
+            <td>son 1<sup>er</sup> caractère est le module — les barres par module de l'écran 02</td>
+          </tr>
+          <tr>
+            <td class="src">—</td>
+            <td class="dst">confiance_id</td>
+            <td>la personne de confiance du résident</td>
+          </tr>
+
+          <tr class="bloc"><td colspan="3">Le corps</td></tr>
+          <tr>
+            <td class="src">rythmeCardiaque</td>
+            <td class="dst">fc_bpm <em>REAL</em></td>
+            <td>agrégé en <code>fc_repos_bpm</code> et <code>fc_moy_bpm</code></td>
+          </tr>
+          <tr>
+            <td class="src">respiration</td>
+            <td class="dst">resp_min</td>
+            <td>cycles par minute</td>
+          </tr>
+          <tr>
+            <td class="src">oxygénationDuSang</td>
+            <td class="dst">spo2_pct</td>
+            <td>pourcentage</td>
+          </tr>
+          <tr>
+            <td class="src">transpiration</td>
+            <td class="dst">eda_us</td>
+            <td>activité électrodermale, en µS — ce que le capteur rend</td>
+          </tr>
+          <tr>
+            <td class="src">HRV</td>
+            <td class="dst">rmssd_ms</td>
+            <td>la HRV est une famille de mesures ; RMSSD en est une</td>
+          </tr>
+          <tr>
+            <td class="src">mouvementActivité</td>
+            <td class="dst">activite_g + pas</td>
+            <td>une accélération et un comptage ne sont pas la même grandeur</td>
+          </tr>
+          <tr>
+            <td class="src">secousses</td>
+            <td class="dst">table evenements</td>
+            <td>une chute a une heure à la seconde, une intensité en g, un acquittement</td>
+          </tr>
+          <tr>
+            <td class="src">status</td>
+            <td class="dst">qualite · statut · severite</td>
+            <td>un seul mot recouvrait trois notions : signal exploitable, état de suivi, gravité d'une alerte</td>
+          </tr>
+
+          <tr class="bloc"><td colspan="3">La tête</td></tr>
+          <tr>
+            <td class="src">scoreMoral</td>
+            <td class="dst">score_moral</td>
+            <td>conservé, avec un <code>CHECK 0–100</code></td>
+          </tr>
+          <tr>
+            <td class="src">statuts</td>
+            <td class="dst">phq9 · gad7 · isi</td>
+            <td>trois échelles cliniques chiffrées au lieu d'un mot libre</td>
+          </tr>
+          <tr>
+            <td class="src">dureeDeSommeil</td>
+            <td class="dst">table nuits</td>
+            <td>le sommeil n'est pas un état mental ; il fallait aussi coucher, lever, latence, éveils</td>
+          </tr>
+          <tr>
+            <td class="src">created_at</td>
+            <td class="dst">evalue_le + created_at</td>
+            <td>la date d'évaluation n'est pas la date d'insertion — le rattrapage après coupure les sépare</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Les quatre partis pris</h2>
+    <div class="pris">
+      <article class="parti">
+        <h3>Une mesure est un nombre</h3>
+        <p>
+          Un <code>'normal'</code> dans un <code>varchar</code> ne se trace pas en
+          courbe, ne se moyenne pas, ne se compare pas à la base personnelle — et
+          il oblige à décider de ce qui est normal à l'écriture, avant de savoir.
+        </p>
+        <div class="ex"><b>rythmeCardiaque varchar(255)</b> → <i>fc_bpm REAL</i></div>
+      </article>
+
+      <article class="parti">
+        <h3>La minute et le jour sont deux tables</h3>
+        <p>
+          À 1 240 résidents, la minute fait 1,8 million de lignes par jour. La
+          console ne les lit jamais : elle lit l'agrégat quotidien, calculé une
+          fois la nuit.
+        </p>
+        <div class="ex"><b>mesures</b> à la minute → <i>mesures_jour</i>, 1 240 lignes / jour</div>
+      </article>
+
+      <article class="parti">
+        <h3>Chaque valeur porte sa source</h3>
+        <p>
+          Le prototype affiche huit constantes dont deux seulement sont vraiment
+          mesurées. Sans cette colonne, l'interface ne peut pas le dire
+          honnêtement — et c'est un argument du pitch.
+        </p>
+        <div class="ex">source = <i>mesure</i> · <i>simule</i> · <i>estime</i></div>
+      </article>
+
+      <article class="parti">
+        <h3>Les paroles n'existent pas ici</h3>
+        <p>
+          La table des conversations n'a qu'un résumé, jamais de texte intégral.
+          Le service d'ingestion refuse en <code>422</code> toute charge utile qui
+          en contiendrait un.
+        </p>
+        <div class="ex">conversations.<i>resume</i> — et rien d'autre</div>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>Deux défauts dans le SQL du template</h2>
+    <div class="defauts">
+      <div class="defaut">
+        <span class="marq">FK</span>
+        <p>
+          <b>Les deux clés étrangères portent le même nom</b> <code>user_posts</code>.
+          MySQL exige qu'un nom de contrainte soit unique dans toute la base, pas
+          seulement dans la table : le second <code>ALTER TABLE</code> échoue.
+          À renommer <code>fk_donnees_user</code> et <code>fk_mental_user</code>.
+        </p>
+      </div>
+      <div class="defaut">
+        <span class="marq">PK</span>
+        <p>
+          <b><code>etatMental</code> n'a pas de clé primaire.</b> Impossible de
+          corriger ou de supprimer une ligne précise.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Les écarts ont été pris sous le mandat donné avec le template — « si ça ne
+    colle pas, modifie le site ou propose-moi quoi changer sur la table ». Le
+    schéma exécutable vit dans <code>db/serveur/01-schema.sql</code> ;
+    <code>db/reference-mysql.sql</code> conserve la version MySQL d'origine.
+  </footer>
+
+</div>

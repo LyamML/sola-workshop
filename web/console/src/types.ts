@@ -8,6 +8,12 @@ export interface Kpi {
   spark: number[];
   tone?: "watch";
   deltaDirection: "up" | "down" | "flat";
+  /**
+   * Couleur de la pastille, qui suit le sens CLINIQUE et non le signe : une
+   * baisse du bien-être se lit en rouge, une baisse du PHQ-9 en vert. Absent,
+   * la direction sert de couleur.
+   */
+  deltaTone?: "up" | "down" | "flat";
   deltaLabel: string;
   footNote: string;
 }

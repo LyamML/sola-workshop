@@ -914,3 +914,358 @@
     box-shadow: 0 0 0 7px transparent;
   }
 }
+
+/* -------------------------------------------------------------- registre -- */
+.filtres {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.champ {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card-2);
+  transition: 0.16s;
+}
+.champ:focus-within {
+  border-color: var(--accent);
+  background: var(--card);
+}
+.champ.recherche {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.champ svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.champ input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.champ input::placeholder {
+  color: var(--ink-3);
+}
+
+.select {
+  height: 38px;
+  padding: 0 32px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  appearance: none;
+  /* Le chevron est dessiné ici : un select natif ne se stylise pas, et une
+     flèche système au milieu de cette barre jurerait. */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 16px center, right 11px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pagin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.btn.mini {
+  padding: 7px 13px;
+  font-size: 12.5px;
+}
+.btn.mini:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Le tableau déborde volontairement : dix-huit colonnes ne tiennent pas dans
+   un écran, et en cacher la moitié derrière un menu obligerait à deviner où
+   se trouve la colonne qu'on veut trier. Il défile, et l'identité reste. */
+.tableau-cadre {
+  overflow-x: auto;
+  margin: 0 -22px -20px;
+  padding: 0 22px 4px;
+}
+.registre {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.registre.chargement {
+  opacity: 0.5;
+}
+.registre th {
+  padding: 0 11px 9px;
+  text-align: left;
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--line-2);
+}
+.registre th.num {
+  text-align: right;
+}
+.registre th button,
+.registre th .th-fixe {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: 0.14s;
+}
+.registre th button:hover {
+  color: var(--ink);
+}
+.registre th button.actif {
+  color: var(--accent);
+}
+.fleche {
+  font-size: 8px;
+  opacity: 0.45;
+}
+.registre th button.actif .fleche {
+  opacity: 1;
+}
+
+.registre td {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.registre td.num {
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.registre tr.cliquable {
+  cursor: pointer;
+}
+.registre tbody tr:hover td {
+  background: var(--card-2);
+}
+
+/* Colonne figée : en faisant défiler dix-huit colonnes, on perd sinon le nom
+   de la personne dont on lit la SpO₂ — exactement l'information qu'il ne faut
+   pas perdre. */
+.registre .fige {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card);
+}
+.registre tbody tr:hover .fige {
+  background: var(--card-2);
+}
+
+.cellule-id {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.cellule-id strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cellule-id .mono {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.pastille {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  flex: none;
+  background: var(--ink-3);
+}
+.pastille.ok {
+  background: var(--accent);
+}
+.pastille.surveillance {
+  background: var(--watch);
+}
+.pastille.critique {
+  background: var(--crit);
+}
+
+.registre .mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.registre .creux {
+  color: var(--ink-3);
+}
+.registre .motif {
+  white-space: normal;
+  display: block;
+  max-width: 380px;
+  color: var(--ink);
+}
+
+.vide {
+  padding: 34px 10px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------ ajout d'une note -------- */
+.note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--card-2);
+}
+
+.note-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.note-champ > span {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.note-champ input,
+.note-champ textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  transition: 0.16s;
+}
+.note-champ textarea {
+  resize: vertical;
+  min-height: 64px;
+}
+.note-champ input:focus,
+.note-champ textarea:focus {
+  border-color: var(--accent);
+}
+.note-champ input::placeholder,
+.note-champ textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.note-prio {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.note-prio legend {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0;
+  margin-bottom: 5px;
+}
+.note-prio > div {
+  display: flex;
+  gap: 6px;
+}
+.note-prio .aide {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* La couleur de la priorité est portée en permanence, pas seulement une fois
+   choisie : on compare trois gravités, il faut les voir toutes les trois. */
+.prio {
+  padding: 7px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--line-2);
+  background: var(--card);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.16s;
+}
+.prio.crit { color: var(--crit); }
+.prio.watch { color: var(--watch); }
+.prio.info { color: var(--ink-2); }
+.prio:hover { border-color: var(--ink-3); }
+.prio.on.crit { background: var(--crit-soft); border-color: var(--crit); }
+.prio.on.watch { background: var(--watch-soft); border-color: var(--watch); }
+.prio.on.info { background: var(--card-3); border-color: var(--ink-3); color: var(--ink); }
+
+.note-erreur {
+  font-size: 12.5px;
+  color: var(--crit);
+  background: var(--crit-soft);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+}
+
+.note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn.mini.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn.mini.primary:hover:not(:disabled) {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.btn.mini:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

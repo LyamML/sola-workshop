@@ -1,0 +1,160 @@
+/* =============================================================================
+   Sola — jetons de design
+   Portés tels quels depuis la maquette de référence. Toute couleur est définie
+   sur :root en clair, puis redéfinie pour le sombre dans les DEUX portées :
+     · @media (prefers-color-scheme: dark) — le réglage système
+     · :root[data-theme="dark"]            — le choix explicite de l'opérateur
+   Ne jamais définir une couleur uniquement dans l'un de ces blocs.
+   ========================================================================== */
+
+:root {
+  --bg: #f4f7f5;
+  --card: #ffffff;
+  --card-2: #eef3f0;
+  --card-3: #e6ede9;
+  --ink: #0e1a1c;
+  --ink-2: #56686b;
+  --ink-3: #8a9a9c;
+  --line: #e4ebe7;
+  --line-2: #d3ddd8;
+  --accent: #0f9e8c;
+  --accent-2: #0b7a6c;
+  --accent-soft: #e0f4f0;
+  --watch: #a8820a;
+  --watch-soft: #f9f0d9;
+  --crit: #c0362f;
+  --crit-soft: #fae6e3;
+
+  --sh-1: 0 1px 2px rgba(14, 26, 28, 0.04), 0 1px 1px rgba(14, 26, 28, 0.03);
+  --sh-2: 0 2px 6px rgba(14, 26, 28, 0.05), 0 16px 34px -24px rgba(14, 26, 28, 0.3);
+  --sh-3: 0 6px 16px rgba(14, 26, 28, 0.08), 0 28px 60px -30px rgba(14, 26, 28, 0.4);
+
+  --r-xl: 26px;
+  --r-lg: 20px;
+  --r: 16px;
+  --r-sm: 12px;
+
+  --ui: "Manrope Variable", "Manrope", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090f11;
+    --card: #121c1f;
+    --card-2: #182427;
+    --card-3: #1e2d31;
+    --ink: #ebf2f0;
+    --ink-2: #9cafb1;
+    --ink-3: #6e8184;
+    --line: #223034;
+    --line-2: #2d3e43;
+    --accent: #35c7b2;
+    --accent-2: #5fdbc8;
+    --accent-soft: #0f2e2c;
+    --watch: #c79b2a;
+    --watch-soft: #2e2718;
+    --crit: #dc5f55;
+    --crit-soft: #331c1b;
+
+    --sh-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --sh-2: 0 2px 6px rgba(0, 0, 0, 0.32), 0 18px 40px -26px rgba(0, 0, 0, 0.9);
+    --sh-3: 0 6px 18px rgba(0, 0, 0, 0.4), 0 30px 64px -32px rgba(0, 0, 0, 1);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #090f11;
+  --card: #121c1f;
+  --card-2: #182427;
+  --card-3: #1e2d31;
+  --ink: #ebf2f0;
+  --ink-2: #9cafb1;
+  --ink-3: #6e8184;
+  --line: #223034;
+  --line-2: #2d3e43;
+  --accent: #35c7b2;
+  --accent-2: #5fdbc8;
+  --accent-soft: #0f2e2c;
+  --watch: #c79b2a;
+  --watch-soft: #2e2718;
+  --crit: #dc5f55;
+  --crit-soft: #331c1b;
+
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-2: 0 2px 6px rgba(0, 0, 0, 0.32), 0 18px 40px -26px rgba(0, 0, 0, 0.9);
+  --sh-3: 0 6px 18px rgba(0, 0, 0, 0.4), 0 30px 64px -32px rgba(0, 0, 0, 1);
+
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ reset -- */
+* {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: 1.2;
+  text-wrap: balance;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+p {
+  margin: 0;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+select {
+  font: inherit;
+  color: inherit;
+}
+img {
+  max-width: 100%;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

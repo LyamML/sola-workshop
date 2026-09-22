@@ -1,4 +1,15 @@
 -- =============================================================================
+--  REFERENCE DE MODELISATION — NON EXECUTEE
+--
+--  Ce fichier est la version MySQL du schema, gardee parce que c'est le
+--  format du modele que l'equipe fait evoluer sur dbdiagram.io. La base qui
+--  tourne reellement est en SQLite : db/serveur/01-schema.sql.
+--
+--  Les deux decrivent les memes 12 tables. Si vous modifiez l'une, modifiez
+--  l'autre — ou supprimez celle-ci le jour ou dbdiagram ne sert plus.
+-- =============================================================================
+
+-- =============================================================================
 --  Sola — base du serveur de bord (MySQL 8)
 --
 --  C'est la base QUE LE MEDECIN LIT. Elle ne contient aucune transcription de
