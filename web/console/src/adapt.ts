@@ -263,14 +263,6 @@ function dateIlYA(n: number): string {
 
 // =========================================================== écran 03 =====
 
-/**
- * Constantes réellement mesurées par le bracelet KY-039. Ce n'est pas une
- * donnée mais une propriété du matériel : deux capteurs, huit constantes
- * affichées, et l'interface doit dire lesquelles sont estimées. Mieux vaut
- * deux mesures honnêtes que huit chiffres dont on ignore l'origine.
- */
-const MESUREES = new Set(["hr", "hrv"]);
-
 interface DefinitionVital {
   key: string;
   label: string;
@@ -282,7 +274,6 @@ interface DefinitionVital {
   decimales: number;
   /** Seuil au-delà (ou en deçà) duquel la tuile passe en ambre. */
   alerte?: (valeur: number, base: number) => boolean;
-  reference: (valeur: number, base: number, mini: number, maxi: number) => string;
 }
 
 const VITAUX: DefinitionVital[] = [
@@ -290,44 +281,34 @@ const VITAUX: DefinitionVital[] = [
     key: "hr", label: "Fréquence cardiaque au repos", unit: "bpm",
     champ: "fc_repos_bpm", titre: "FC de repos", suffixe: " bpm", pas: 5, decimales: 0,
     alerte: (v) => v > 75,
-    reference: (_v, _b, mini, maxi) => `base perso ${Math.round(mini)}–${Math.round(maxi)}`,
   },
   {
     key: "spo2", label: "Oxygénation du sang", unit: "%",
     champ: "spo2_pct", titre: "SpO₂", suffixe: " %", pas: 2, decimales: 0,
     alerte: (v) => v < 95,
-    reference: () => "norme ≥ 95",
   },
   {
     key: "resp", label: "Fréquence respiratoire", unit: "/min",
     champ: "resp_min", titre: "Respiration", suffixe: " /min", pas: 2, decimales: 0,
-    reference: () => "norme 12–18",
   },
   {
     key: "hrv", label: "Variabilité cardiaque · RMSSD", unit: "ms",
     champ: "rmssd_ms", titre: "Variabilité cardiaque", suffixe: " ms", pas: 5, decimales: 0,
     alerte: (v, base) => v < base * 0.8,
-    reference: (v, base) =>
-      `base perso ${Math.round(base)} · ${v < base ? "−" : "+"}${Math.round(
-        Math.abs((v - base) / base) * 100,
-      )} %`,
   },
   {
     key: "temp", label: "Température cutanée", unit: "°C",
     champ: "temp_c", titre: "Température cutanée", suffixe: " °C", pas: 0.5, decimales: 1,
-    reference: (_v, _b, mini, maxi) => `base perso ${fr(mini)}–${fr(maxi)}`,
   },
   {
     key: "eda", label: "Activité électrodermale", unit: "µS",
     champ: "eda_us", titre: "Activité électrodermale", suffixe: " µS", pas: 0.5, decimales: 1,
     alerte: (v, base) => v > base * 1.3,
-    reference: (v, base) => `base perso ${fr(base)} · ${v > base ? "élevée" : "normale"}`,
   },
   {
     key: "steps", label: "Pas sur 24 h",
     champ: "pas", titre: "Activité", suffixe: " pas", pas: 500, decimales: 0,
     alerte: (v) => v < 4000,
-    reference: () => "objectif 8 000",
   },
 ];
 
@@ -350,10 +331,8 @@ export function adapterResident(d: ResidentApi) {
       label: def.label,
       unit: def.unit,
       value: def.key === "steps" ? entier(valeur) : fr(valeur, def.decimales),
-      reference: def.reference(valeur, base, Math.min(...serie), Math.max(...serie)),
       spark: serie.slice(-7),
       watch: def.alerte?.(valeur, base) ?? false,
-      measured: MESUREES.has(def.key),
       chart: {
         title: def.titre,
         subtitle: `${c.length} derniers jours · ${def.unit ?? "pas"}`,
@@ -377,9 +356,7 @@ export function adapterResident(d: ResidentApi) {
     label: "Secousses et chutes",
     unit: "évt",
     value: String(chutes.at(-1) ?? 0),
-    reference: `${chutes.reduce((a, b) => a + b, 0)} sur la période`,
     spark: chutes.slice(-7),
-    measured: false,
     chart: {
       title: "Secousses détectées",
       subtitle: `${c.length} derniers jours · événements`,

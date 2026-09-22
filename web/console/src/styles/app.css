@@ -543,11 +543,35 @@
 }
 
 .vital {
+  position: relative;
   gap: 8px;
   padding: 17px 19px;
+  min-height: 124px;
   cursor: pointer;
   transition: 0.18s;
   text-align: left;
+}
+/* Le texte passe au-dessus de la courbe de fond : sans `position`, une tuile
+   positionnee en absolu peint toujours par-dessus ses freres statiques. */
+.vital > span {
+  position: relative;
+}
+
+/* La courbe tient toute la largeur de la tuile, en retrait des bords comme le
+   reste du contenu, et le chiffre lui passe dessus. Elle occupe la moitie
+   basse : assez haute pour avoir une forme, assez pale pour ne rien gener. */
+.vital .spark-fond {
+  position: absolute;
+  left: 19px;
+  bottom: 15px;
+  /* Les DEUX dimensions sont donnees, et c'est necessaire : un SVG est un
+     element remplace, une seule dimension fixee et il recalcule l'autre selon
+     le rapport de son viewBox. Le 38px est le retrait gauche + droite, le
+     pourcentage se comptant sur la boite de la tuile, bordure interieure
+     comprise. */
+  width: calc(100% - 38px);
+  height: 56px;
+  pointer-events: none;
 }
 .vital:hover {
   border-color: var(--line-2);
@@ -557,10 +581,23 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+/* Le libelle a gauche, le chiffre en haut a droite, alignes sur la meme ligne
+   de base : le regard parcourt une colonne de chiffres au lieu de les chercher
+   chacun sous son titre. */
+.vital-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
 .vital .lbl {
   font-size: 12px;
   color: var(--ink-3);
-  min-height: 2.4em;
+  min-width: 0;
+}
+.vital .stat {
+  flex: none;
+  white-space: nowrap;
 }
 .vital .v {
   font-family: var(--mono);
@@ -574,30 +611,8 @@
   color: var(--ink-3);
   margin-left: 3px;
 }
-.vital .ref {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
-}
 .vital.w .v {
   color: var(--watch);
-}
-/* Une constante simulée doit se voir : deux mesures réelles honnêtes valent
-   mieux que huit chiffres dont on ne sait pas lesquels sont mesurés. */
-.vital .sim {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  padding: 1px 7px;
-  align-self: flex-start;
-}
-.vital .live {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* --------------------------------------------------- histogramme sommeil -- */
@@ -1012,8 +1027,16 @@
 .tableau-cadre {
   overflow-x: auto;
   margin: 0 -22px -20px;
-  padding: 0 22px 4px;
+  padding-bottom: 4px;
 }
+
+/* Le retrait par rapport au bord de la carte est porté par les cellules, pas
+   par le cadre. Une marge intérieure sur le conteneur de défilement laisse à
+   gauche de la colonne figée une bande de sa largeur : `left: 0` colle la
+   cellule au bord du CONTENU, et les colonnes qui défilent restent visibles
+   dans ce qui reste. */
+.registre tr > :first-child { padding-left: 33px; }
+.registre tr > :last-child { padding-right: 33px; }
 .registre {
   width: 100%;
   border-collapse: collapse;
