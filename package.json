@@ -17,6 +17,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:rollup": "node --env-file=server/.env scripts/db-rollup.mjs",
     "db:demo": "node --env-file=server/.env scripts/db-demo.mjs",
+    "db:repli": "node --env-file=server/.env --import tsx scripts/db-repli.mjs",
     "db:reset": "npm run db:load && npm run db:demo",
     "dev:backoffice": "npm run dev --workspace=web/backoffice",
     "db:sql": "node --env-file=server/.env scripts/db-sql.mjs",

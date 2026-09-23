@@ -1,21 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { ErreurApi, type Compte, api } from "./api";
-import { Apercu } from "./pages/Apercu";
+import { Base } from "./pages/Base";
 import { Comptes } from "./pages/Comptes";
 import { Ecrans } from "./pages/Ecrans";
-import { ResidentDetail } from "./pages/ResidentDetail";
-import { Residents } from "./pages/Residents";
-import { Signaux } from "./pages/Signaux";
-import { Tables } from "./pages/Tables";
 
+// Dans l'ordre des questions de l'administrateur de bord : ce que la console
+// affiche vient-il de la base, la base reçoit-elle ses flux, qui peut l'ouvrir.
+// Les gestes cliniques — statut d'un dossier, signal, note — n'ont pas
+// d'onglet ici : ils se font dans la console, sous la session du soignant.
 const ONGLETS = [
-  ["/", "Aperçu"],
-  ["/residents", "Équipage"],
-  ["/signaux", "Signaux"],
+  ["/", "Écrans et sources"],
+  ["/base", "Base"],
   ["/comptes", "Comptes"],
-  ["/ecrans", "Écrans et sources"],
-  ["/tables", "Tables"],
 ];
 
 type Etat =
@@ -63,7 +60,7 @@ export default function App() {
           <div className="marque">
             Sola <span>Backoffice</span>
           </div>
-          <nav className="onglets">
+          <nav className="onglets" aria-label="Onglets du backoffice">
             {ONGLETS.map(([to, label]) => (
               <NavLink
                 key={to}
@@ -77,25 +74,23 @@ export default function App() {
           </nav>
           <div className="fin">
             <span>
-              {etat.compte.prenom} {etat.compte.nom} · J+4 128
+              {etat.compte.prenom} {etat.compte.nom} · administrateur
             </span>
-            <button className="bouton mini" onClick={sortir}>
+            <button type="button" className="bouton mini" onClick={sortir}>
               Quitter
             </button>
           </div>
         </div>
       </header>
 
-      <Routes>
-        <Route path="/" element={<Apercu />} />
-        <Route path="/residents" element={<Residents />} />
-        <Route path="/residents/:code" element={<ResidentDetail />} />
-        <Route path="/signaux" element={<Signaux />} />
-        <Route path="/comptes" element={<Comptes />} />
-        <Route path="/ecrans" element={<Ecrans />} />
-        <Route path="/tables" element={<Tables />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <main>
+        <Routes>
+          <Route path="/" element={<Ecrans />} />
+          <Route path="/base" element={<Base />} />
+          <Route path="/comptes" element={<Comptes moi={etat.compte} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </>
   );
 }
@@ -104,10 +99,11 @@ export default function App() {
  * Connexion d'un administrateur.
  *
  * Le jeton partagé a disparu : il prouvait qu'on connaissait une clé, jamais
- * qu'on était quelqu'un, et le backoffice écrit dans des dossiers médicaux.
- * À sa place, un compte de la table `admins`, un mot de passe haché en
- * argon2id et une session dans un cookie `httpOnly`. Les médecins ne passent
- * pas cette porte : le serveur réserve `/admin` au rôle administrateur.
+ * qu'on était quelqu'un, et le backoffice ouvre la base entière et les
+ * comptes. À sa place, un compte de la table `admins`, un mot de passe haché
+ * en argon2id et une session dans un cookie `httpOnly`. Les médecins ne
+ * passent pas cette porte : le serveur réserve `/admin` au rôle
+ * administrateur.
  */
 function Connexion({
   horsLigne,
@@ -129,7 +125,7 @@ function Connexion({
       const { compte } = await api.connexion(email.trim(), mdp);
       if (compte.role !== "admin") {
         // Le serveur le refuserait de toute façon sur chaque route ; le dire
-        // ici évite un backoffice ouvert sur six pages toutes en erreur.
+        // ici évite un backoffice ouvert sur trois onglets tous en erreur.
         await api.deconnexion().catch(() => {});
         setMdp("");
         setErreur("Ce compte est un compte soignant : il ouvre la console, pas le backoffice.");
@@ -147,18 +143,20 @@ function Connexion({
   }
 
   return (
-    <div className="connexion">
-      <div className="marque" style={{ fontSize: 19 }}>
+    <main className="connexion">
+      <h1 className="marque" style={{ fontSize: 19 }}>
         Sola <span>Backoffice</span>
-      </div>
+      </h1>
       <p className="sous" style={{ marginTop: 10 }}>
-        Outil d’exploitation du serveur de bord, réservé aux administrateurs. Le
-        premier compte se crée au terminal&nbsp;: <code>npm run compte -- admin</code>.
+        Outil de l’administrateur de bord&nbsp;: les flux arrivent-ils, et qui a
+        accès&nbsp;? Le premier compte se crée au terminal&nbsp;:{" "}
+        <code>npm run compte -- admin</code>.
       </p>
       <form onSubmit={envoyer}>
         <input
           type="email"
           placeholder="Adresse de bord"
+          aria-label="Adresse de bord"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="username"
@@ -168,14 +166,19 @@ function Connexion({
         <input
           type="password"
           placeholder="Mot de passe"
+          aria-label="Mot de passe"
           value={mdp}
           onChange={(e) => setMdp(e.target.value)}
           autoComplete="current-password"
           required
         />
-        {erreur && <div className="message erreur">{erreur}</div>}
+        {erreur && (
+          <div className="message erreur" role="alert">
+            {erreur}
+          </div>
+        )}
         <button type="submit" className="bouton primaire" disabled={envoi}>
-          {envoi ? "Vérification…" : "Entrer"}
+          {envoi ? "Vérification…" : "Se connecter"}
         </button>
       </form>
       <div className="avert" style={{ marginTop: 18 }}>
@@ -188,10 +191,11 @@ function Connexion({
           <>
             La session tient douze heures et vit dans un cookie qu’aucun script de la
             page ne peut lire. Elle est distincte du jeton des bornes de cabine&nbsp;:
-            une borne écrit des mesures, elle ne doit pas pouvoir modifier un dossier.
+            une borne écrit des mesures, elle ne doit pas pouvoir ouvrir la base ni
+            les comptes.
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }

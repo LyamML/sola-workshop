@@ -11,15 +11,14 @@ import type { Niveau } from "../api";
  * ce dossier, ce sont les notes manquantes qui coûtent cher, pas les notes mal
  * rangées.
  *
- * La note part sans auteur tant que la session médecin n'existe pas. C'est la
- * limite connue de cet écran : le dossier saura ce qui a été écrit, pas par
- * qui.
+ * La note est signée par la session : le serveur prend l'auteur dans le
+ * cookie, jamais dans le formulaire, et le bandeau l'affiche sous la note.
  */
 
-const PRIORITES: { valeur: Niveau; label: string; classe: string; aide: string }[] = [
-  { valeur: "critique", label: "Important", classe: "crit", aide: "à lire avant tout geste" },
-  { valeur: "surveillance", label: "Vigilance", classe: "watch", aide: "à garder en tête" },
-  { valeur: "info", label: "Info", classe: "info", aide: "contexte du dossier" },
+const PRIORITES: { valeur: Niveau; libelle: string; classe: string; aide: string }[] = [
+  { valeur: "critique", libelle: "Important", classe: "crit", aide: "à lire avant tout geste" },
+  { valeur: "surveillance", libelle: "Vigilance", classe: "watch", aide: "à garder en tête" },
+  { valeur: "info", libelle: "Info", classe: "info", aide: "contexte du dossier" },
 ];
 
 export function AjoutNote({
@@ -95,7 +94,7 @@ export function AjoutNote({
               onClick={() => setNiveau(p.valeur)}
               title={p.aide}
             >
-              {p.label}
+              {p.libelle}
             </button>
           ))}
         </div>
@@ -108,7 +107,7 @@ export function AjoutNote({
         <button type="button" className="btn mini" onClick={onAnnule} disabled={envoi}>
           Annuler
         </button>
-        <button type="submit" className="btn mini primary" disabled={envoi}>
+        <button type="submit" className="btn mini pri" disabled={envoi}>
           {envoi ? "Enregistrement…" : "Enregistrer la note"}
         </button>
       </div>

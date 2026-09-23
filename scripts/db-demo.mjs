@@ -53,7 +53,7 @@ const SPARK_DEPISTAGE = {
 };
 const DEPISTAGE_IL_Y_A_UN_AN = [6.2, 6.9, 9.8];
 
-// Alertes physiologiques d'hier — les six barres du bas de l'ecran 02.
+// Alertes physiologiques du jour courant — les six barres de l'ecran 02.
 // Les seuils sont ceux de la vue v_alertes_physio, pas des valeurs choisies
 // ici : si la vue change, ce script doit changer avec elle.
 const PHYSIO = {
@@ -165,8 +165,8 @@ const SANGS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 //
 const MEDECINS = [
   { code: "M-001", titre: "Dr.",  prenom: "Candice", nom: "Oyelaran", poste: "Psychologue de bord" },
-  { code: "M-002", titre: "Dr.",  prenom: "Ines",    nom: "Ferreira", poste: "Medecine generale" },
-  { code: "M-003", titre: "Dr.",  prenom: "Bob",     nom: "Nakamura", poste: "Medecin de bord" },
+  { code: "M-002", titre: "Dr.",  prenom: "Ines",    nom: "Ferreira", poste: "Médecine générale" },
+  { code: "M-003", titre: "Dr.",  prenom: "Bob",     nom: "Nakamura", poste: "Médecin de bord" },
   { code: "M-004", titre: "Inf.", prenom: "Jonas",   nom: "Bakker",   poste: "Soins infirmiers" },
   { code: "M-005", titre: "Inf.", prenom: "Naima",   nom: "Haddad",   poste: "Soins infirmiers" },
 ];
@@ -199,6 +199,15 @@ const MS_JOUR = 86400000;
 const AUJOURDHUI = new Date();
 AUJOURDHUI.setHours(12, 0, 0, 0);
 
+// L'horloge de demonstration : aujourd'hui, 16:05. Les heures de la journee
+// (signaux ouverts, synchronisations des bracelets) partent de cet instant et
+// non de l'horloge du poste : generee a 9 h ou a 23 h, la base montre les
+// memes heures, et le repli de la console (web/console/src/data/) reste
+// juste. Seule la date suit le calendrier, comme dans le seed SQL.
+const HEURE_DEMO = 16 * 60 + 5;
+const MAINTENANT = new Date(AUJOURDHUI);
+MAINTENANT.setHours(0, HEURE_DEMO, 0, 0);
+
 /** Date ISO (AAAA-MM-JJ) a J moins `n` jours. */
 function jour(n) {
   return new Date(AUJOURDHUI.getTime() - n * MS_JOUR).toISOString().slice(0, 10);
@@ -214,9 +223,9 @@ function aujourdhuiA(m) {
   );
 }
 
-/** Horodatage SQLite a `n` minutes dans le passe. */
+/** Horodatage SQLite a `n` minutes avant l'horloge de demonstration. */
 function ilYAMinutes(n) {
-  const d = new Date(Date.now() - n * 60000);
+  const d = new Date(MAINTENANT.getTime() - n * 60000);
   const p = (x) => String(x).padStart(2, "0");
   return (
     `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
@@ -448,9 +457,12 @@ try {
             'estime')
     ON CONFLICT (resident_id, nuit_du) DO NOTHING`);
 
-  // Les valeurs d'hier restent en memoire : ce sont elles que comptent les six
-  // barres d'alertes, et il faudra les ajuster pour tomber sur les cibles.
-  const hier = new Map();
+  // Les valeurs du jour courant restent en memoire : ce sont elles que
+  // comptent les six barres d'alertes (v_alertes_physio), et il faudra les
+  // ajuster pour tomber sur les cibles. Celles de la veille aussi, pour une
+  // raison donnee plus bas.
+  const courant = new Map();
+  const veille = new Map();
   let nJours = 0;
   let nNuits = 0;
 
@@ -486,15 +498,18 @@ try {
         rid: r.id,
         jour: jour(d),
         jv: JOUR_VOL - d,
-        coucher: instant(d, 22, entier(0, 59)),
-        lever: instant(d - 1, 6, entier(0, 59)),
+        // `nuit_du` est la date du lever : la nuit qui finit ce matin-la,
+        // celle que la console appelle « derniere nuit » au jour courant.
+        coucher: instant(d + 1, 22, entier(0, 59)),
+        lever: instant(d, 6, entier(0, 59)),
         sommeil,
         latence: Math.round(clamp(normale(18 + p.fragilite * 9, 9), 2, 120)),
         eveils: Math.round(clamp(normale(22 + p.fragilite * 14, 14), 0, 180)),
       });
       nNuits++;
 
-      if (d === 1) hier.set(r.id, { ...ligne, sommeil });
+      if (d === 0) courant.set(r.id, { ...ligne, sommeil });
+      if (d === 1) veille.set(r.id, { ...ligne, sommeil });
     }
   }
   etape("journees de constantes (14 j x equipage)", nJours);
@@ -515,11 +530,11 @@ try {
 
   /**
    * Amene a `cible` le nombre de residents pour lesquels `test` est vrai
-   * hier. Les candidats les plus fragiles basculent en premier : un resident
-   * deja en difficulte est le plus plausible sous le seuil.
+   * dans `jour`. Les candidats les plus fragiles basculent en premier : un
+   * resident deja en difficulte est le plus plausible sous le seuil.
    */
-  function calibrer(test, pousser, ramener, cible) {
-    const lignes = [...hier.values()];
+  function calibrerSur(jour, test, pousser, ramener, cible) {
+    const lignes = [...jour.values()];
     const dedans = lignes.filter(test);
     const dehors = lignes.filter((l) => !test(l));
     const parFragilite = (a, b) => profils.get(b.rid).fragilite - profils.get(a.rid).fragilite;
@@ -533,38 +548,65 @@ try {
     }
   }
 
-  // prettier-ignore
-  {
-    calibrer((l) => l.rmssd < 30,
-      (l) => { l.rmssd = arrondi(entre(14, 29.4)); },
-      (l) => { l.rmssd = arrondi(entre(30.6, 44)); }, PHYSIO.rmssdBas);
-    calibrer((l) => l.spo2 < 95,
-      (l) => { l.spo2 = arrondi(entre(89, 94.6)); },
-      (l) => { l.spo2 = arrondi(entre(95.4, 99)); }, PHYSIO.spo2Bas);
-    calibrer((l) => l.fcr > 75,
-      (l) => { l.fcr = arrondi(entre(75.6, 92)); },
-      (l) => { l.fcr = arrondi(entre(56, 74.4)); }, PHYSIO.fcHaute);
-    calibrer((l) => l.pas < 4000,
-      (l) => { l.pas = entier(900, 3900); },
-      (l) => { l.pas = entier(4100, 9000); }, PHYSIO.peuActif);
-    calibrer((l) => l.sommeil < 360,
-      (l) => { l.sommeil = entier(180, 355); },
-      (l) => { l.sommeil = entier(365, 500); }, PHYSIO.sommeilCourt);
+  const ligneScripte = db.prepare(
+    `SELECT m.rmssd_ms AS rmssd, m.spo2_pct AS spo2, m.fc_repos_bpm AS fcr, m.pas,
+            n.sommeil_min AS sommeil
+       FROM mesures_jour m
+       LEFT JOIN nuits n ON n.resident_id = m.resident_id AND n.nuit_du = m.jour
+      WHERE m.resident_id = :rid AND m.jour = :jour`,
+  );
+
+  /**
+   * Les cinq seuils de la vue, tires avec le hasard `alea`. La vue compte
+   * tout l'equipage, R-0448 compris : ce que sa ligne scriptee franchit deja
+   * est retire de la cible des autres.
+   */
+  function caler(jour, alea, date) {
+    const entreA = (min, max) => min + alea() * (max - min);
+    const entierA = (min, max) => Math.floor(entreA(min, max + 1));
+    const scripte = ligneScripte.get({ rid: SCRIPTE, jour: date });
+    const calibrer = (lignes, test, pousser, ramener, cible) =>
+      calibrerSur(lignes, test, pousser, ramener, cible - (scripte && test(scripte) ? 1 : 0));
+    // prettier-ignore
+    {
+      calibrer(jour, (l) => l.rmssd < 30,
+        (l) => { l.rmssd = arrondi(entreA(14, 29.4)); },
+        (l) => { l.rmssd = arrondi(entreA(30.6, 44)); }, PHYSIO.rmssdBas);
+      calibrer(jour, (l) => l.spo2 < 95,
+        (l) => { l.spo2 = arrondi(entreA(89, 94.6)); },
+        (l) => { l.spo2 = arrondi(entreA(95.4, 99)); }, PHYSIO.spo2Bas);
+      calibrer(jour, (l) => l.fcr > 75,
+        (l) => { l.fcr = arrondi(entreA(75.6, 92)); },
+        (l) => { l.fcr = arrondi(entreA(56, 74.4)); }, PHYSIO.fcHaute);
+      calibrer(jour, (l) => l.pas < 4000,
+        (l) => { l.pas = entierA(900, 3900); },
+        (l) => { l.pas = entierA(4100, 9000); }, PHYSIO.peuActif);
+      calibrer(jour, (l) => l.sommeil < 360,
+        (l) => { l.sommeil = entierA(180, 355); },
+        (l) => { l.sommeil = entierA(365, 500); }, PHYSIO.sommeilCourt);
+    }
+    for (const l of jour.values()) {
+      majJour.run({ rid: l.rid, jour: l.jour, rmssd: l.rmssd, spo2: l.spo2, fcr: l.fcr, pas: l.pas });
+      majNuit.run({ rid: l.rid, jour: l.jour, sommeil: l.sommeil });
+    }
   }
 
-  for (const l of hier.values()) {
-    majJour.run({ rid: l.rid, jour: l.jour, rmssd: l.rmssd, spo2: l.spo2, fcr: l.fcr, pas: l.pas });
-    majNuit.run({ rid: l.rid, jour: l.jour, sommeil: l.sommeil });
-  }
-  etape("lignes d'hier calibrees sur les six seuils", hier.size);
+  // La vue lit le jour courant. La veille reste calee comme elle l'etait quand
+  // la vue la lisait, et avec le meme hasard : c'est ce qui laisse intact le
+  // tirage de tout ce qui suit (scores, signaux, clotures), donc les chiffres
+  // que citent la documentation et les maquettes. Le jour courant a son
+  // propre tirage, pour la meme raison.
+  caler(veille, rnd, jour(1));
+  caler(courant, graine(4128 * 2), jour(0));
+  etape("lignes du jour courant calees sur les six seuils", courant.size);
 
-  // Chutes d'hier : la barre la plus basse de l'ecran, 0,3 %.
+  // Chutes du jour courant : la barre la plus basse de l'ecran, 0,3 %.
   const chutesDeja = db
     .prepare(
       `SELECT COUNT(DISTINCT resident_id) AS n FROM evenements
-        WHERE type = 'chute' AND survenu_at >= datetime('now','-1 day')`,
+        WHERE type = 'chute' AND date(survenu_at) = :jour`,
     )
-    .get().n;
+    .get({ jour: jour(0) }).n;
   const insEvt = db.prepare(
     `INSERT INTO evenements (resident_id, type, survenu_at, intensite_g, acquitte_at)
      VALUES (:rid, 'chute', :quand, :g, :acq)`,
@@ -736,16 +778,11 @@ try {
 
   // Fenetre d'ouverture, en minutes depuis minuit. Le dernier signal scripte
   // de gravite « surveillance » tombe a 09:15 (+555) ; on ouvre juste apres,
-  // et on s'arrete a l'heure courante. Le sixieme scripte, a 11:02, est de
-  // gravite « info » : la file etant triee par gravite d'abord, il reste en
-  // bas quoi qu'il arrive. Lance tot le matin, le generateur garde quand meme
-  // une demi-heure de fenetre — mieux vaut des horaires serres que des
-  // horaires a venir.
+  // et on s'arrete deux minutes avant l'horloge de demonstration. Le sixieme
+  // scripte, a 11:02, est de gravite « info » : la file etant triee par
+  // gravite d'abord, il reste en bas quoi qu'il arrive.
   const DEBUT_SIGNAUX = 556;
-  const minuit = new Date();
-  minuit.setHours(0, 0, 0, 0);
-  const maintenant = Math.floor((Date.now() - minuit.getTime()) / 60000);
-  const finSignaux = Math.min(1439, Math.max(maintenant - 2, DEBUT_SIGNAUX + 30));
+  const finSignaux = HEURE_DEMO - 2;
 
   const insSignal = db.prepare(`
     INSERT INTO signaux
@@ -770,20 +807,25 @@ try {
       // noierait la file de triage sous des cas qui ne racontent rien.
       const [severite, origine, motif] = piocher(SIGNAUX_COURANTS);
       const assigne = rnd() < 0.62 ? tirerSoignant() : { assigne_id: null, assigne_a: null };
+      // Ouverts apres le dernier signal scripte (09:15) et jamais dans le
+      // futur. Deux contraintes a la fois : la file de triage trie par
+      // gravite puis par anciennete, donc les six scriptes du matin doivent
+      // rester en tete ; et l'ecran des alertes recentes affiche des heures,
+      // or une alerte ouverte dans huit heures ne veut rien dire.
+      const quand = aujourdhuiA(entier(DEBUT_SIGNAUX, finSignaux));
+      // Un signal que quelqu'un a pris est « en cours » : c'est le geste
+      // « Je prends » de la console. Le tirage qui en decidait est garde, sans
+      // effet et a sa place, pour ne pas decaler le hasard de ce qui suit.
+      const pris = Boolean(assigne.assigne_id || assigne.assigne_a);
+      if (pris) rnd();
       insSignal.run({
         rid: r.id,
         severite,
         motif,
         origine,
         ...assigne,
-        // Ouverts apres le dernier signal scripte (09:15) et jamais dans le
-        // futur. Deux contraintes a la fois : la file de triage trie par
-        // gravite puis par anciennete, donc les six scriptes du matin doivent
-        // rester en tete ; et l'ecran des alertes recentes affiche des heures,
-        // or une alerte ouverte dans huit heures ne veut rien dire.
-        quand: aujourdhuiA(entier(DEBUT_SIGNAUX, finSignaux)),
-        statut:
-          (assigne.assigne_id || assigne.assigne_a) && rnd() < 0.5 ? "en_cours" : "ouvert",
+        quand,
+        statut: pris ? "en_cours" : "ouvert",
       });
       majStatut.run({ rid: r.id, statut: severite === "critique" ? "critique" : "surveillance" });
       nSignaux++;
@@ -815,7 +857,7 @@ try {
         "Entretien réalisé, retour à la normale",
         "Faux positif : artefact de mesure confirmé",
         "Traitement ajusté, suivi programmé",
-        "Pris en charge par la psychologue de bord",
+        "Orienté vers la psychologie de bord",
       ]),
     });
     nClos++;
@@ -874,17 +916,18 @@ try {
 
   // Un jeton par etiquette a placer : le total de chaque motif est impose par
   // la maquette, on tire juste l'ordre. Ce que le jeu scripte a deja pose
-  // dans la fenetre de 30 jours est deduit de la cible.
+  // dans la fenetre de 30 jours est deduit de la cible — la meme fenetre que
+  // v_motifs_30j : du J-29 a la fin du jour courant.
   const tagsDeja = Object.fromEntries(
     db
       .prepare(
         `SELECT t.tag, COUNT(*) AS n
            FROM conversation_tags t
            JOIN conversations c ON c.id = t.conversation_id
-          WHERE c.debut_at >= datetime('now', '-30 days')
+          WHERE c.debut_at >= :debut AND c.debut_at < :fin
           GROUP BY t.tag`,
       )
-      .all()
+      .all({ debut: jour(29), fin: jour(-1) })
       .map((r) => [r.tag, r.n]),
   );
   const jetons = [];
@@ -991,6 +1034,8 @@ try {
     ["inflammation", "Vitesse de sédimentation", "mm/h", 0, 15],
     ["lipides", "Cholestérol total", "g/L", 1.4, 2],
     ["lipides", "LDL", "g/L", 0.7, 1.3],
+    // Le HDL protege : un laboratoire ne le signale que sous 0,40 g/L. La
+    // borne haute ne sert qu'au tirage, voir BORNE_BASSE_SEULE.
     ["lipides", "HDL", "g/L", 0.4, 0.8],
     ["lipides", "Triglycérides", "g/L", 0.5, 1.5],
     ["vitamines", "Vitamine D", "nmol/L", 50, 125],
@@ -1009,10 +1054,17 @@ try {
    */
   const QUALITATIF = ["inflammation", "Recherche d'agent infectieux"];
 
-  /** Situe une valeur par rapport a ses bornes. */
+  /**
+   * Les marqueurs dont le laboratoire ne donne qu'un seuil bas. Leur plage de
+   * MARQUEURS sert a tirer une valeur plausible ; en base, `ref_haut` reste
+   * vide et une valeur haute n'est pas « elevee ».
+   */
+  const BORNE_BASSE_SEULE = new Set(["HDL"]);
+
+  /** Situe une valeur par rapport a ses bornes ; `haut` peut manquer. */
   function interpreter(v, bas, haut) {
     if (v < bas) return v < bas * 0.7 ? "critique" : "bas";
-    if (v > haut) return v > haut * 1.5 ? "critique" : "eleve";
+    if (haut !== null && v > haut) return v > haut * 1.5 ? "critique" : "eleve";
     return "normal";
   }
 
@@ -1092,6 +1144,7 @@ try {
         // laboratoire ecrit la plus petite valeur qu'il sait lire.
         const plancher = bas > 0 ? 0 : decimales === 0 ? 1 : 0.1;
         const v = Math.max(arrondi(brut, decimales), plancher);
+        const borneHaute = BORNE_BASSE_SEULE.has(marqueur) ? null : haut;
 
         insAnalyse.run({
           bid,
@@ -1101,8 +1154,8 @@ try {
           texte: null,
           unite,
           bas,
-          haut,
-          interpretation: interpreter(v, bas, haut),
+          haut: borneHaute,
+          interpretation: interpreter(v, bas, borneHaute),
         });
         nAnalyses++;
       }
@@ -1121,6 +1174,20 @@ try {
       nAnalyses++;
     }
   }
+
+  // La fiche de R-0448 montre un bilan presque sans histoire : un seul
+  // marqueur hors borne, la vitamine B12, qui monte d'un bilan a l'autre
+  // sous supplementation. Le hasard ne le garantit pas — un tirage de plus,
+  // n'importe ou au-dessus, et la valeur rentre dans sa plage — alors elle
+  // est posee ici, apres coup et sans tirage, pour ne rien decaler.
+  db.prepare(`
+    UPDATE analyses_sang
+       SET valeur_num = 711, interpretation = 'eleve'
+     WHERE marqueur = 'Vitamine B12'
+       AND bilan_id = (SELECT id FROM bilans_sanguins
+                        WHERE resident_id = :rid
+                        ORDER BY preleve_le DESC LIMIT 1)`).run({ rid: SCRIPTE });
+
   etape("bilans sanguins (3 par resident, un cycle de 14 jours)", nBilans);
   etape("analyses du sang", nAnalyses);
 
@@ -1140,9 +1207,10 @@ try {
   // d'elle. Sans ces lignes, le rollup n'a rien a agreger et on ne saurait
   // pas s'il fonctionne.
   //
-  // La journee choisie est J-2, PAS hier : les six barres d'alertes de
-  // l'ecran 02 lisent la ligne d'hier, calibree plus haut. Un rollup lance
-  // sur hier la remplacerait et ferait bouger les pourcentages.
+  // La journee choisie est J-2, ni le jour courant ni la veille : les six
+  // barres d'alertes de l'ecran 02 lisent le jour courant, cale plus haut
+  // avec la veille. Un rollup lance sur l'un des deux le remplacerait et
+  // ferait bouger les pourcentages.
   const insMesure = db.prepare(`
     INSERT INTO mesures
       (resident_id, bracelet_id, mesure_at, fc_bpm, rmssd_ms, spo2_pct,

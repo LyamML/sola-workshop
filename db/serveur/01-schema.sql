@@ -243,9 +243,12 @@ CREATE INDEX idx_mesures_jour_date ON mesures_jour (jour);
 
 -- Une ligne par nuit et par resident. `sommeil_min` est une ESTIMATION du
 -- bracelet (immobilite + baisse de FC), jamais une mesure — d'ou `source`.
+-- Une nuit est rangee a la date du lever, comme le font les bracelets du
+-- commerce : au jour J, la « derniere nuit » est celle qui a fini ce matin,
+-- et elle se lit a cote des constantes du meme jour.
 CREATE TABLE nuits (
   resident_id INTEGER NOT NULL REFERENCES residents (id) ON DELETE CASCADE,
-  nuit_du     TEXT NOT NULL,              -- date du coucher
+  nuit_du     TEXT NOT NULL,              -- date du lever
   jour_vol    INTEGER NOT NULL,
   coucher_at  TEXT,
   lever_at    TEXT,

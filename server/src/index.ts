@@ -12,8 +12,8 @@ import { ingest } from "./routes/ingest.js";
  *
  *   POST /ingest/*   ecrit par les bornes de cabine     (jeton borne)
  *   /auth/*          connexion des personnes            (ouvert)
- *   GET  /api/*      console medicale                   (session medecin ou admin)
- *   /admin/*         backoffice : lecture et correction (session admin)
+ *   /api/*           console medicale                   (session medecin ou admin)
+ *   /admin/*         backoffice : lecture et comptes    (session admin)
  *   GET  /health     supervision
  *
  * Le service ne sert pas les interfaces : la borne et la console restent deux
@@ -67,6 +67,8 @@ app.get("/", (_req, res) => {
       "POST /ingest/evenement": "chute, secousse, bouton d'urgence (jeton requis)",
       "POST /api/residents/:code/particularites":
         "note de particularite, signee par la session medecin",
+      "PATCH /api/signaux/:id":
+        "prendre un signal, ou le clore avec un motif de son origine (session medecin)",
     },
     connexion: {
       "POST /auth/connexion": "e-mail et mot de passe, pose le cookie de session",
@@ -78,17 +80,14 @@ app.get("/", (_req, res) => {
       "GET /api/residents/:code": "ecran 03 — fiche resident, ex. /api/residents/R-0448",
       "GET /api/equipage": "ecran 04 — registre des residents, triable et pagine",
       "GET /api/signaux": "ecran 04 — registre des signaux, triable et pagine",
+      "GET /api/signaux/stats": "ecran 04 — a traiter, faux positifs, motifs de cloture a revoir",
     },
     backoffice: {
-      "GET /admin/apercu": "compteurs par table et fraicheur des flux",
-      "GET /admin/ecrans": "correspondance bloc d'interface <-> requete",
-      "GET /admin/residents": "recherche, filtres module et statut",
-      "PATCH /admin/residents/:code": "statut, poste, cabine",
-      "GET /admin/signaux": "file de triage complete",
-      "PATCH /admin/signaux/:id": "assigner ou clore",
-      "POST /admin/residents/:code/particularites": "ajouter une allergie ou un antecedent",
-      "DELETE /admin/particularites/:id": "retirer une particularite",
-      "GET /admin/tables/:nom": "lecture brute d'une table",
+      "GET /admin/apercu": "fraicheur des flux et volume des tables",
+      "GET /admin/tables/:nom": "dernieres lignes d'une table, hors comptes et sessions",
+      "GET /admin/ecrans": "chaque bloc de la console, sa source et ce qu'elle renvoie",
+      "GET /admin/comptes": "soignants et administrateurs, sans adresse ni empreinte",
+      "PATCH /admin/comptes/:role/:id": "activer ou desactiver un compte",
     },
     supervision: { "GET /health": "etat du service et de la base" },
   });

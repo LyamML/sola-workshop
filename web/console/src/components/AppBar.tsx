@@ -1,77 +1,59 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useCompte } from "../session";
+import { Logo } from "./Icone";
 
+/**
+ * Deux entrées, pas quatre. « Résidents » et « Signaux » ouvraient la même
+ * page sur deux onglets : c'est le registre. La fiche d'un résident reste
+ * sous « Équipage », d'où on y arrive.
+ */
 const NAV = [
-  { to: "/", label: "Équipage", end: true },
-  { to: "/registre", label: "Résidents", end: false },
-  { to: "/signaux", label: "Signaux", end: false },
+  { to: "/", libelle: "Équipage", actif: (p: string) => p === "/" || p.startsWith("/residents/") },
+  { to: "/registre", libelle: "Registre", actif: (p: string) => p === "/registre" || p === "/signaux" },
 ];
 
 export function AppBar() {
   const { compte, deconnecter } = useCompte();
+  const { pathname } = useLocation();
 
   // Sans compte, la console tourne sur le jeu de démonstration : l'avatar le
   // dit au lieu d'afficher les initiales d'un soignant qui n'est pas là.
   const nom = compte
     ? `${compte.titre ? `${compte.titre} ` : ""}${compte.prenom} ${compte.nom}`
     : "Mode démonstration";
-  const initiales = compte
-    ? `${compte.prenom[0] ?? ""}${compte.nom[0] ?? ""}`
-    : "··";
+  const initiales = compte ? `${compte.prenom[0] ?? ""}${compte.nom[0] ?? ""}` : "··";
 
   return (
     <header className="appbar">
       <div className="app">
         <div className="appbar-in">
-          <div className="logo">
-            <svg width="17" height="17" viewBox="0 0 26 26" aria-hidden="true">
-              <circle cx="13" cy="13" r="4.4" fill="var(--accent)" />
-              <path
-                d="M13 1.4v3.2M13 21.4v3.2M1.4 13h3.2M21.4 13h3.2"
-                stroke="var(--accent)"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-              />
-            </svg>
+          <Link to="/" className="logo">
+            <Logo />
             SOLA
-          </div>
+          </Link>
 
-          <nav className="navpills">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) => (isActive ? "on" : undefined)}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-            <a href="#protocoles" onClick={(e) => e.preventDefault()}>
-              Protocoles
-            </a>
+          <nav className="navpills" aria-label="Écrans">
+            {NAV.map((n) => {
+              const actif = n.actif(pathname);
+              return (
+                <Link key={n.to} to={n.to} className={actif ? "on" : undefined} aria-current={actif ? "page" : undefined}>
+                  {n.libelle}
+                </Link>
+              );
+            })}
           </nav>
 
-          <div className="right">
-            <Link to="/registre" className="searchbox">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-4-4" />
-              </svg>
-              Rechercher un résident…
-            </Link>
-            <div className="qui">
-              <div className="avatar" title={nom}>
-                {initiales}
-              </div>
-              <div className="nom">
-                <span>{nom}</span>
-                {compte && (
-                  <button type="button" onClick={deconnecter}>
-                    Se déconnecter
-                  </button>
-                )}
-              </div>
+          <div className="qui">
+            <div className="avatar" title={nom} aria-hidden="true">
+              {initiales}
+            </div>
+            <div className="nom">
+              <span>{nom}</span>
+              {compte && (
+                <button type="button" onClick={deconnecter}>
+                  Se déconnecter
+                </button>
+              )}
             </div>
           </div>
         </div>

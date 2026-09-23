@@ -114,45 +114,45 @@ Le README a une section « limites » et elle est à jour. Si vous en levez une,
 retirez la ligne. Si vous en créez une, ajoutez-la. Une limite assumée et
 documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
-**Les huit limites ouvertes aujourd'hui :** aucune purge des mesures n'est
+**Les neuf limites ouvertes aujourd'hui :** aucune purge des mesures n'est
 implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
 il n'y écrit que les trames du bracelet —, ces mesures n'atteignent pas la
-fiche (`mesures_jour` ne se calcule qu'avec `npm run db:rollup`, et `adapt.ts`
-afficherait à 0 ce que le bracelet ne mesure pas), la borne ne transmet que
-servie par Vite, dont le relais porte le jeton, une partie de la trame est
-reçue sans être conservée — une chute comptée par le bracelet n'ouvre pas de
-signal —, les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
-et la fiche le dit), la reconnaissance vocale de la borne n'existe que dans
-les navigateurs à moteur Chromium — ailleurs elle bascule au clavier et le dit
-dans sa barre d'état —, et Sola ne reconnaît sa propre voix que par le texte :
-un mot qu'elle vient de dire ne vaut pas réponse dans les deux secondes qui
-suivent.
+fiche (`mesures_jour` ne se calcule qu'avec `npm run db:rollup`), la borne ne
+transmet que servie par Vite, dont le relais porte le jeton, une partie de la
+trame est reçue sans être conservée — une chute comptée par le bracelet
+n'ouvre pas de signal —, les bilans sanguins du jeu de démonstration sont
+simulés (`source = 'simule'`, et la fiche le dit), la reconnaissance vocale de
+la borne n'existe que dans les navigateurs à moteur Chromium — ailleurs elle
+bascule au clavier et le dit dans sa barre d'état —, Sola ne reconnaît sa
+propre voix que par le texte : un mot qu'elle vient de dire ne vaut pas
+réponse dans les deux secondes qui suivent, et, serveur éteint, seule la fiche
+de R-0448 s'affiche — le repli ne contient qu'elle.
 
 ---
 
 ## Les conventions d'écriture
 
-**Français partout** — identifiants, commentaires, libellés d'interface. Les
-types de `web/console/src/types.ts` et les props des composants les plus anciens
-sont restés en anglais : c'est de l'héritage, on ne les renomme pas en passant,
-mais le code neuf est en français (`Colonne`, `cle`, `titre`, `rendu`, `fige`).
+**Français partout** — identifiants, commentaires, libellés d'interface, types
+compris : ceux de `web/console/src/types.ts` sont en français depuis la refonte
+des écrans 02 à 04 (`Constante`, `Pastille`, `cle`, `libelle`, `rendu`).
 
 **Les commentaires disent *pourquoi*, pas *quoi*.** Le code dit déjà quoi. Un
 commentaire qui paraphrase la ligne suivante est du bruit ; un commentaire qui
 explique un arbitrage se garde.
 
 **Tout écran de la console s'affiche rempli, serveur éteint.** C'est le rôle de
-`useSource` : le jeu de démonstration est la valeur de départ, l'API la remplace
-quand elle répond, et l'en-tête dit lequel des deux est affiché. Une console
-médicale qui montre une page blanche parce qu'un service est tombé est pire
-qu'inutile. Seul l'écran 04 fait exception — il lit forcément la base, et il le
-dit.
+`useSource` : le repli est la valeur de départ, l'API la remplace quand elle
+répond, et l'en-tête dit lequel des deux est affiché. Une console médicale qui
+montre une page blanche parce qu'un service est tombé est pire qu'inutile. Deux
+exceptions, et elles le disent : l'écran 04, qui lit forcément la base, et la
+fiche d'un autre résident que R-0448, que le repli ne contient pas.
 
-**Deux fichiers pour une même chaîne.** Ce qui s'affiche sur les écrans 02 et 03
-existe en double : dans `adapt.ts` (construit depuis l'API, c'est ce qu'on voit
-quand le serveur tourne) et dans `data/` (le repli statique). Modifier l'un sans
-l'autre crée une incohérence qui n'apparaît que le jour où le serveur ne démarre
-pas.
+**Le repli est une réponse figée, pas un second jeu de chaînes.** Ce qui
+s'affiche sur les écrans 02 et 03 ne s'écrit qu'à un endroit, `adapt.ts`.
+Serveur éteint, le même adaptateur lit `data/crew.json` et `data/resident.json`,
+deux réponses du serveur figées par `npm run db:repli`. Changer la forme de
+`/api/crew` ou de `/api/residents/:code`, le générateur ou les vues oblige à
+relancer ce script ; `npm run db:repli -- --verifier` dit quand il le faut.
 
 **Les couleurs passent par les tokens** de `styles/tokens.css`, jamais en dur, et
 les deux thèmes — clair et sombre — sont traités.
@@ -194,6 +194,7 @@ marche.
 | `npm run dev:backoffice` | le backoffice | 5176 |
 | `npm run db:reset` | recharge schéma + vues + jeu de démonstration | — |
 | `npm run db:demo` | régénère seulement les données | — |
+| `npm run db:repli` | fige le repli de la console depuis la base ; `-- --verifier` compare seulement | — |
 | `npm run db:sql "…"` | interroge la base, en lecture seule | — |
 | `npm run compte -- liste \| medecin \| admin \| mdp <email>` | les comptes, au terminal | — |
 | `npm run typecheck` | tous les espaces de travail | — |
@@ -231,14 +232,21 @@ racine, réglé par `DB_FILE`.
 | Ce que vous cherchez | Fichier |
 |---|---|
 | Les routes de l'application | `src/App.tsx` |
-| **Les chaînes affichées sur les écrans 02 et 03** (sous-titres, références, unités) | `src/adapt.ts` — construit depuis l'API, **c'est ce qui s'affiche** |
-| Les mêmes chaînes, version repli | `src/data/crew.ts`, `src/data/resident.ts` |
-| L'appel à l'API et le POST d'une note | `src/api.ts` |
+| **Les chaînes affichées sur les écrans 02 et 03** (sous-titres, références, unités, seuils) | `src/adapt.ts` — le seul endroit où elles s'écrivent, serveur allumé ou éteint |
+| Les nombres, dates et durées à la française | `src/format.ts` |
+| Le repli, serveur éteint : deux réponses figées | `src/repli.ts`, `src/data/crew.json`, `src/data/resident.json` — écrits par `npm run db:repli` |
+| L'appel à l'API, le POST d'une note, le PATCH d'un signal | `src/api.ts` |
 | Le mécanisme de repli et `rafraichir` | `src/useSource.ts` |
+| La file « À traiter maintenant » de l'écran 02 | `src/components/FileTriage.tsx` |
+| Le signal ouvert de la fiche : prendre, clore avec un motif | `src/components/SignalOuvert.tsx` |
+| Les tuiles de constantes, la courbe et les barres | `src/components/TuileConstante.tsx`, `src/components/Courbe.tsx`, `src/components/Barres.tsx` |
+| Les conversations remontées et les résumés de contexte | `src/components/Conversations.tsx` |
 | Les colonnes, tris et filtres de l'écran 04 | `src/pages/RegistrePage.tsx` (descripteurs `Colonne<T>`) |
 | Le chargement paginé de l'écran 04 | `src/registre.ts` |
 | Le formulaire d'ajout d'une note | `src/components/AjoutNote.tsx` |
-| Les tuiles de constantes et leur courbe de fond | `src/components/VitalTile.tsx`, `src/components/Sparkline.tsx` |
+| Le retour d'un geste, en une ligne au bas de l'écran | `src/components/Avis.tsx` (`useAvis`) |
+| Les onglets et sélecteurs segmentés, les pictogrammes | `src/components/Segments.tsx`, `src/components/Icone.tsx` |
+| La mention « jeu de démonstration » | `src/components/MentionDemo.tsx` |
 | La session, le formulaire de connexion, le mode démonstration | `src/session.tsx` |
 | La carte de bilan sanguin | `src/components/BilanSanguin.tsx` |
 | Les types partagés | `src/types.ts` |
@@ -251,7 +259,7 @@ racine, réglé par `DB_FILE`.
 |---|---|
 | Montage des routes, CORS, liste des routes sur `/` | `src/index.ts` |
 | Lecture de la console — écrans 02, 03, 04 | `src/routes/console.ts` |
-| Écriture d'une note (partagée avec le backoffice) | `src/routes/console.ts`, `ajouterParticularite` |
+| Les gestes de la console : note signée, prise et clôture d'un signal | `src/routes/console.ts` (`ajouterParticularite`, `PATCH /signaux/:id`) |
 | Backoffice — tables, correction, signaux | `src/routes/admin.ts` |
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
 | **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`) |
@@ -277,6 +285,7 @@ racine, réglé par `DB_FILE`.
 | Chargement des fichiers SQL | `scripts/db-load.mjs` |
 | Créer un compte, changer un mot de passe | `scripts/db-compte.mjs`, `scripts/hachage.mjs` |
 | Agrégats quotidiens | `scripts/db-rollup.mjs` |
+| Figer le repli de la console | `scripts/db-repli.mjs` |
 | Interroger la base au terminal | `scripts/db-sql.mjs` |
 
 ### Le matériel et la documentation

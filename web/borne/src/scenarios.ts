@@ -1,14 +1,21 @@
 /**
  * Scénarios de la borne.
  *
- * La borne n'a plus de commande à l'écran : on lui parle, elle répond à voix
+ * La borne n'a pas de commande à l'écran : on lui parle, elle répond à voix
  * haute, et l'écran ne sert qu'à laisser une trace lisible de l'échange. Un
  * scénario est donc une suite d'instants — ce que Sola dit, quand elle écoute,
- * quand elle pose une question, quand elle affiche ce qu'elle vient de faire.
+ * quand elle pose une question, et ce qui quitte la cabine.
  *
  * Deux objets seulement portent du contenu :
- *   · `Carte`    — ce que Sola a fait, pour information, sans réponse attendue ;
+ *   · `Sortie`   — ce qui vient de quitter la cabine : la pastille d'état le
+ *                  dit au moment où ça part, pendant que Sola le dit à voix
+ *                  haute ;
  *   · `Question` — une demande qui attend une réponse, à voix haute ou au doigt.
+ *
+ * Le récit suit la base de démonstration : les nuits et la variabilité
+ * cardiaque de R-0448, son médecin, sa sœur et le résident que Sola lui
+ * propose de voir y sont tels qu'ils sont dits ici. Un chiffre qu'on change
+ * dans une réplique se vérifie d'abord avec `npm run db:sql`.
  */
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking";
@@ -20,21 +27,21 @@ export interface Personne {
   meta: string;
 }
 
-/** Une trace de ce que Sola vient de faire. Aucune action : depuis qu'il n'y a
- *  plus de bouton sur la borne, tout ce qui appelle une réponse est une
- *  `Question`. */
-export interface Carte {
+/**
+ * Ce qui vient de quitter la cabine. La pastille d'état dit la dernière :
+ * elle remplace « Tout reste dans la cabine », que la scène démentait deux
+ * répliques plus loin en prévenant la maintenance puis le médecin.
+ */
+export interface Sortie {
+  /** Une même sortie annoncée deux fois ne s'empile pas. */
   id: string;
-  tag: string;
-  /** Teinte chaude : ce qui sort de la cabine (transmission à un soignant). */
-  warm?: boolean;
-  /** Peut contenir un balisage léger (<b>, <br>). */
-  texte?: string;
-  personne?: Personne;
+  texte: string;
+  /** `chaud` : un soignant est prévenu. `critique` : une alerte est partie. */
+  ton?: "chaud" | "critique";
 }
 
 /** Une réponse possible. Le doigt lit `label`, la voix reconnaît `mots` — la
- *  première forme de `mots` est celle qu'on affiche sous le bouton, elle doit
+ *  première forme de `mots` est celle qu'on affiche sur le bouton, elle doit
  *  donc rester courte et facile à prononcer. */
 export interface Option {
   label: string;
@@ -45,12 +52,20 @@ export interface Option {
   suite?: Beat[];
 }
 
-/** La fenêtre qui s'ouvre quand Sola pose une question. */
+/** Ce que Sola demande : la feuille qui monte du bas, ou la carte de l'alerte. */
 export interface Question {
   id: string;
+  /** Au-dessus du titre ; « Sola te demande » quand rien n'est précisé. */
+  surtitre?: string;
   /** Reprise écrite de ce que Sola vient de demander à voix haute. */
   titre: string;
   detail?: string;
+  /**
+   * Ce que Sola prononce en posant la question, quand la réplique qui l'amène
+   * ne la pose pas déjà. Dit, pas écrit : la question est à l'écran, la
+   * recopier dans la trace la ferait lire deux fois.
+   */
+  dit?: string;
   personne?: Personne;
   options: Option[];
 }
@@ -63,7 +78,10 @@ export interface Beat {
   dit?: string;
   /** Ligne d'état affichée en pied de borne. */
   hint?: string;
-  carte?: Carte;
+  /** Sola se remet à attendre son nom : c'est ce qui rend vrai « dis « Sola »
+   *  si tu veux reparler », au lieu d'une borne qui écoute encore tout. */
+  veille?: boolean;
+  sortie?: Sortie;
   question?: Question;
 }
 
@@ -75,13 +93,23 @@ export interface Echange {
   reponse: Beat[];
 }
 
+/** La carte d'arrivée de l'alerte : qui vient, dans combien de temps, et ce
+ *  qui est déjà fait. */
+export interface Arrivee {
+  qui: string;
+  minutes: number;
+  trajet: string;
+  faits: string[];
+}
+
 export interface Scene {
   key: SceneKey;
   label: string;
   /** Classe de modulation de l'ambiance lumineuse de l'écran. */
   mode?: "calme" | "alerte";
-  /** État de départ, avant toute interaction. */
-  ouverture: { dit: string; hint: string; state: VoiceState };
+  /** État de départ, avant toute interaction. `sortie` : ce qui est parti
+   *  avant même que Sola ne parle. */
+  ouverture: { dit: string; hint: string; state: VoiceState; sortie?: Sortie };
   /** Tours de parole, joués l'un après l'autre. */
   echanges: Echange[];
   /** Instants joués dès l'entrée dans le scénario. */
@@ -89,6 +117,7 @@ export interface Scene {
   /** Sola mène seule : la borne n'attend pas que le résident parle. */
   monologue?: boolean;
   breathing?: boolean;
+  arrivee?: Arrivee;
 }
 
 /** Ce que la borne affiche en pied quand elle a le micro ouvert sur quelqu'un. */
@@ -96,12 +125,28 @@ export const HINT_ECOUTE = "Je t’écoute…";
 
 const APPEL = "Dis « Sola » pour commencer";
 
+/** La fin d'un échange ne ramène pas à « pour commencer » : la conversation
+ *  vient d'avoir lieu. */
+const REPARLER = "Dis « Sola » si tu veux reparler";
+
+const PARLE = "Parle quand tu veux";
+
+const MAINTENANCE: Sortie = { id: "maintenance", texte: "1 demande envoyée à la maintenance" };
+const SELIM: Sortie = { id: "selim", texte: "1 message envoyé à Selim" };
+const MEDECIN: Sortie = {
+  id: "medecin",
+  texte: "1 résumé transmis au Dr Ferreira",
+  ton: "chaud",
+};
+
 export const SCENES: Scene[] = [
   {
     key: "jour",
     label: "Échange",
     ouverture: {
-      dit: "Salut Lyam. Tu as dormi 5 h 12 cette nuit — je me disais qu’on pouvait en parler.",
+      // Sans le prénom : cette ligne reste à l'écran tant que personne ne
+      // parle, et la borne n'affiche pas qui habite la cabine.
+      dit: "Salut. Tu as dormi 5 h 18 cette nuit — je me disais qu’on pouvait en parler.",
       hint: APPEL,
       state: "idle",
     },
@@ -111,26 +156,28 @@ export const SCENES: Scene[] = [
         reponse: [
           { at: 0, state: "thinking", hint: "" },
           {
+            // Les six heures de l'avant-veille coupent la série : c'est la
+            // cinquième nuit courte en deux semaines, pas la troisième
+            // d'affilée.
             at: 1100,
             state: "speaking",
-            dit: "Cinq heures douze. C’est ta troisième nuit courte d’affilée. Tu veux qu’on regarde ce qui se passe, ou je te laisse tranquille ?",
+            dit: "Cinq heures dix-huit. C’est ta cinquième nuit sous cinq heures et demie en deux semaines. Tu veux qu’on regarde ce qui se passe, ou je te laisse tranquille ?",
           },
           {
-            at: 6400,
+            at: 7000,
             state: "idle",
-            hint: "Réponds à voix haute, ou touche l’écran",
             question: {
               id: "regarder",
               titre: "On regarde ensemble ce qui t’empêche de dormir ?",
               detail:
-                "Rien ne sort de la cabine tant que tu ne l’as pas décidé — je te dirai à chaque fois.",
+                "5 nuits sur 14 sous 5 h 30, et une variabilité cardiaque sous ton seuil depuis 6 jours.",
               options: [
                 {
                   label: "Oui, on regarde",
                   mots: ["oui", "d’accord", "ok", "vas-y", "regarde"],
                   suite: [
                     { at: 0, state: "speaking", dit: "D’accord. Raconte-moi ta nuit." },
-                    { at: 2400, state: "idle", hint: "Parle quand tu veux" },
+                    { at: 2400, state: "idle", hint: PARLE },
                   ],
                 },
                 {
@@ -143,7 +190,7 @@ export const SCENES: Scene[] = [
                       state: "speaking",
                       dit: "Comme tu veux. Je reste là si tu changes d’avis.",
                     },
-                    { at: 3000, state: "idle", hint: APPEL },
+                    { at: 3000, state: "idle", hint: REPARLER, veille: true },
                   ],
                 },
               ],
@@ -158,21 +205,13 @@ export const SCENES: Scene[] = [
           {
             at: 1100,
             state: "speaking",
-            dit: "Je préviens la maintenance — c’est fait, tu n’as rien à faire. Je peux aussi baisser la lumière de la cabine à 19 h ce soir, pour t’aider à recaler ton cycle.",
+            dit: "Je préviens la maintenance — c’est fait. Je peux aussi baisser la lumière de ta cabine à 19 h ce soir.",
           },
+          // Au « c'est fait », pas avant : la pastille suit ce que Sola dit.
+          { at: 3200, sortie: MAINTENANCE },
           {
-            at: 3000,
-            carte: {
-              id: "maintenance",
-              tag: "Action lancée",
-              texte:
-                "Demande de contrôle acoustique transmise à la maintenance — module C, conduit 4.",
-            },
-          },
-          {
-            at: 8200,
+            at: 7000,
             state: "idle",
-            hint: "Réponds à voix haute, ou touche l’écran",
             question: {
               id: "lumiere",
               titre: "Je baisse la lumière de la cabine à 19 h ce soir ?",
@@ -187,15 +226,7 @@ export const SCENES: Scene[] = [
                       state: "speaking",
                       dit: "C’est réglé. Dix-neuf heures, lumière basse.",
                     },
-                    {
-                      at: 1200,
-                      carte: {
-                        id: "lumiere-ok",
-                        tag: "Réglé pour ce soir",
-                        texte: "Lumière de cabine <b>C-12</b> avancée à 19:00, pour cette nuit.",
-                      },
-                    },
-                    { at: 3600, state: "idle", hint: "Parle quand tu veux" },
+                    { at: 3000, state: "idle", hint: PARLE },
                   ],
                 },
                 {
@@ -204,7 +235,7 @@ export const SCENES: Scene[] = [
                   ghost: true,
                   suite: [
                     { at: 0, state: "speaking", dit: "Entendu, je ne touche à rien." },
-                    { at: 2600, state: "idle", hint: "Parle quand tu veux" },
+                    { at: 2600, state: "idle", hint: PARLE },
                   ],
                 },
               ],
@@ -217,44 +248,36 @@ export const SCENES: Scene[] = [
         reponse: [
           { at: 0, state: "thinking", hint: "" },
           {
+            // Un bruit de conduit, pas un symptôme : Sola ne dit rien de la
+            // santé d'un autre résident.
             at: 1000,
             state: "speaking",
-            dit: "Je sais. Une dernière chose : Yuki, du C-14, a eu exactement le même souci le mois dernier. Elle est au jardin 2 à 18 h. Je lui dis que tu passes ?",
+            dit: "Je sais. Une dernière chose : Selim, du C-04, a eu le même bruit de conduit le mois dernier. Ce soir, Selim est au jardin 2 à 18 h. Je lui dis que tu passes ?",
           },
           {
-            at: 7200,
+            at: 8000,
             state: "idle",
-            hint: "Réponds à voix haute, ou touche l’écran",
             question: {
-              id: "yuki",
-              titre: "Je préviens Yuki que tu passes au jardin 2 ?",
+              id: "selim",
+              titre: "Je préviens Selim que tu passes au jardin 2 ?",
               personne: {
-                initiales: "YK",
-                nom: "Yuki Tanabe · C-14",
-                meta: "Hydroponie, musique · disponible à 18 h",
+                initiales: "SB",
+                nom: "Selim Bergstrom · C-04",
+                meta: "Hydroponie · au jardin 2 à 18 h",
               },
               options: [
                 {
                   label: "Dis-lui que je passe",
                   mots: ["oui", "dis lui", "je passe", "d’accord"],
                   suite: [
-                    { at: 0, state: "speaking", dit: "C’est envoyé. Elle t’attend à 18 h." },
                     {
-                      at: 2600,
+                      at: 0,
                       state: "speaking",
-                      dit: "Et j’ai signalé ta fatigue au Dr Ferreira. Rien d’inquiétant — c’est un point de vigilance, il te contactera peut-être cette semaine.",
+                      dit: "C’est envoyé : rendez-vous au jardin 2 à 18 h. Et j’ai prévenu le Dr Ferreira de ta fatigue — rien d’inquiétant, un point de vigilance.",
                     },
-                    {
-                      at: 4200,
-                      carte: {
-                        id: "escalade",
-                        tag: "Je t’en informe",
-                        warm: true,
-                        texte:
-                          "Trois nuits sous 5 h 30 et une variabilité cardiaque sous ton seuil depuis 4 jours. Je n’ai transmis <b>qu’un résumé</b> — pas notre conversation.",
-                      },
-                    },
-                    { at: 9000, state: "idle", hint: APPEL },
+                    { at: 600, sortie: SELIM },
+                    { at: 3600, sortie: MEDECIN },
+                    { at: 9500, state: "idle", hint: REPARLER, veille: true },
                   ],
                 },
                 {
@@ -265,19 +288,10 @@ export const SCENES: Scene[] = [
                     {
                       at: 0,
                       state: "speaking",
-                      dit: "Pas de souci. J’ai quand même signalé ta fatigue au Dr Ferreira — un point de vigilance, rien de plus.",
+                      dit: "Pas de souci. J’ai quand même prévenu le Dr Ferreira de ta fatigue — un point de vigilance, rien de plus.",
                     },
-                    {
-                      at: 4000,
-                      carte: {
-                        id: "escalade",
-                        tag: "Je t’en informe",
-                        warm: true,
-                        texte:
-                          "Trois nuits sous 5 h 30 et une variabilité cardiaque sous ton seuil depuis 4 jours. Je n’ai transmis <b>qu’un résumé</b> — pas notre conversation.",
-                      },
-                    },
-                    { at: 7000, state: "idle", hint: APPEL },
+                    { at: 1800, sortie: MEDECIN },
+                    { at: 7000, state: "idle", hint: REPARLER, veille: true },
                   ],
                 },
               ],
@@ -306,11 +320,11 @@ export const SCENES: Scene[] = [
       {
         at: 19000,
         state: "idle",
-        hint: "Réponds à voix haute, ou touche l’écran",
         question: {
           id: "apaisement",
           titre: "Ça descend un peu ?",
           detail: "Ton rythme cardiaque est passé de 94 à 81 depuis le début du cycle.",
+          dit: "Ça descend un peu ?",
           options: [
             {
               label: "Oui, ça va mieux",
@@ -345,31 +359,31 @@ export const SCENES: Scene[] = [
     mode: "alerte",
     monologue: true,
     ouverture: {
-      dit: "J’ai prévenu le Dr Ferreira. Il arrive dans 4 minutes. Reste assis, je reste avec toi.",
+      dit: "J’ai prévenu le Dr Ferreira. Ne te lève pas, je reste avec toi.",
       hint: "",
       state: "speaking",
+      sortie: { id: "alerte", texte: "Alerte transmise · infirmerie B", ton: "critique" },
     },
     echanges: [],
+    arrivee: {
+      qui: "Dr Ferreira arrive",
+      minutes: 4,
+      trajet: "parti de l’infirmerie B à 14:31 · arrivée 14:35",
+      faits: ["Porte déverrouillée pour l’équipe", "Contact de confiance prévenu : Amara, C-15"],
+    },
     onEnter: [
-      {
-        at: 1200,
-        carte: {
-          id: "secours",
-          tag: "Services médicaux en route",
-          texte:
-            "<b>Dr A. Ferreira</b> — parti de l’infirmerie B à 14:31, arrivée estimée 14:35.<br>Ta porte a été déverrouillée pour l’équipe. Ton contact de confiance, Amara (C-15), a été prévenue.",
-        },
-      },
       // Répondre à la voix compte double ici : quelqu'un au sol n'atteint pas
-      // l'écran. Le bouton reste, pour celui qui est debout devant la borne.
+      // l'écran, et ne le voit peut-être pas — d'où la question prononcée. Les
+      // boutons restent, pour qui est debout devant la borne.
       {
-        at: 5000,
+        at: 5600,
         state: "idle",
-        hint: "Réponds à voix haute, ou touche l’écran",
         question: {
           id: "presence",
+          surtitre: "Si tu peux",
           titre: "Tu m’entends ?",
           detail: "Dis-le-moi seulement si tu peux. Sinon je garde l’appel tel quel.",
+          dit: "Tu m’entends ? Dis-le-moi seulement si tu peux.",
           options: [
             {
               label: "Oui, je t’entends",
@@ -378,9 +392,9 @@ export const SCENES: Scene[] = [
                 {
                   at: 0,
                   state: "speaking",
-                  dit: "Bien. Je préviens l’équipe que tu es conscient. Respire doucement, il arrive.",
+                  dit: "Je préviens l’équipe que tu m’entends. Respire doucement, le Dr Ferreira arrive.",
                 },
-                { at: 5000, state: "idle", hint: "Dr Ferreira · arrivée 14:35" },
+                { at: 5000, state: "idle" },
               ],
             },
             {
@@ -393,7 +407,7 @@ export const SCENES: Scene[] = [
                   state: "speaking",
                   dit: "Je transmets, mais le Dr Ferreira passera quand même te voir. C’est la règle après une chute.",
                 },
-                { at: 5500, state: "idle", hint: "Passage de contrôle maintenu" },
+                { at: 5500, state: "idle" },
               ],
             },
           ],
