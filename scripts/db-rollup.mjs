@@ -5,6 +5,12 @@
 //
 // A lancer une fois par jour (cron a 00:20, heure de bord). `mesures` est
 // ecrite en continu par les bornes ; `mesures_jour` est ce que la console lit.
+//
+// Le serveur de bord tient deja a jour la ligne du jour a chaque trame recue
+// (`SQL_JOUR`, server/src/routes/ingest.ts) : ce script sert a recalculer un
+// jour entier. Les deux calculs sont jumeaux et changent ensemble, a une
+// difference pres : ici la ligne est ecrasee, la-bas elle est completee — une
+// colonne que les minutes n'ont pas y garde sa valeur.
 
 import { DatabaseSync } from "node:sqlite";
 

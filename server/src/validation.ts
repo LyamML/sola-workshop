@@ -13,18 +13,28 @@ const codeResident = z
   .string()
   .regex(/^R-\d{4}$/, "Code resident attendu au format R-0448.");
 
+const numeroBracelet = z
+  .string()
+  .regex(/^BR-\d{4}$/, "Numero de bracelet attendu au format BR-0448.");
+
 /** Horodatage ISO 8601. La borne envoie toujours en UTC. */
 const horodatage = z.string().datetime({ offset: true });
 
 /**
  * Bornes physiologiques d'une minute de mesure. Les deux routes qui ecrivent
  * `mesures` les partagent : /ingest/mesure les impose a ce qu'on lui envoie,
- * /ingest/bracelet ecarte ce qui en sort avant de faire ses moyennes.
+ * /ingest/bracelet ecarte ce qui en sort avant de faire ses moyennes, et le
+ * renvoie a l'emetteur dans sa reponse. Celles de la FC et de la SpO2 recopient
+ * les CHECK de `mesures` (db/serveur/01-schema.sql) : les changer d'un seul
+ * cote, c'est faire d'une valeur ecartee une erreur 500.
  */
 export const BORNES = {
   bpm: { min: 25, max: 220 },
   rmssd: { min: 0, max: 300 },
-  spo2: { min: 50, max: 100 },
+  // Toute l'echelle : une SpO2 sous 50 % est rare mais vraie — detresse
+  // respiratoire, fin de vie — et c'est celle qu'un soignant doit voir. Seul
+  // zero reste dehors, puisqu'il veut dire « pas de valeur ».
+  spo2: { min: 1, max: 100 },
   activite: { min: 0, max: 16 },
 } as const;
 
@@ -111,10 +121,27 @@ export const lotTramesSchema = z
     resident: codeResident,
     // Obligatoire ici, contrairement a /ingest/mesure : c'est lui qui permet
     // de verifier que le bracelet appaire est bien celui du resident.
-    bracelet: z.string().regex(/^BR-\d{4}$/, "Numero de bracelet attendu au format BR-0448."),
+    bracelet: numeroBracelet,
     // Une heure a une trame par seconde. La borne envoie par paquets de dix
     // minutes ; la marge couvre un relais qui accumulerait davantage.
     trames: z.array(trameSchema).min(1).max(3600),
+  })
+  .strict();
+
+/**
+ * Une lecture seule, du bracelet qui envoie lui-meme en Wi-Fi : la trame sans
+ * `at`, puisque rien ne l'horodate avant le serveur, et avec son adresse. Un
+ * croquis Arduino n'a souvent ni `rmssd` ni indice de qualite : zero veut deja
+ * dire « pas de valeur », et une lecture sans qualite passe pour `fair` — les
+ * bornes physiologiques ecartent toujours ce qui est aberrant.
+ */
+export const lectureSchema = trameSchema
+  .omit({ at: true, id: true })
+  .extend({
+    resident: codeResident,
+    bracelet: numeroBracelet,
+    rmssd: z.number().min(0).default(0),
+    q: z.enum(["good", "fair", "poor", "warmup"]).default("fair"),
   })
   .strict();
 
