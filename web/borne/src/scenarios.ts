@@ -123,7 +123,9 @@ export interface Scene {
 /** Ce que la borne affiche en pied quand elle a le micro ouvert sur quelqu'un. */
 export const HINT_ECOUTE = "Je t’écoute…";
 
-const APPEL = "Dis « Sola » pour commencer";
+// Plus de mot d'éveil depuis la conversation libre : passé le voile, toute
+// phrase entendue part à Sola. L'invite ne demande donc plus son nom.
+const APPEL = "Parle quand tu veux";
 
 export const SCENES: Scene[] = [
   {
