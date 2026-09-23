@@ -21,7 +21,9 @@ PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
 -- Les enfants d'abord : avec `PRAGMA foreign_keys = ON`, supprimer une table
--- encore referencee echoue.
+-- encore referencee echoue. `residents` passe donc avant `medecins`, que son
+-- medecin traitant reference : dans l'autre sens, un reset sur une base deja
+-- remplie s'arrete apres avoir vide toutes les autres tables.
 DROP TABLE IF EXISTS analyses_sang;
 DROP TABLE IF EXISTS bilans_sanguins;
 DROP TABLE IF EXISTS sessions;
@@ -36,9 +38,9 @@ DROP TABLE IF EXISTS mesures;
 DROP TABLE IF EXISTS suivis;
 DROP TABLE IF EXISTS particularites;
 DROP TABLE IF EXISTS bracelets;
+DROP TABLE IF EXISTS residents;
 DROP TABLE IF EXISTS medecins;
 DROP TABLE IF EXISTS admins;
-DROP TABLE IF EXISTS residents;
 
 -- ----------------------------------------------------------------- comptes ---
 --
