@@ -45,6 +45,11 @@ export const config = {
   // administrateurs — ouvrent une session (table `sessions`), et l'ancien
   // ADMIN_TOKEN a disparu avec elle.
   borneToken: requis("BORNE_TOKEN"),
+  // Porte par le bracelet quand il envoie lui-meme en Wi-Fi. Facultatif :
+  // sans lui, le port reseau reste ferme et tout le serveur n'ecoute que sur
+  // le poste. `||` et non `??` : la ligne vide du modele vaut « absent ».
+  braceletToken: process.env.BRACELET_TOKEN || null,
+  portReseau: entier("PORT_RESEAU", 5177),
   // Fichier SQLite du serveur de bord. Il se sauvegarde par copie.
   //
   // Resolu depuis la racine du depot, PAS depuis le repertoire courant : le
@@ -55,4 +60,15 @@ export const config = {
 
 if (config.borneToken.length < 32) {
   throw new Error("BORNE_TOKEN doit faire au moins 32 caracteres.");
+}
+
+if (config.braceletToken !== null) {
+  if (config.braceletToken.length < 32) {
+    throw new Error("BRACELET_TOKEN doit faire au moins 32 caracteres.");
+  }
+  // Le jeton du bracelet est aussi ecrit dans son code : s'il valait celui des
+  // bornes, un bracelet perdu ouvrirait toutes les routes d'ecriture.
+  if (config.braceletToken === config.borneToken) {
+    throw new Error("BRACELET_TOKEN doit differer de BORNE_TOKEN.");
+  }
 }

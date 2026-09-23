@@ -50,6 +50,25 @@ export function authBorne(req: Request, res: Response, next: NextFunction): void
   next();
 }
 
+const jetonBracelet = config.braceletToken ? Buffer.from(config.braceletToken, "utf8") : null;
+
+/**
+ * Authentification du bracelet qui envoie lui-meme en Wi-Fi, sur le port
+ * reseau.
+ *
+ * Un jeton a part plutot que celui des bornes : celui-ci est aussi ecrit dans
+ * le code du bracelet, et un bracelet se perd plus facilement qu'une borne.
+ * Il n'ouvre donc que l'ecriture des trames, jamais une conversation ni un
+ * evenement.
+ */
+export function authBracelet(req: Request, res: Response, next: NextFunction): void {
+  if (!jetonBracelet || !porteurValide(req.header("authorization") ?? "", jetonBracelet)) {
+    res.status(401).json({ erreur: "Jeton de bracelet invalide." });
+    return;
+  }
+  next();
+}
+
 /**
  * Le compte de la requete en cours.
  *

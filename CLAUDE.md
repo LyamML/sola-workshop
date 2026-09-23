@@ -29,11 +29,11 @@ proposer autre chose plutôt que de les contourner.
 
 ### 1. Les secrets ne sortent jamais du disque
 
-`server/.env` contient `BORNE_TOKEN`. On ne le recopie **nulle part** : ni dans
-un fichier, ni dans un message, ni dans un commentaire, ni dans une URL, ni dans
-un commit. Même règle pour un mot de passe de compte, y compris celui d'un
-compte de démonstration créé à la main. `.env` et `*.db` sont dans `.gitignore` —
-ne les en sortez pas.
+`server/.env` contient `BORNE_TOKEN`, et `BRACELET_TOKEN` pour les bracelets en
+Wi-Fi. On ne les recopie **nulle part** : ni dans un fichier, ni dans un
+message, ni dans un commentaire, ni dans une URL, ni dans un commit. Même règle
+pour un mot de passe de compte, y compris celui d'un compte de démonstration
+créé à la main. `.env` et `*.db` sont dans `.gitignore` — ne les en sortez pas.
 
 **Le dépôt est public.** Tout ce qui est commité est lisible par n'importe qui.
 
@@ -116,12 +116,13 @@ documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
 **Les limites ouvertes aujourd'hui :** aucune purge des mesures n'est
 implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
-il n'y écrit que les trames du bracelet —, ces mesures n'atteignent pas la
-fiche (`mesures_jour` ne se calcule qu'avec `npm run db:rollup`, et `adapt.ts`
-afficherait à 0 ce que le bracelet ne mesure pas), la borne ne transmet que
-servie par Vite, dont le relais porte le jeton, une partie de la trame est
-reçue sans être conservée — une chute comptée par le bracelet n'ouvre pas de
-signal —, la conversation libre de la borne exige Ollama sur la machine, le
+il n'y écrit que les trames du bracelet —, le bracelet ne remplit que trois
+constantes de la fiche — un jour qu'il est seul à écrire, `adapt.ts` affiche
+les autres à 0 —, le jour d'une mesure est le jour UTC, le port réseau des
+bracelets parle HTTP en clair avec un seul jeton pour tous, la borne ne
+transmet que servie par Vite, dont le relais porte le jeton, une partie de la
+trame est reçue sans être conservée — une chute comptée par le bracelet n'ouvre
+pas de signal —, la conversation libre de la borne exige Ollama sur la machine, le
 résumé clinique à la sortie d'« Échange » exige Ollama et le serveur de bord
 (sinon la barre d'état le dit), Sola ne déclenche aucune action et, hors
 urgences gérées dans le code (réponses écrites, sévérité forcée), ses règles
@@ -196,7 +197,7 @@ marche.
 | `npm run dev` | les quatre services dans un terminal, journaux préfixés, Ctrl+C arrête tout — `scripts/dev.mjs` ; `npm run dev -- console server` pour un sous-ensemble | 5173–5176 |
 | `npm run dev:borne` | écran 01 — la borne de cabine | 5173 |
 | `npm run dev:console` | écrans 02 à 04 — la console médicale | 5174 |
-| `npm run dev:server` | le serveur de bord (API) | 5175 |
+| `npm run dev:server` | le serveur de bord (API) ; avec `BRACELET_TOKEN`, aussi le port réseau des bracelets en Wi-Fi | 5175, 5177 |
 | `npm run dev:backoffice` | le backoffice | 5176 |
 | `npm run db:reset` | recharge schéma + vues + jeu de démonstration | — |
 | `npm run db:demo` | régénère seulement les données | — |
@@ -257,16 +258,18 @@ racine, réglé par `DB_FILE`.
 
 | Ce que vous cherchez | Fichier |
 |---|---|
-| Montage des routes, CORS, liste des routes sur `/` | `src/index.ts` |
+| Montage des routes, CORS, liste des routes sur `/`, le port réseau des bracelets en Wi-Fi | `src/index.ts` |
 | Lecture de la console — écrans 02, 03, 04 | `src/routes/console.ts` |
 | Écriture d'une note (partagée avec le backoffice) | `src/routes/console.ts`, `ajouterParticularite` |
 | Backoffice — tables, correction, signaux | `src/routes/admin.ts` |
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
-| **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`) |
+| **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures`, puis la ligne du jour de `mesures_jour` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`, `SQL_JOUR`) |
+| La lecture seule d'un bracelet en Wi-Fi, et ce qu'une réponse dit des valeurs écartées | `src/validation.ts` (`lectureSchema`), `src/routes/ingest.ts` (`recevoirWifi`, `accuse`) |
+| La dernière minute du bracelet et l'heure écoulée, pour la carte « en direct » de l'écran 03 | `src/routes/direct.ts` |
 | Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
 | Hachage argon2id des mots de passe | `src/mdp.ts` |
 | Ouverture, lecture et purge des sessions, cookie | `src/sessions.ts` |
-| Jeton porteur des bornes, exigences de rôle | `src/auth.ts` |
+| Jetons porteurs des bornes et des bracelets, exigences de rôle | `src/auth.ts` |
 | Ouverture SQLite, `requete`, `ecrire`, `transaction` | `src/db.ts` |
 | Variables d'environnement | `src/config.ts`, modèle dans `.env.example` |
 | Schémas de validation | `src/validation.ts` |
@@ -284,7 +287,7 @@ racine, réglé par `DB_FILE`.
 | **Le générateur du jeu de démonstration (37 200 évaluations, 281 signaux)** | `scripts/db-demo.mjs` |
 | Chargement des fichiers SQL | `scripts/db-load.mjs` |
 | Créer un compte, changer un mot de passe | `scripts/db-compte.mjs`, `scripts/hachage.mjs` |
-| Agrégats quotidiens | `scripts/db-rollup.mjs` |
+| Agrégats quotidiens — le serveur tient celui du jour à chaque trame, ce script recalcule un jour entier | `scripts/db-rollup.mjs`, jumeau de `SQL_JOUR` dans `server/src/routes/ingest.ts` |
 | Interroger la base au terminal | `scripts/db-sql.mjs` |
 
 ### Le matériel et la documentation
