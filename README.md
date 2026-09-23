@@ -59,6 +59,40 @@ npm install
 ```
 
 ```bash
+npm run dev:borne
+```
+
+```bash
+npm run dev:console
+```
+
+La borne écoute sur <http://localhost:5173>, la console sur <http://localhost:5174>.
+`npm run build` et `npm run typecheck` traversent tous les espaces de travail.
+
+La conversation de la borne passe par un modèle de langage **local**, servi
+par [Ollama](https://ollama.com) sur la même machine. Une fois Ollama installé
+et lancé :
+
+```bash
+ollama pull qwen3:8b
+```
+
+Le serveur de la borne relaie `/ollama` vers `http://127.0.0.1:11434` : aucune
+configuration CORS à faire côté Ollama. Pour un autre modèle, par exemple plus
+léger, créez `web/borne/.env.local` avec `VITE_OLLAMA_MODEL=qwen3:4b`.
+
+À la sortie de la scène « Échange », la borne produit un **résumé clinique**
+(jamais le verbatim) et l'envoie au serveur de bord via le proxy `/bord`, qui
+ajoute `BORNE_TOKEN` lu dans `server/.env` — le navigateur ne voit jamais le
+jeton. Il faut donc `npm run dev:server` en parallèle pour que la remontée
+aboutisse ; sinon la barre d'état affiche « Serveur de bord injoignable ».
+
+La console lit le serveur de bord quand il répond, et retombe sur son jeu de
+démonstration sinon — en le disant dans son en-tête. Pour la brancher sur la
+base (**Node 24 ou plus**, pour `node:sqlite`), copiez le modèle de
+configuration et renseignez le jeton des bornes :
+
+```bash
 cp server/.env.example server/.env
 ```
 
@@ -218,11 +252,13 @@ est précisément le cas dans le scénario d'alerte.
 
 **La barre d'espace double la voix de bout en bout**, et les touches `1` et `2`
 répondent à une question ouverte : c'est ce qui sauve la démonstration quand le
-micro est refusé ou la salle trop bruyante.
+micro est refusé ou la salle trop bruyante. En conversation libre, il n'y a pas
+de réplique toute prête à faire dire au résident : la barre d'espace place le
+curseur dans le champ « Ou écris à Sola », en pied de borne.
 
 Le bandeau effacé en bas à droite rejoue les trois états de l'écran :
 
-- **Échange** — trois tours de parole : la nuit courte, l'action de maintenance, puis le lien social et l'escalade vers le médecin, annoncée au résident ; trois questions jalonnent l'échange et la réponse choisie change la suite ;
+- **Échange** — conversation libre : Sola ouvre sur la nuit courte, puis chaque phrase du résident part au modèle local (`web/borne/src/ia.ts`), qui répond en une à trois phrases, à voix haute. L'historique ne vit que dans la page et s'efface au changement de scène ;
 - **Apaisement** — respiration guidée 4-7-8, déclenchée dans la vraie vie par une hausse de stress ; Sola demande au bout d'un cycle si ça descend ;
 - **Alerte** — les secours sont en route, Sola reste présente et vérifie qu'on l'entend.
 
@@ -332,13 +368,16 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 - **L'estimation du sommeil surestime.** Rester allongé éveillé, immobile et détendu est classé comme du sommeil : compter une erreur de l'ordre de la demi-heure sur une nuit. Les stades (léger / profond / paradoxal) ne sont pas calculés — sans EEG, ce serait de l'invention.
 - **La SpO₂ n'est pas calibrée.** Le rapport des rapports est appliqué avec les coefficients génériques de la littérature, sans oxymètre de référence. La valeur montre une tendance, elle ne pose pas un diagnostic.
 - **Le PPG au poignet est difficile.** Le MAX30102 mesure par réflexion : le signal y est 5 à 10 fois plus faible qu'au doigt, et le moindre mouvement fait perdre le contact. C'est la contrainte matérielle la plus lourde du prototype.
-- **Le LLM embarqué n'est pas implémenté.** La borne rejoue des scénarios scriptés : l'architecture réserve sa place et garantit son isolement, mais le modèle reste à intégrer.
-- **L'écran 01 rejoue des scénarios scriptés.** Les écrans 02 à 04 lisent le serveur de bord ; la borne n'y écrit que les trames du bracelet, et ses conversations restent scriptées, ce qui est cohérent avec le fait que son LLM n'est pas implémenté.
+- **Le modèle de la borne exige Ollama sur la machine.** Sans lui, Sola répond par une phrase de repli (« si c'est urgent, appelle l'infirmerie ») et la barre d'état affiche « IA locale injoignable ». Sur le poste de développement (RTX 4050 Laptop, 6 Go), `qwen3:8b` ne tient pas entièrement en mémoire graphique : le premier chargement prend une dizaine de secondes, puis une réponse commence en moins d'une seconde et se termine en 4 à 7 secondes. `qwen3.5:4b` tient entièrement sur la carte et répond en 2 secondes, mais il invente nettement plus : il n'est pas retenu.
+- **Le résumé clinique dépend d'Ollama et du serveur de bord.** À la sortie de « Échange », un second appel au modèle produit un résumé (mental et physique évoqués à l'oral) ; le proxy `/bord` l'envoie à `POST /ingest/conversation`. Si la sévérité n'est pas `info`, un signal s'ouvre dans la file du médecin. Sans Ollama le résumé n'est pas produit ; sans serveur (ou sans `BORNE_TOKEN` dans `server/.env`) la barre d'état le dit. Le verbatim ne quitte jamais la cabine.
+- **Sola ne déclenche aucune action, et la plupart de ses règles sont des consignes.** Elle ne peut ni prévenir la maintenance, ni régler la lumière, ni contacter quelqu'un. Trois garde-fous sont écrits dans le code (`web/borne/src/ia.ts`) : une urgence (douleur thoracique, gêne respiratoire, malaise, idée suicidaire) reçoit une réponse écrite à l'avance et force la sévérité `critique` du résumé ; une phrase qui prétend une action est remplacée ; une phrase qui nomme une maladie est retirée. Le reste — ne rien inventer, rester dans le sujet — n'est que consigne, et un modèle de 8 milliards de paramètres s'en écarte encore : conseil incongru, faute de français, supposition.
+- **La détection d'urgence repose sur des mots-clés.** Elle reconnaît les formulations courantes (« douleur dans la poitrine », « du mal à respirer », « plus envie de vivre »…) ; une formulation qu'elle ne connaît pas passe au modèle, qui n'a plus alors que sa consigne. Elle préfère le faux positif : une phrase de trop coûte moins qu'une urgence manquée.
 - **Les mesures du bracelet n'atteignent pas encore la fiche.** `POST /ingest/bracelet` écrit une ligne par minute dans `mesures`, mais la fiche et le registre (écrans 03 et 04) lisent les agrégats de `mesures_jour`, que seul `npm run db:rollup` calcule : il n'y a pas de tâche de nuit. Un agrégat réel laisserait de plus vides la respiration, la température, l'activité électrodermale et les pas, et `adapt.ts` les afficherait à 0 sur la fiche, alertes comprises. Les vraies mesures se lisent donc au backoffice ou au terminal.
 - **La borne ne transmet que servie par Vite.** C'est son serveur de développement qui ajoute le jeton de `/ingest`. Publiée en fichiers statiques, elle n'aurait plus de relais, et ce rôle reviendrait au serveur de bord ou à un service de la cabine. Sa file d'attente vit en mémoire : une heure au plus, perdue si l'on recharge la page.
 - **Une partie de la trame est reçue sans être conservée.** `tst`, `waso`, `hrRest`, `fall`, `shake`, `beats` et `amp` sont validées puis écartées : aucune table ne les attend encore. En particulier, une chute comptée par le bracelet n'ouvre pas de signal. Seul `POST /ingest/evenement` en ouvre un, et la borne ne l'appelle pas.
-- **La reconnaissance vocale de la borne dépend du navigateur.** `SpeechRecognition` n'existe aujourd'hui que dans les navigateurs à moteur Chromium, et elle y passe par un service distant de Google — un vrai vaisseau ne s'en contenterait pas. Ailleurs, ou micro refusé, la borne le dit dans sa barre d'état et se conduit à la barre d'espace. Ce que Sola entend ne sert qu'à faire avancer le scénario : rien n'est enregistré, rien n'est envoyé au serveur de bord.
-- **Sola ne reconnaît sa propre voix que par le texte.** Le micro reste ouvert pendant qu'elle parle, pour qu'on puisse la couper, et ce qu'il entend est écarté quand ce sont ses mots à elle. Un mot qu'elle vient de dire ne vaut donc pas réponse, ni pendant sa phrase ni dans les deux secondes qui suivent : « regarde », « laisse » et « dis-lui » figurent dans les phrases qui posent leurs questions, il faut alors répondre « oui » ou « d'accord ». Le filtre dépend aussi de ce que l'annulation d'écho de Chrome laisse passer ; au casque, il n'a rien à faire.
+- **La borne n'est pas branchée sur la base pour le résumé IA.** L'écran 01 ne connaît du résident que ce que son prompt lui dit. Un problème physique n'entre dans le résumé que s'il a été dit à l'oral.
+- **La reconnaissance vocale de la borne dépend du navigateur.** `SpeechRecognition` n'existe aujourd'hui que dans les navigateurs à moteur Chromium, et elle y passe par un service distant de Google — un vrai vaisseau ne s'en contenterait pas. Ailleurs, ou micro refusé, la borne le dit dans sa barre d'état et se conduit à la barre d'espace. Ce que Sola entend ne va qu'au modèle local : le verbatim n'est ni enregistré ni envoyé ; seul le résumé clinique peut partir au serveur de bord.
+- **Sola ne reconnaît sa propre voix que par le texte.** Le micro reste ouvert pendant qu'elle parle, pour qu'on puisse la couper, et ce qu'il entend est écarté quand ce sont ses mots à elle. Un mot qu'elle vient de dire ne vaut donc pas réponse, ni pendant sa phrase ni dans les deux secondes qui suivent : à une question, mieux vaut répondre « oui » ou « d'accord » que reprendre ses mots, et en conversation libre une phrase qui reprend surtout les siens peut être ignorée. Le filtre dépend aussi de ce que l'annulation d'écho de Chrome laisse passer ; au casque, il n'a rien à faire.
 - **Aucune purge des mesures n'est implémentée.** Le schéma prévoit une rétention de 90 jours sur `mesures` ; rien ne l'applique aujourd'hui. La base cabine, elle, efface bien le verbatim à 30 jours, par un trigger.
 - **Les bilans sanguins du jeu de démonstration sont simulés.** Les 29 marqueurs, leurs bornes de référence et leurs unités sont ceux d'un bilan réel, mais les valeurs sont tirées par le générateur : chaque bilan porte `source = 'simule'` et la fiche l'affiche.
 - **Les données sont synthétiques.** Elles sont calibrées pour être vraisemblables et cohérentes entre elles, pas pour être vraies. Aucun chiffre de ce dépôt ne dit quoi que ce soit d'une population réelle.

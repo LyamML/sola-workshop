@@ -1,49 +1,38 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
-import { parseEnv } from "node:util";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 
-/**
- * Le relais des trames du bracelet vers le serveur de bord.
- *
- * /ingest exige le jeton des bornes, et une page web ne garde aucun secret :
- * le jeton reste donc ici, côté Node, et s'ajoute à la requête en passant.
- * Il est lu dans server/.env, comme le serveur le lit, et l'environnement
- * l'emporte sur le fichier, comme pour `node --env-file`.
- */
-function relais(): Record<string, ProxyOptions> | undefined {
-  let fichier: Record<string, string | undefined> = {};
-  try {
-    fichier = parseEnv(readFileSync(new URL("../../server/.env", import.meta.url), "utf8"));
-  } catch {
-    /* pas de server/.env : on s'en tient à l'environnement */
-  }
-  const env = { ...fichier, ...process.env };
-  const jeton = env.BORNE_TOKEN;
-  if (!jeton) {
-    console.warn(
-      "[borne] BORNE_TOKEN introuvable dans server/.env : les trames du bracelet ne partiront pas.",
-    );
-    return undefined;
-  }
+const ici = dirname(fileURLToPath(import.meta.url));
 
-  return {
-    "^/ingest/bracelet$": {
-      target: `http://localhost:${env.PORT ?? 5175}`,
-      bypass: (req) => (depuisLaBorne(req) ? undefined : false),
-      // Posé à chaque requête plutôt que dans `headers` : ainsi le jeton ne
-      // figure dans aucun objet de configuration qu'un journal de débogage
-      // de Vite pourrait afficher.
-      configure: (proxy) => {
-        proxy.on("proxyReq", (requete) => {
-          requete.setHeader("Authorization", `Bearer ${jeton}`);
-          // La page n'a rien d'autre à dire au serveur de bord que ses trames.
-          requete.removeHeader("Cookie");
-        });
-      },
-    },
-  };
+/**
+ * Le jeton des bornes vit dans `server/.env` (ou dans l'environnement du
+ * process). Il ne doit jamais arriver au navigateur : les proxies `/bord` et
+ * `/ingest` l'ajoutent côté serveur Vite, comme `/ollama` masque l'adresse
+ * du modèle.
+ */
+function lireBorneToken(): string | undefined {
+  if (process.env.BORNE_TOKEN) return process.env.BORNE_TOKEN;
+  const chemin = resolve(ici, "../../server/.env");
+  if (!existsSync(chemin)) return undefined;
+  for (const ligne of readFileSync(chemin, "utf8").split(/\r?\n/)) {
+    const m = /^\s*BORNE_TOKEN\s*=\s*(.*)$/.exec(ligne);
+    if (!m) continue;
+    return m[1].replace(/^["']|["']$/g, "").trim();
+  }
+  return undefined;
+}
+
+const borneToken = lireBorneToken();
+const bordCible = process.env.BORD_URL ?? "http://127.0.0.1:5175";
+
+if (!borneToken) {
+  console.warn(
+    "[borne] BORNE_TOKEN introuvable : les résumés et les trames du bracelet " +
+      "ne partiront pas vers le serveur de bord. Renseignez server/.env ou exportez BORNE_TOKEN.",
+  );
 }
 
 /**
@@ -65,10 +54,47 @@ function depuisLaBorne(req: IncomingMessage): boolean {
   return req.method === "POST" && locale && memeOrigine;
 }
 
-export default defineConfig(({ command }) => ({
+const ollama: Record<string, ProxyOptions> = {
+  "/ollama": {
+    target: "http://127.0.0.1:11434",
+    changeOrigin: true,
+    rewrite: (chemin) => chemin.replace(/^\/ollama/, ""),
+  },
+};
+
+const bord: Record<string, ProxyOptions> = borneToken
+  ? {
+      "/bord": {
+        target: bordCible,
+        changeOrigin: true,
+        rewrite: (chemin) => chemin.replace(/^\/bord/, ""),
+        configure(proxy) {
+          proxy.on("proxyReq", (req) => {
+            req.setHeader("Authorization", `Bearer ${borneToken}`);
+          });
+        },
+      },
+      "^/ingest/bracelet$": {
+        target: bordCible,
+        bypass: (req) => (depuisLaBorne(req) ? undefined : false),
+        // Posé à chaque requête plutôt que dans `headers` : ainsi le jeton ne
+        // figure dans aucun objet de configuration qu'un journal de débogage
+        // de Vite pourrait afficher.
+        configure: (proxy) => {
+          proxy.on("proxyReq", (req) => {
+            req.setHeader("Authorization", `Bearer ${borneToken}`);
+            // La page n'a rien d'autre à dire au serveur de bord que ses trames.
+            req.removeHeader("Cookie");
+          });
+        },
+      },
+    }
+  : {};
+
+export default defineConfig({
   plugins: [react()],
   // Web Bluetooth exige un contexte sécurisé : localhost en fait partie,
-  // donc le serveur de développement suffit, sans certificat. `vite preview`
-  // reprend le même relais : preview.proxy vaut server.proxy par défaut.
-  server: { port: 5173, proxy: command === "serve" ? relais() : undefined },
-}));
+  // donc le serveur de développement suffit, sans certificat.
+  server: { port: 5173, proxy: { ...ollama, ...bord } },
+  preview: { port: 5173, proxy: { ...ollama, ...bord } },
+});

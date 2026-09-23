@@ -114,14 +114,20 @@ Le README a une section « limites » et elle est à jour. Si vous en levez une,
 retirez la ligne. Si vous en créez une, ajoutez-la. Une limite assumée et
 documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
-**Les huit limites ouvertes aujourd'hui :** aucune purge des mesures n'est
+**Les limites ouvertes aujourd'hui :** aucune purge des mesures n'est
 implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
 il n'y écrit que les trames du bracelet —, ces mesures n'atteignent pas la
 fiche (`mesures_jour` ne se calcule qu'avec `npm run db:rollup`, et `adapt.ts`
 afficherait à 0 ce que le bracelet ne mesure pas), la borne ne transmet que
 servie par Vite, dont le relais porte le jeton, une partie de la trame est
 reçue sans être conservée — une chute comptée par le bracelet n'ouvre pas de
-signal —, les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
+signal —, la conversation libre de la borne exige Ollama sur la machine, le
+résumé clinique à la sortie d'« Échange » exige Ollama et le serveur de bord
+(sinon la barre d'état le dit), Sola ne déclenche aucune action et, hors
+urgences gérées dans le code (réponses écrites, sévérité forcée), ses règles
+ne sont que des consignes données au modèle, la détection d'urgence ne repose
+que sur des mots-clés,
+les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
 et la fiche le dit), la reconnaissance vocale de la borne n'existe que dans
 les navigateurs à moteur Chromium — ailleurs elle bascule au clavier et le dit
 dans sa barre d'état —, et Sola ne reconnaît sa propre voix que par le texte :
@@ -218,9 +224,11 @@ racine, réglé par `DB_FILE`.
 | L'enchaînement des scènes, le clavier de secours | `src/App.tsx` |
 | Les répliques, les cartes et les questions | `src/scenarios.ts` |
 | Écoute, synthèse, mot d'éveil, filtre d'écho | `src/voix.ts` |
+| La conversation libre : prompt de Sola, appel au modèle local (Ollama), réponses d'urgence, filtres de sortie, résumé clinique | `src/ia.ts` |
+| Envoi du résumé au serveur de bord (via proxy `/bord`) | `src/remontee.ts` |
 | Le client Web Bluetooth du bracelet | `src/bracelet.ts` |
 | La file d'envoi des trames et son libellé dans la barre d'état | `src/transmission.ts` |
-| Le relais qui ajoute le jeton de `/ingest`, et à qui il le prête | `vite.config.ts` |
+| Le relais `/ollama` vers Ollama, `/bord` pour le résumé, `/ingest/bracelet` pour les trames | `vite.config.ts` |
 | **Le visage de Sola** — trois images, une par état | `src/components/SolaAvatar.tsx` |
 | Le chat vectoriel d'origine, gardé en réserve | `src/components/SolaCat.tsx` |
 | Les images en pixels (repos, écoute, parole) | `src/assets/` |
