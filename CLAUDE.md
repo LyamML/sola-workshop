@@ -181,6 +181,7 @@ pas d'outils, et l'équipe travaille sous Windows.
 | **Micro dans le panneau navigateur** | il est bloqué : la borne affiche « micro refusé » | Piloter l'écran 01 au clavier (espace, `1`/`2`) — mais le clavier contourne l'écoute : pour tester interruption et écho, capturer le moteur en remplaçant `webkitSpeechRecognition.prototype.start`, puis appeler son `onresult` avec des résultats fabriqués. La vraie voix se teste dans Chrome |
 | **Bluetooth dans le panneau navigateur** | aucun bracelet n'y est joignable, et le premier clic est pris par le voile du micro | Remplacer `navigator.bluetooth` par un faux qui notifie des trames, cliquer « Appairer » en JavaScript. Tester l'envoi contre une copie de la base (`VACUUM INTO`) et un serveur sur un autre port : une trame écrite dans `sola.db` ne s'efface plus, faute de purge |
 | **Routes de la console** | `/residents/:id`, pas `/resident/:id` | Voir `web/console/src/App.tsx` |
+| **Port déjà pris** | un serveur resté d'une autre session tient le port : Vite refuse de démarrer (`strictPort`, dans chaque `vite.config.ts`) au lieu de glisser sur 5178, où plus rien ne correspond | `npm run dev` arrête un serveur Sola qui tient l'un de ses ports, et nomme le programme qui tient les autres. Un serveur d'essai prend un port hors de 5173–5177, et s'arrête avec son entrée de `.claude/launch.json` quand l'essai est fini |
 
 **Vérifier avant d'annoncer.** `npm run typecheck` pour le code ; pour une
 modification visible, la mesurer dans le navigateur plutôt que supposer qu'elle
@@ -194,7 +195,7 @@ marche.
 
 | Commande | Ce qu'elle fait | Port |
 |---|---|---|
-| `npm run dev` | les quatre services dans un terminal, journaux préfixés, Ctrl+C arrête tout — `scripts/dev.mjs` ; `npm run dev -- console server` pour un sous-ensemble | 5173–5176 |
+| `npm run dev` | les quatre services dans un terminal, journaux préfixés, Ctrl+C arrête tout ; libère d'abord un port qu'un ancien serveur Sola tient encore, finit par la liste des adresses — `scripts/dev.mjs` ; `npm run dev -- console server` pour un sous-ensemble | 5173–5177 |
 | `npm run dev:borne` | écran 01 — la borne de cabine | 5173 |
 | `npm run dev:console` | écrans 02 à 04 — la console médicale | 5174 |
 | `npm run dev:server` | le serveur de bord (API) ; avec `BRACELET_TOKEN`, aussi le port réseau des bracelets en Wi-Fi | 5175, 5177 |

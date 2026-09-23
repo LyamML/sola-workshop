@@ -108,7 +108,8 @@ npm run dev
 ```
 
 lance les quatre services dans un seul terminal. Chaque ligne porte le nom du
-service qui l'a écrite, et Ctrl+C les arrête tous.
+service qui l'a écrite, Ctrl+C les arrête tous, et la dernière chose affichée
+est la liste des adresses :
 
 | Service | Adresse |
 |---|---|
@@ -116,12 +117,19 @@ service qui l'a écrite, et Ctrl+C les arrête tous.
 | Console — écrans 02 à 04 | <http://localhost:5174> |
 | Serveur de bord — l'API | <http://localhost:5175> |
 | Backoffice | <http://localhost:5176> |
+| Serveur de bord, côté Wi-Fi — pour le bracelet | `http://<adresse du poste>:5177`, ouvert seulement si `BRACELET_TOKEN` est renseigné — voir [En Wi-Fi, sans borne](#en-wi-fi-sans-borne) |
+
+Sola n'ouvre que ces cinq ports, et aucun ne bouge : un port déjà pris fait
+échouer son service au lieu de le décaler au suivant — une console servie
+ailleurs que sur 5174 ne serait plus une origine autorisée par le serveur, et
+la connexion échouerait sans raison visible. Un port que tient encore un
+ancien serveur Sola, oublié dans un autre terminal, `npm run dev` le libère
+avant de lancer le sien ; tenu par un autre programme, il n'y touche pas et
+dit lequel.
 
 `npm run dev -- console server` n'en lance que certains, et `npm run dev:borne`,
-`dev:console`, `dev:server` ou `dev:backoffice` en lance un seul. Un port déjà
-pris fait échouer son service au lieu de le déplacer : une console servie
-ailleurs que sur 5174 ne serait plus une origine autorisée par le serveur, et
-la connexion échouerait sans raison visible.
+`dev:console`, `dev:server` ou `dev:backoffice` en lance un seul, sans rien
+libérer.
 
 La console lit le serveur de bord quand il répond, et retombe sur son jeu de
 démonstration sinon — en le disant dans son en-tête. Sans `server/.env`,
