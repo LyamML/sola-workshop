@@ -95,7 +95,7 @@ machine. La borne de cabine reste accessible à tous.
 Une note de particularité écrite depuis la console porte `auteur_id`. Ne
 rouvrez pas une route d'écriture sans session, et ne servez jamais `mdp_hash` :
 c'est pour cela que `medecins`, `admins` et `sessions` sont hors de la liste
-blanche de `/admin/tables`, qui fait un `SELECT *`.
+blanche de `/admin/tables/:nom`, qui fait un `SELECT *`.
 
 Créer un compte ou changer un mot de passe se fait au terminal
 (`npm run compte`), pas par l'interface — le premier compte est celui qu'aucun
