@@ -67,9 +67,10 @@ CREATE TABLE medecins (
   derniere_connexion TEXT
 ) STRICT;
 
--- Ceux qui exploitent : corriger une donnee, reassigner un signal, regarder
--- les tables brutes. Meme forme, table separee — la separation est dans le
--- schema et non dans une clause WHERE qu'on peut oublier d'ecrire.
+-- Ceux qui exploitent : regarder les tables brutes, verifier qu'un ecran dit
+-- ce que la base contient, activer ou desactiver un compte. Meme forme, table
+-- separee — la separation est dans le schema et non dans une clause WHERE
+-- qu'on peut oublier d'ecrire.
 CREATE TABLE admins (
   id                 INTEGER PRIMARY KEY,
   prenom             TEXT NOT NULL,

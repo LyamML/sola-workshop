@@ -441,6 +441,7 @@ La fiche, elle, ne fait pas la différence, et c'est voulu : dans le jeu de dém
 - **Sola ne reconnaît sa propre voix que par le texte.** Le micro reste ouvert pendant qu'elle parle, pour qu'on puisse la couper, et ce qu'il entend est écarté quand ce sont ses mots à elle. Un mot qu'elle vient de dire ne vaut donc pas réponse, ni pendant sa phrase ni dans les deux secondes qui suivent : à une question, mieux vaut répondre « oui » ou « d'accord » que reprendre ses mots, et en conversation libre une phrase qui reprend surtout les siens peut être ignorée. Le filtre dépend aussi de ce que l'annulation d'écho de Chrome laisse passer ; au casque, il n'a rien à faire.
 - **Aucune purge des mesures n'est implémentée.** Le schéma prévoit une rétention de 90 jours sur `mesures` ; rien ne l'applique aujourd'hui. La base cabine, elle, efface bien le verbatim à 30 jours, par un trigger.
 - **Les bilans sanguins du jeu de démonstration sont simulés.** Les 29 marqueurs, leurs bornes de référence et leurs unités sont ceux d'un bilan réel, mais les valeurs sont tirées par le générateur : chaque bilan porte `source = 'simule'` et la fiche l'affiche.
+- **Un geste clinique ne se défait pas, et un dossier ne se corrige plus à l'écran.** Le backoffice n'écrit que l'état d'un compte. Un signal pris ne passe pas à un autre soignant, un signal clos ne se rouvre pas, une note de particularité erronée ne se retire pas, et le poste ou la cabine d'un résident ne se modifient plus depuis une interface.
 - **Serveur éteint, seule la fiche de R-0448 s'affiche.** Le repli de la console ne contient que les deux réponses figées par `npm run db:repli`, l'écran 02 et cette fiche. Celle d'un autre résident dit qu'elle est indisponible, plutôt que de montrer R-0448 sous un autre nom.
 - **Les données sont synthétiques.** Elles sont calibrées pour être vraisemblables et cohérentes entre elles, pas pour être vraies. Aucun chiffre de ce dépôt ne dit quoi que ce soit d'une population réelle.
 
@@ -499,18 +500,18 @@ est bien ce que la base contient ? ».
 
 | Onglet | Ce qu'il montre |
 |---|---|
-| **Aperçu** | nombre de lignes par table, fraîcheur des données, indicateurs du jour |
-| **Équipage** | recherche, filtres, accès au dossier de n'importe quel résident |
-| **Signaux** | assignation et clôture — une clôture exige un motif |
-| **Écrans et sources** | chaque bloc de chaque écran, la requête qui l'alimente, et sa valeur actuelle |
-| **Tables** | les lignes brutes, pour vérifier sans passer par `sqlite3` |
+| **Écrans et sources** | chaque bloc de la console, la vue qui le remplit, et ce qu'elle renvoie maintenant |
+| **Base** | la fraîcheur des flux d'abord, les volumes ensuite ; chaque table se parcourt en lignes brutes, sans passer par `sqlite3` |
+| **Comptes** | qui a accès, qui ne s'est jamais connecté ; un compte se désactive sans être supprimé |
 
 L'onglet **Écrans et sources** est le plus utile en soutenance : il met côte à
 côte le bloc affiché, la vue SQL qui le remplit et la valeur qu'elle renvoie à
 l'instant. La correspondance entre l'interface et la base devient vérifiable
 d'un coup d'œil, au lieu d'être promise dans un document.
 
-Une clôture de signal **exige un motif** parce que ce motif est la seule chose
+Le backoffice ne soigne pas : il n'écrit que l'état d'un compte. Prendre un
+signal, le clore, signer une note se font dans la console, sous le nom d'un
+soignant. Une clôture **exige un motif** parce que ce motif est la seule chose
 qui permettra plus tard de mesurer les faux positifs du moteur de règles. Sans
 lui, on sait qu'un signal a été fermé, jamais s'il aurait dû être ouvert.
 

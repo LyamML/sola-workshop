@@ -48,8 +48,8 @@ dans un champ de formulaire**. Pour tester une route authentifiée, on passe par
 cours, et la veille d'une soutenance ce n'est pas le moment.
 
 `npm run db:sql` ouvre la base en **lecture seule**, volontairement. Pour écrire,
-il y a le backoffice, qui valide ce qu'il écrit. Pas d'`UPDATE` ni de `DELETE`
-tapé à la main.
+il y a la console, qui valide ce qu'elle écrit et le signe, et `npm run compte`
+pour les comptes. Pas d'`UPDATE` ni de `DELETE` tapé à la main.
 
 ### 3. Rien ne part sur GitHub sans demande explicite
 
@@ -132,8 +132,10 @@ simulés (`source = 'simule'`, et la fiche le dit), la reconnaissance vocale de
 la borne n'existe que dans les navigateurs à moteur Chromium — ailleurs elle
 bascule au clavier et le dit dans sa barre d'état —, Sola ne reconnaît sa propre
 voix que par le texte : un mot qu'elle vient de dire ne vaut pas réponse dans
-les deux secondes qui suivent, et, serveur éteint, seule la fiche de R-0448
-s'affiche — le repli ne contient qu'elle.
+les deux secondes qui suivent, un geste clinique ne se défait pas — ni signal à
+rouvrir ou à réassigner, ni note à retirer —, aucun dossier ne se corrige à
+l'écran, et, serveur éteint, seule la fiche de R-0448 s'affiche — le repli ne
+contient qu'elle.
 
 ---
 
@@ -271,7 +273,7 @@ racine, réglé par `DB_FILE`.
 | Montage des routes, CORS, liste des routes sur `/`, le port réseau des bracelets en Wi-Fi | `src/index.ts` |
 | Lecture de la console — écrans 02, 03, 04 | `src/routes/console.ts` |
 | Les gestes de la console : note signée, prise et clôture d'un signal | `src/routes/console.ts` (`ajouterParticularite`, `PATCH /signaux/:id`) |
-| Backoffice — tables, correction, signaux | `src/routes/admin.ts` |
+| Backoffice — écrans ↔ requêtes, fraîcheur des flux, tables brutes, comptes | `src/routes/admin.ts` |
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
 | **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures`, puis la ligne du jour de `mesures_jour` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`, `SQL_JOUR`) |
 | La lecture seule d'un bracelet en Wi-Fi, et ce qu'une réponse dit des valeurs écartées | `src/validation.ts` (`lectureSchema`), `src/routes/ingest.ts` (`recevoirWifi`, `accuse`) |
