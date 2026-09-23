@@ -63,9 +63,21 @@ function Tableau<T>({
   vide: string;
 }) {
   if (erreur) {
+    // Un refus n'est pas une panne, et le dire de travers envoie chercher un
+    // serveur éteint qui tourne très bien.
+    const refus = erreur.includes("401");
     return (
       <div className="vide">
-        Registre indisponible&nbsp;: le serveur de bord ne répond pas ({erreur}).
+        {refus ? (
+          <>
+            Registre indisponible&nbsp;: votre session a expiré. Rechargez la page
+            pour vous reconnecter.
+          </>
+        ) : (
+          <>
+            Registre indisponible&nbsp;: le serveur de bord ne répond pas ({erreur}).
+          </>
+        )}
         <br />
         Cet écran lit la base directement, il n’a pas de jeu de démonstration.
       </div>

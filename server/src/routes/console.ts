@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { RequestHandler } from "express";
+import { compte } from "../auth.js";
 import { config } from "../config.js";
 import { ecrire, requete } from "../db.js";
 
@@ -19,6 +20,17 @@ const AGE = "CAST((julianday('now') - julianday(r.date_naissance)) / 365.25 AS I
 /** Ordre de gravite. SQLite n'a pas FIELD() : un CASE fait la meme chose. */
 const ORDRE_SEVERITE = `
   CASE s.severite WHEN 'critique' THEN 1 WHEN 'surveillance' THEN 2 ELSE 3 END`;
+
+/**
+ * A qui revient un signal.
+ *
+ * Deux sources pour une seule colonne a l'ecran : la cle etrangere quand
+ * c'est une personne, le texte libre quand ce n'en est pas une (« Equipe
+ * d'intervention »). L'interface n'a pas a connaitre cette subtilite, elle
+ * recoit un nom ou rien.
+ */
+const ASSIGNE = "COALESCE(ma.titre || ' ' || ma.nom, s.assigne_a)";
+const JOINTURE_ASSIGNE = "LEFT JOIN medecins ma ON ma.id = s.assigne_id";
 
 // ------------------------------------------------------- ecran 02 : equipage
 consoleApi.get("/crew", (_req, res, next) => {
@@ -61,10 +73,11 @@ consoleApi.get("/crew", (_req, res, next) => {
               ${AGE}     AS age,
               s.motif,
               strftime('%H:%M', s.ouvert_at) AS ouvert_a,
-              s.assigne_a,
+              ${ASSIGNE} AS assigne_a,
               s.statut
          FROM signaux s
          JOIN residents r ON r.id = s.resident_id
+         ${JOINTURE_ASSIGNE}
         WHERE s.statut <> 'clos'
         ORDER BY ${ORDRE_SEVERITE}, s.ouvert_at
         LIMIT 20`,
@@ -75,7 +88,7 @@ consoleApi.get("/crew", (_req, res, next) => {
     const compteurs = requete<{ ouverts: number; critiques: number; non_assignes: number }>(
       `SELECT COUNT(*) AS ouverts,
               COALESCE(SUM(severite = 'critique'), 0) AS critiques,
-              COALESCE(SUM(assigne_a IS NULL), 0)     AS non_assignes
+              COALESCE(SUM(assigne_a IS NULL AND assigne_id IS NULL), 0) AS non_assignes
          FROM signaux WHERE statut <> 'clos'`,
     )[0];
 
@@ -109,9 +122,12 @@ consoleApi.get("/residents/:code", (req, res, next) => {
               r.groupe_sanguin, r.statut, r.embarque_jour_vol,
               ${AGE} AS age,
               c.code AS confiance_code, c.prenom AS confiance_prenom,
-              c.nom  AS confiance_nom,  r.confiance_lien
+              c.nom  AS confiance_nom,  r.confiance_lien,
+              m.code AS traitant_code,  m.titre  AS traitant_titre,
+              m.prenom AS traitant_prenom, m.nom AS traitant_nom
          FROM residents r
          LEFT JOIN residents c ON c.id = r.confiance_id
+         LEFT JOIN medecins  m ON m.id = r.medecin_traitant_id
         WHERE r.code = :code`,
       { code },
     )[0];
@@ -180,15 +196,58 @@ consoleApi.get("/residents/:code", (req, res, next) => {
       { id },
     )[0];
 
+    // L'auteur voyage avec la note : c'est tout l'objet de la table
+    // `medecins`. `auteur` reste nul pour les notes anterieures aux comptes,
+    // et l'interface l'ecrit ainsi plutot que d'inventer un nom.
     const particularites = requete(
-      `SELECT type, niveau, titre, detail
-         FROM particularites
-        WHERE resident_id = :id
-        ORDER BY CASE niveau
+      `SELECT p.type, p.niveau, p.titre, p.detail, p.constate_le,
+              CASE WHEN m.id IS NULL THEN NULL
+                   ELSE m.titre || ' ' || m.nom END AS auteur
+         FROM particularites p
+         LEFT JOIN medecins m ON m.id = p.auteur_id
+        WHERE p.resident_id = :id
+        ORDER BY CASE p.niveau
                    WHEN 'critique' THEN 1 WHEN 'surveillance' THEN 2 ELSE 3
-                 END, id`,
+                 END, p.id`,
       { id },
     );
+
+    // --------------------------------------------------- bilans sanguins --
+    // Les trois derniers, soit six semaines au rythme d'une consultation tous
+    // les quinze jours : de quoi voir une ferritine remonter sous traitement.
+    const bilans = requete<{ id: number }>(
+      `SELECT b.id, b.preleve_le, b.jour_vol, b.prochain_le, b.statut,
+              b.commentaire, b.source,
+              CASE WHEN m.id IS NULL THEN NULL
+                   ELSE m.titre || ' ' || m.nom END AS medecin
+         FROM bilans_sanguins b
+         LEFT JOIN medecins m ON m.id = b.medecin_id
+        WHERE b.resident_id = :id
+        ORDER BY b.preleve_le DESC
+        LIMIT 3`,
+      { id },
+    );
+
+    // Les analyses des memes bilans, en une requete : la sous-requete rejoue
+    // la selection ci-dessus plutot que de fabriquer une liste d'identifiants
+    // dans le SQL.
+    const analyses = requete<{ bilan_id: number }>(
+      `SELECT a.bilan_id, a.panel, a.marqueur, a.valeur_num, a.valeur_texte,
+              a.unite, a.ref_bas, a.ref_haut, a.interpretation
+         FROM analyses_sang a
+         JOIN (SELECT id FROM bilans_sanguins
+                WHERE resident_id = :id
+                ORDER BY preleve_le DESC LIMIT 3) d ON d.id = a.bilan_id
+        ORDER BY a.bilan_id DESC, a.panel, a.id`,
+      { id },
+    );
+
+    const parBilan = new Map<number, typeof analyses>();
+    for (const a of analyses) {
+      const liste = parBilan.get(a.bilan_id);
+      if (liste) liste.push(a);
+      else parBilan.set(a.bilan_id, [a]);
+    }
 
     const suivis = requete(
       `SELECT type, titre, detail, debut_jour_vol, echeance_jour_vol
@@ -221,6 +280,7 @@ consoleApi.get("/residents/:code", (req, res, next) => {
       particularites,
       suivis,
       etat_mental: etatMental,
+      bilans: bilans.map((b) => ({ ...b, analyses: parBilan.get(b.id) ?? [] })),
     });
   } catch (e) {
     next(e);
@@ -396,7 +456,7 @@ const TRIS_SIGNAUX: Record<string, string> = {
   motif: "s.motif",
   origine: "s.origine",
   ouvert: "s.ouvert_at",
-  assigne: "s.assigne_a",
+  assigne: "assigne_a",
   statut: "ordre_statut",
   clos: "s.clos_at",
 };
@@ -429,7 +489,8 @@ consoleApi.get("/signaux", (req, res, next) => {
       )[0]?.n ?? 0;
 
     const lignes = requete(
-      `SELECT s.id, s.severite, s.motif, s.origine, s.ouvert_at, s.assigne_a,
+      `SELECT s.id, s.severite, s.motif, s.origine, s.ouvert_at,
+              ${ASSIGNE} AS assigne_a,
               s.statut, s.clos_at, s.clos_motif,
               r.code AS resident, r.prenom, r.nom, r.cabine,
               SUBSTR(r.cabine, 1, 1) AS module,
@@ -438,6 +499,7 @@ consoleApi.get("/signaux", (req, res, next) => {
               CASE s.statut WHEN 'ouvert' THEN 1 WHEN 'en_cours' THEN 2 ELSE 3 END AS ordre_statut
          FROM signaux s
          JOIN residents r ON r.id = s.resident_id
+         ${JOINTURE_ASSIGNE}
          ${filtre}
         ORDER BY ${ordre(TRIS_SIGNAUX, req.query.tri, req.query.sens, "ordre_severite")},
                  s.ouvert_at DESC
@@ -462,18 +524,16 @@ consoleApi.get("/signaux", (req, res, next) => {
 /**
  * Ajout d'une note de particularite par un medecin, depuis la fiche.
  *
- * L'ecriture est ouverte — provisoirement. Elle passait par le jeton du
- * backoffice, ce qui etait faux de deux facons : le jeton d'exploitation
- * n'atteste pas d'un medecin, et une console de soin ne demande pas a
- * l'utilisateur de recopier une cle de 64 caracteres pour ecrire une ligne.
+ * La note est SIGNEE : `auteur_id` vient de la session, jamais du corps de la
+ * requete — sinon n'importe quel appelant choisirait au nom de qui il ecrit.
  *
- * La porte sera la session medecin (table `medecins`), pas un jeton partage :
- * c'est elle qui dira QUI a ecrit la note, ce qu'aucun jeton unique ne peut
- * dire. En attendant la table, la route reste ouverte et la note n'a pas
- * d'auteur — a ne pas laisser passer en service.
+ * Un administrateur peut ecrire une note depuis le backoffice, et elle reste
+ * non signee : il corrige une base, il ne soigne personne. Le schema dit la
+ * meme chose — `auteur_id` ne reference que `medecins`.
  */
 export const ajouterParticularite: RequestHandler = (req, res, next) => {
   try {
+    const auteur = compte(res);
     const { type, niveau, titre, detail } = req.body ?? {};
 
     if (!["allergie", "contre_indication", "antecedent", "info"].includes(type)) {
@@ -501,9 +561,17 @@ export const ajouterParticularite: RequestHandler = (req, res, next) => {
     }
 
     const { lastInsertRowid } = ecrire(
-      `INSERT INTO particularites (resident_id, type, niveau, titre, detail, constate_le)
-       VALUES (:rid, :type, :niveau, :titre, :detail, date('now'))`,
-      { rid: cible.id, type, niveau, titre, detail },
+      `INSERT INTO particularites
+         (resident_id, type, niveau, titre, detail, constate_le, auteur_id)
+       VALUES (:rid, :type, :niveau, :titre, :detail, date('now'), :auteur)`,
+      {
+        rid: cible.id,
+        type,
+        niveau,
+        titre,
+        detail,
+        auteur: auteur?.role === "medecin" ? auteur.id : null,
+      },
     );
 
     res.status(201).json({ id: lastInsertRowid });

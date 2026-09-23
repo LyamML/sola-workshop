@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ErreurApi, oublierJeton } from "./api";
+import { ErreurApi } from "./api";
 
 /**
  * Charge une ressource et expose les trois etats qu'une page doit savoir
@@ -7,8 +7,8 @@ import { ErreurApi, oublierJeton } from "./api";
  * d'exploitation passent leur temps en erreur ou en attente — autant que ce
  * soit le cas par defaut plutot qu'un cas particulier.
  *
- * Un 401 vide le jeton : la session a expire ou le jeton est faux, inutile de
- * laisser l'utilisateur rejouer la meme requete.
+ * Un 401 recharge la page : la session a expire, le formulaire de connexion
+ * reprend la main. Inutile de laisser rejouer la meme requete.
  */
 export function useChargement<T>(
   charger: () => Promise<T>,
@@ -33,7 +33,6 @@ export function useChargement<T>(
       .catch((e: unknown) => {
         if (!vivant) return;
         if (e instanceof ErreurApi && e.statut === 401) {
-          oublierJeton();
           window.location.reload();
           return;
         }

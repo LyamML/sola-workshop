@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AjoutNote } from "../components/AjoutNote";
 import { AreaChart } from "../components/AreaChart";
+import { BilanSanguin } from "../components/BilanSanguin";
 import { ConversationList } from "../components/ConversationList";
 import { FlagList } from "../components/FlagList";
 import { PrivacyNote } from "../components/PrivacyNote";
@@ -12,6 +13,7 @@ import { adapterResident } from "../adapt";
 import { api } from "../api";
 import { REPLI_RESIDENT } from "../repli";
 import { useSource } from "../useSource";
+import type { SensEcart } from "../types";
 
 type Window = "24h" | "7j" | "30j" | "90j";
 
@@ -23,6 +25,17 @@ const WINDOWS: { value: Window; label: string }[] = [
 ];
 
 /** Écran 03 — fiche individuelle. */
+/**
+ * Le sens est porte par une forme autant que par une couleur : lu en noir et
+ * blanc, ou par un oeil qui confond l'ambre et le turquoise, la fleche reste.
+ */
+const FLECHE: Record<SensEcart, string> = {
+  haut: "▲",
+  bas: "▼",
+  dans: "—",
+  sans: "○",
+};
+
 export function ResidentPage() {
   const { id = "R-0448" } = useParams();
   const [window, setWindow] = useState<Window>("7j");
@@ -129,12 +142,21 @@ export function ResidentPage() {
               <i style={{ background: vital.watch ? "var(--watch)" : "var(--accent)" }} />
               Mesure nocturne
             </span>
-            <span>
-              <i style={{ background: "var(--line-2)" }} />
-              Base personnelle
-            </span>
+            {vital.chart.etat && (
+              <span className={`etat ${vital.chart.etat.sens}`}>
+                <i aria-hidden="true">{FLECHE[vital.chart.etat.sens]}</i>
+                <b>{vital.chart.etat.verdict}</b>
+                <em>{vital.chart.etat.repere}</em>
+              </span>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* Entre les constantes et les conversations : le bilan est une mesure,
+          pas une confidence, et il se lit dans la continuité des tuiles. */}
+      <div className="row">
+        <BilanSanguin reports={vue.bloodReports} />
       </div>
 
       <div className="row">

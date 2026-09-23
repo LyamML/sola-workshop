@@ -4,14 +4,38 @@
     {
       "name": "borne",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:borne"],
+      "runtimeArgs": [
+        "run",
+        "dev:borne"
+      ],
       "port": 5173
     },
     {
       "name": "console",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:console"],
+      "runtimeArgs": [
+        "run",
+        "dev:console"
+      ],
       "port": 5174
+    },
+    {
+      "name": "server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:server"
+      ],
+      "port": 5175
+    },
+    {
+      "name": "backoffice",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:backoffice"
+      ],
+      "port": 5176
     }
   ]
 }

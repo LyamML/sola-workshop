@@ -15,7 +15,8 @@ même commit. Une carte fausse est pire que pas de carte.
 **Sola**, workshop EPSI *Horizon 2080*, catégorie **Santé humaine**. Un compagnon
 de santé pour les 1 240 résidents du vaisseau générationnel *Méridien*, en route
 depuis 4 128 jours. **Quatre écrans répartis sur trois applications web
-distinctes**, un serveur de bord, une base SQLite, un bracelet ESP32.
+distinctes**, un serveur de bord, une base SQLite de 17 tables, un bracelet
+ESP32.
 
 Le projet est **noté**. Les livrables doivent être carrés, clairs et concis.
 
@@ -23,20 +24,22 @@ Le projet est **noté**. Les livrables doivent être carrés, clairs et concis.
 
 ## Les gardes-fous
 
-Ces huit points ne se négocient pas. Si une demande les contredit, le dire et
+Ces neuf points ne se négocient pas. Si une demande les contredit, le dire et
 proposer autre chose plutôt que de les contourner.
 
 ### 1. Les secrets ne sortent jamais du disque
 
-`server/.env` contient `BORNE_TOKEN` et `ADMIN_TOKEN`. On ne les recopie **nulle
-part** : ni dans un fichier, ni dans un message, ni dans un commentaire, ni dans
-une URL, ni dans un commit. `.env` et `*.db` sont dans `.gitignore` — ne les en
-sortez pas.
+`server/.env` contient `BORNE_TOKEN`. On ne le recopie **nulle part** : ni dans
+un fichier, ni dans un message, ni dans un commentaire, ni dans une URL, ni dans
+un commit. Même règle pour un mot de passe de compte, y compris celui d'un
+compte de démonstration créé à la main. `.env` et `*.db` sont dans `.gitignore` —
+ne les en sortez pas.
 
 **Le dépôt est public.** Tout ce qui est commité est lisible par n'importe qui.
 
-Et un agent qui pilote un navigateur **ne tape pas un jeton dans un champ de
-formulaire**. Pour tester une route authentifiée, on passe par `curl`.
+Et un agent qui pilote un navigateur **ne tape pas un jeton ni un mot de passe
+dans un champ de formulaire**. Pour tester une route authentifiée, on passe par
+`curl`.
 
 ### 2. La base de démonstration s'efface en une commande
 
@@ -81,22 +84,44 @@ npm run db:sql "SELECT COUNT(*) FROM signaux"
 Cela vaut aussi pour les chiffres à l'écran : les maquettes et le jeu de
 démonstration sont calibrés pour coïncider, ne les désaccordez pas.
 
-### 7. L'interface ne pose pas de diagnostic
+### 7. Une écriture dans un dossier porte un nom
+
+La console et le backoffice passent par des comptes : `medecins`, `admins`,
+`sessions`, mot de passe haché en **argon2id**, session de douze heures dans un
+cookie `httpOnly`. `/api` exige une session, `/admin` exige en plus le rôle
+administrateur, `/ingest` garde son jeton porteur parce qu'une borne est une
+machine. La borne de cabine reste accessible à tous.
+
+Une note de particularité écrite depuis la console porte `auteur_id`. Ne
+rouvrez pas une route d'écriture sans session, et ne servez jamais `mdp_hash` :
+c'est pour cela que `medecins`, `admins` et `sessions` sont hors de la liste
+blanche de `/admin/tables`, qui fait un `SELECT *`.
+
+Créer un compte ou changer un mot de passe se fait au terminal
+(`npm run compte`), pas par l'interface — le premier compte est celui qu'aucun
+compte existant ne peut créer.
+
+### 8. L'interface ne pose pas de diagnostic
 
 On écrit « dépistage dépressif », pas « dépression ». Les seuils affichés sont
 les seuils cliniques validés — **PHQ-9 ≥ 10**, **GAD-7 ≥ 10**, **ISI ≥ 15** — et
 ne se changent pas sans une raison écrite. Le PHQ-9 se lit sur 0–27 ; le 9 est le
 nombre d'items, le 10 est un seuil de score, les deux nombres n'ont rien à voir.
 
-### 8. Les limites connues restent écrites
+### 9. Les limites connues restent écrites
 
 Le README a une section « limites » et elle est à jour. Si vous en levez une,
 retirez la ligne. Si vous en créez une, ajoutez-la. Une limite assumée et
 documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
-**Les trois limites ouvertes aujourd'hui :** l'écriture d'une note est ouverte
-(pas de session médecin), aucune purge des mesures n'est implémentée, et l'écran
-01 rejoue des scénarios scriptés au lieu de lire la base.
+**Les cinq limites ouvertes aujourd'hui :** aucune purge des mesures n'est
+implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base,
+les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
+et la fiche le dit), la reconnaissance vocale de la borne n'existe que dans
+les navigateurs à moteur Chromium — ailleurs elle bascule au clavier et le dit
+dans sa barre d'état —, et Sola ne reconnaît sa propre voix que par le texte :
+un mot qu'elle vient de dire ne vaut pas réponse dans les deux secondes qui
+suivent.
 
 ---
 
@@ -141,6 +166,7 @@ pas d'outils, et l'équipe travaille sous Windows.
 | **Heredocs Bash** | lâchent au-delà d'environ 100 lignes (`unexpected EOF`) | Écrire le fichier avec l'outil d'écriture, pas avec `cat <<` |
 | **Cache de Vite** | après réécriture complète d'un fichier, le serveur de dev peut le servir **vide** (`Content-Length: 0`), d'où une page blanche | `touch` le fichier ; ce n'est pas votre code |
 | **Captures d'écran** | le panneau navigateur échoue parfois (`Screenshot timed out`) | Mesurer en JavaScript (`getBoundingClientRect`) plutôt que regarder |
+| **Micro dans le panneau navigateur** | il est bloqué : la borne affiche « micro refusé » | Piloter l'écran 01 au clavier (espace, `1`/`2`) — mais le clavier contourne l'écoute : pour tester interruption et écho, capturer le moteur en remplaçant `webkitSpeechRecognition.prototype.start`, puis appeler son `onresult` avec des résultats fabriqués. La vraie voix se teste dans Chrome |
 | **Routes de la console** | `/residents/:id`, pas `/resident/:id` | Voir `web/console/src/App.tsx` |
 
 **Vérifier avant d'annoncer.** `npm run typecheck` pour le code ; pour une
@@ -162,6 +188,7 @@ marche.
 | `npm run db:reset` | recharge schéma + vues + jeu de démonstration | — |
 | `npm run db:demo` | régénère seulement les données | — |
 | `npm run db:sql "…"` | interroge la base, en lecture seule | — |
+| `npm run compte -- liste \| medecin \| admin \| mdp <email>` | les comptes, au terminal | — |
 | `npm run typecheck` | tous les espaces de travail | — |
 
 Espaces de travail npm : `web/*` et `server`. Fichier de base : `sola.db` à la
@@ -171,11 +198,23 @@ racine, réglé par `DB_FILE`.
 
 | Écran | Application | Point d'entrée |
 |---|---|---|
-| 01 · Borne de cabine | `web/borne` | `src/App.tsx`, scénarios dans `src/scenarios.ts` |
+| 01 · Borne de cabine | `web/borne` | `src/App.tsx` — détail plus bas |
 | 02 · Santé de l'équipage | `web/console` | `src/pages/CrewPage.tsx` |
 | 03 · Fiche résident | `web/console` | `src/pages/ResidentPage.tsx` |
 | 04 · Registre | `web/console` | `src/pages/RegistrePage.tsx` |
 | — · Backoffice | `web/backoffice` | `src/App.tsx`, pages dans `src/pages/` |
+
+### La borne, fichier par fichier
+
+| Ce que vous cherchez | Fichier |
+|---|---|
+| L'enchaînement des scènes, le clavier de secours | `src/App.tsx` |
+| Les répliques, les cartes et les questions | `src/scenarios.ts` |
+| Écoute, synthèse, mot d'éveil, filtre d'écho | `src/voix.ts` |
+| **Le visage de Sola** — trois images, une par état | `src/components/SolaAvatar.tsx` |
+| Le chat vectoriel d'origine, gardé en réserve | `src/components/SolaCat.tsx` |
+| Les images en pixels (repos, écoute, parole) | `src/assets/` |
+| Tout le style, y compris le recadrage des images | `src/styles/borne.css` |
 
 ### La console, fichier par fichier
 
@@ -190,6 +229,8 @@ racine, réglé par `DB_FILE`.
 | Le chargement paginé de l'écran 04 | `src/registre.ts` |
 | Le formulaire d'ajout d'une note | `src/components/AjoutNote.tsx` |
 | Les tuiles de constantes et leur courbe de fond | `src/components/VitalTile.tsx`, `src/components/Sparkline.tsx` |
+| La session, le formulaire de connexion, le mode démonstration | `src/session.tsx` |
+| La carte de bilan sanguin | `src/components/BilanSanguin.tsx` |
 | Les types partagés | `src/types.ts` |
 | Les couleurs, rayons, ombres | `src/styles/tokens.css` |
 | Tout le reste du style | `src/styles/app.css` |
@@ -203,7 +244,10 @@ racine, réglé par `DB_FILE`.
 | Écriture d'une note (partagée avec le backoffice) | `src/routes/console.ts`, `ajouterParticularite` |
 | Backoffice — tables, correction, signaux | `src/routes/admin.ts` |
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
-| Jetons porteurs, comparaison à temps constant | `src/auth.ts` |
+| Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
+| Hachage argon2id des mots de passe | `src/mdp.ts` |
+| Ouverture, lecture et purge des sessions, cookie | `src/sessions.ts` |
+| Jeton porteur des bornes, exigences de rôle | `src/auth.ts` |
 | Ouverture SQLite, `requete`, `ecrire`, `transaction` | `src/db.ts` |
 | Variables d'environnement | `src/config.ts`, modèle dans `.env.example` |
 | Schémas de validation | `src/validation.ts` |
@@ -212,7 +256,7 @@ racine, réglé par `DB_FILE`.
 
 | Ce que vous cherchez | Fichier |
 |---|---|
-| Les 12 tables, contraintes et index | `db/serveur/01-schema.sql` |
+| Les 17 tables, contraintes et index | `db/serveur/01-schema.sql` |
 | Les vues (`v_depistage_jour`, `v_depistage_serie`…) | `db/serveur/02-vues.sql` |
 | Les résidents et notes de départ | `db/serveur/03-seed.sql` |
 | La base locale de la borne (verbatim) | `db/borne/01-schema.sql` |
@@ -220,6 +264,7 @@ racine, réglé par `DB_FILE`.
 | Comment tout ça s'articule | `db/README.md` |
 | **Le générateur du jeu de démonstration (37 200 évaluations, 281 signaux)** | `scripts/db-demo.mjs` |
 | Chargement des fichiers SQL | `scripts/db-load.mjs` |
+| Créer un compte, changer un mot de passe | `scripts/db-compte.mjs`, `scripts/hachage.mjs` |
 | Agrégats quotidiens | `scripts/db-rollup.mjs` |
 | Interroger la base au terminal | `scripts/db-sql.mjs` |
 

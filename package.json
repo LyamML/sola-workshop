@@ -19,7 +19,8 @@
     "db:demo": "node --env-file=server/.env scripts/db-demo.mjs",
     "db:reset": "npm run db:load && npm run db:demo",
     "dev:backoffice": "npm run dev --workspace=web/backoffice",
-    "db:sql": "node --env-file=server/.env scripts/db-sql.mjs"
+    "db:sql": "node --env-file=server/.env scripts/db-sql.mjs",
+    "compte": "node --env-file=server/.env scripts/db-compte.mjs"
   },
   "allowScripts": {
     "esbuild": true

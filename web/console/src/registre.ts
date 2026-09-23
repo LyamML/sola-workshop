@@ -103,7 +103,10 @@ export function useListe<T>(
     const minuteur = setTimeout(() => arret.abort(), DELAI_MS);
     setChargement(true);
 
-    fetch(`${BASE}${chemin}?${cle}`, { signal: arret.signal })
+    // `credentials` comme dans api.ts : le serveur est sur un autre port, et
+    // sans cette option le navigateur n'envoie pas le cookie de session — la
+    // page se lirait alors comme un serveur en panne alors qu'il refuse.
+    fetch(`${BASE}${chemin}?${cle}`, { signal: arret.signal, credentials: "include" })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<PageApi<T>>;

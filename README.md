@@ -70,7 +70,7 @@ La borne écoute sur <http://localhost:5173>, la console sur <http://localhost:5
 La console lit le serveur de bord quand il répond, et retombe sur son jeu de
 démonstration sinon — en le disant dans son en-tête. Pour la brancher sur la
 base (**Node 24 ou plus**, pour `node:sqlite`), copiez le modèle de
-configuration et renseignez les deux jetons :
+configuration et renseignez le jeton des bornes :
 
 ```bash
 cp server/.env.example server/.env
@@ -93,30 +93,75 @@ Le backoffice écoute sur <http://localhost:5176>, l'API sur <http://localhost:5
 Une commande par bloc : l'équipe est sous Windows PowerShell, qui ne connaît
 pas l'enchaînement `&&`.
 
-### Les jetons
+### Qui entre, et comment
 
-`server/.env` en porte deux, et ils ne doivent jamais être le même :
+Deux portes, et elles ne se ressemblent pas, parce qu'elles ne laissent pas
+passer la même chose.
 
-| Variable | Qui s'en sert | Ce qu'il permet |
-|---|---|---|
-| `BORNE_TOKEN` | les bornes de cabine | écrire des mesures, des nuits, des résumés |
-| `ADMIN_TOKEN` | le backoffice | lire et corriger les dossiers |
-
-Une borne écrit des constantes ; elle n'a aucune raison de pouvoir modifier un
-dossier médical. Le serveur refuse de démarrer si les deux jetons sont
-identiques ou font moins de 32 caractères. Pour en fabriquer un :
+**Les bornes de cabine** portent `BORNE_TOKEN`, un jeton dans `server/.env`,
+comparé à temps constant. Une borne est une machine : elle ne tape pas de mot
+de passe, et elle n'écrit que des mesures, des nuits, des résumés. Elle n'a
+aucune raison de pouvoir modifier un dossier. Le serveur refuse de démarrer si
+le jeton fait moins de 32 caractères. Pour en fabriquer un :
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
+**Les soignants et les administrateurs** ont un compte : une adresse, un mot de
+passe haché en **argon2id** (paramètres OWASP : 19 MiB, 2 passes), et une
+session de douze heures dans un cookie `httpOnly` que nul script de la page ne
+peut lire. La base ne garde que l'empreinte SHA-256 du jeton de session — une
+copie du fichier `sola.db` n'ouvre aucune session.
+
+Un médecin ouvre la console, un administrateur ouvre la console **et** le
+backoffice. La borne de cabine, elle, reste accessible à tous : c'est une porte
+de couloir, pas un dossier.
+
+Le premier compte se crée au terminal, donc physiquement à bord — c'est la
+réponse la plus simple au problème du premier compte, celui qu'aucun compte
+existant ne peut créer :
+
+```bash
+npm run compte -- admin
+```
+
+```bash
+npm run compte -- medecin
+```
+
+```bash
+npm run compte -- mdp quelquun@meridien.vol
+```
+
+`npm run compte -- liste` affiche les comptes existants. Le mot de passe se
+tape sans écho et n'apparaît jamais dans un argument de commande, donc jamais
+dans l'historique du shell.
+
+Derrière HTTPS, mettre `COOKIE_SECURE=1` dans `server/.env` : le cookie porte
+alors l'attribut `Secure`. En développement sur `http://localhost`, le laisser
+à `0`, sinon le navigateur refuse de le poser.
+
 ### Le jeu de test
 
 `npm run db:load` charge le schéma, les vues et **13 résidents scriptés** — ceux
 des maquettes, dont R-0448 dont la fiche raconte toute l'histoire du projet.
-`npm run db:demo` complète jusqu'à **1 240 résidents** et environ 79 000 lignes :
+`npm run db:demo` complète jusqu'à **1 240 résidents** et environ 190 000 lignes :
 constantes quotidiennes, nuits, scores de dépistage, conversations, signaux
-ouverts et clos. `npm run db:reset` enchaîne les deux.
+ouverts et clos, et 3 720 bilans sanguins. `npm run db:reset` enchaîne les deux.
+
+Le générateur crée aussi **huit comptes de démonstration** — cinq soignants,
+trois administrateurs — et imprime adresses et mots de passe à la fin. C'est un
+jeu de démonstration sur une base synthétique et locale, pas une base de
+production, et le dire vaut mieux que le cacher à moitié.
+
+Parmi eux, un passe-partout pour le développement : **`root@root.com`**, mot de
+passe **`admin`**. Il est administrateur, donc il ouvre la console *et* le
+backoffice. Il ne signe pas de note de dossier — `auteur_id` pointe sur
+`medecins`, et une note clinique porte le nom d'un soignant ; pour voir une
+note signée, se connecter avec un des cinq comptes médecin. **Ce compte n'a
+rien à faire sur une instance accessible à d'autres** : supprimer sa ligne dans
+`scripts/db-demo.mjs` avant tout déploiement.
 
 Le générateur est **déterministe** (graine 4 128) : deux exécutions donnent la
 même base, donc la même soutenance. Et il est **calibré** — il tire une
@@ -142,13 +187,43 @@ npm run db:rollup 2026-09-20
 agrège les mesures à la minute d'une journée en une ligne par résident, comme
 le ferait la tâche de nuit du serveur de bord.
 
-### Les trois scénarios de la borne
+### La borne se parle, elle ne se touche pas
 
-Le sélecteur en haut à droite rejoue les trois états de l'écran 01 :
+L'écran 01 n'a aucune commande. On lui parle, elle répond à voix haute, et
+l'écran ne sert qu'à laisser une trace lisible : les derniers tours de parole
+empilés en bas, le plus récent en grand, les précédents qui s'estompent vers le
+haut. Rien ne défile — la borne est un mur, elle occupe exactement l'écran.
 
-- **Échange** — trois prises de parole au bouton micro : la nuit courte, l'action de maintenance, puis le lien social et l'escalade vers le médecin, annoncée au résident ;
-- **Apaisement** — respiration guidée 4-7-8, déclenchée dans la vraie vie par une hausse de stress ;
-- **Alerte** — les secours sont en route, Sola reste présente.
+Au premier chargement, un voile demande un geste : ni le micro ni la synthèse
+vocale ne s'ouvrent sans lui, c'est une règle du navigateur. Ensuite la borne
+écoute en continu et se réveille sur son nom — **« Sola »**.
+
+**On peut lui couper la parole.** Le micro reste ouvert pendant qu'elle parle :
+la question affichée se répond sans attendre la fin de la phrase, et Sola se
+tait dès qu'on lui parle dessus. Elle s'entend donc elle-même — un filtre
+compare ce qui est entendu à ce qu'elle dit ou vient de dire, et n'en retient
+que l'autre voix. Ce filtre travaille sur du texte, pas sur du son : au casque
+il n'a rien à faire, et c'est la configuration à préférer pour une
+démonstration.
+
+**Les questions passent par une fenêtre.** Quand Sola demande quelque chose, un
+cadre s'ouvre sous elle avec les réponses possibles. Chacune porte son bouton
+*et* le mot qui suffit à la dire — « oui », « plus tard », « annule ». Le doigt
+sert à qui est debout devant la borne ; la voix sert à qui ne l'est pas, ce qui
+est précisément le cas dans le scénario d'alerte.
+
+**La barre d'espace double la voix de bout en bout**, et les touches `1` et `2`
+répondent à une question ouverte : c'est ce qui sauve la démonstration quand le
+micro est refusé ou la salle trop bruyante.
+
+Le bandeau effacé en bas à droite rejoue les trois états de l'écran :
+
+- **Échange** — trois tours de parole : la nuit courte, l'action de maintenance, puis le lien social et l'escalade vers le médecin, annoncée au résident ; trois questions jalonnent l'échange et la réponse choisie change la suite ;
+- **Apaisement** — respiration guidée 4-7-8, déclenchée dans la vraie vie par une hausse de stress ; Sola demande au bout d'un cycle si ça descend ;
+- **Alerte** — les secours sont en route, Sola reste présente et vérifie qu'on l'entend.
+
+Ce bandeau n'est pas l'interface de la borne, c'est la main de celui qui
+présente : il s'efface au repos et revient au survol.
 
 ## Le bracelet
 
@@ -174,7 +249,7 @@ Un service propre à Sola transporte ce que le standard ne prévoit pas : RMSSD,
 
 ### Appairer depuis la borne
 
-Le bouton **Appairer le bracelet**, en bas de l'écran, ouvre le sélecteur Web Bluetooth. Deux contraintes : **Chrome ou Edge** en contexte sécurisé (`localhost` suffit), et un **clic** de l'utilisateur — c'est pourquoi l'appairage n'est pas automatique. Une fois connectée, la barre d'état affiche la FC, le RMSSD et la batterie réels à la place des valeurs de démonstration.
+Le bouton **Appairer**, dans le bandeau de démonstration en bas à droite, ouvre le sélecteur Web Bluetooth. Deux contraintes : **Chrome ou Edge** en contexte sécurisé (`localhost` suffit), et un **clic** de l'utilisateur — c'est pourquoi l'appairage n'est pas automatique, et c'est aussi pourquoi il est resté dans le bandeau plutôt que sur l'écran de la borne, qui n'a plus de bouton. Une fois connectée, la barre d'état affiche la FC, le RMSSD et la batterie réels à la place des valeurs de démonstration.
 
 ## Mesure du sommeil
 
@@ -215,7 +290,10 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 - **Le PPG au poignet est difficile.** Le MAX30102 mesure par réflexion : le signal y est 5 à 10 fois plus faible qu'au doigt, et le moindre mouvement fait perdre le contact. C'est la contrainte matérielle la plus lourde du prototype.
 - **Le LLM embarqué n'est pas implémenté.** La borne rejoue des scénarios scriptés : l'architecture réserve sa place et garantit son isolement, mais le modèle reste à intégrer.
 - **La borne n'est pas branchée sur la base.** Les écrans 02 à 04 lisent le serveur de bord ; l'écran 01 rejoue encore ses scénarios scriptés, ce qui est cohérent avec le fait que son LLM n'est pas implémenté.
-- **Il n'y a pas encore de comptes.** Le backoffice s'ouvre avec un jeton unique qui vit dans le `sessionStorage` du navigateur, et la console écrit une note sans rien demander du tout. Dans les deux cas, personne ne sait qui a touché le dossier. Une table `medecins` et une session par soignant sont en cours de conception : c'est la **première** chose à finir, parce qu'un vaisseau où l'on ne sait pas qui a modifié un dossier médical n'est pas un vaisseau où l'on peut se soigner.
+- **La reconnaissance vocale de la borne dépend du navigateur.** `SpeechRecognition` n'existe aujourd'hui que dans les navigateurs à moteur Chromium, et elle y passe par un service distant de Google — un vrai vaisseau ne s'en contenterait pas. Ailleurs, ou micro refusé, la borne le dit dans sa barre d'état et se conduit à la barre d'espace. Ce que Sola entend ne sert qu'à faire avancer le scénario : rien n'est enregistré, rien n'est envoyé au serveur de bord.
+- **Sola ne reconnaît sa propre voix que par le texte.** Le micro reste ouvert pendant qu'elle parle, pour qu'on puisse la couper, et ce qu'il entend est écarté quand ce sont ses mots à elle. Un mot qu'elle vient de dire ne vaut donc pas réponse, ni pendant sa phrase ni dans les deux secondes qui suivent : « regarde », « laisse » et « dis-lui » figurent dans les phrases qui posent leurs questions, il faut alors répondre « oui » ou « d'accord ». Le filtre dépend aussi de ce que l'annulation d'écho de Chrome laisse passer ; au casque, il n'a rien à faire.
+- **Aucune purge des mesures n'est implémentée.** Le schéma prévoit une rétention de 90 jours sur `mesures` ; rien ne l'applique aujourd'hui. La base cabine, elle, efface bien le verbatim à 30 jours, par un trigger.
+- **Les bilans sanguins du jeu de démonstration sont simulés.** Les 29 marqueurs, leurs bornes de référence et leurs unités sont ceux d'un bilan réel, mais les valeurs sont tirées par le générateur : chaque bilan porte `source = 'simule'` et la fiche l'affiche.
 - **Les données sont synthétiques.** Elles sont calibrées pour être vraisemblables et cohérentes entre elles, pas pour être vraies. Aucun chiffre de ce dépôt ne dit quoi que ce soit d'une population réelle.
 
 ## Le serveur de bord
@@ -233,9 +311,12 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 | `GET /api/equipage` | la console | écran 04 : les 1 240 résidents, triés et filtrés par le serveur |
 | `GET /api/signaux` | la console | écran 04 : les signaux, de l'ouverture à la clôture |
 | `POST /api/residents/:code/particularites` | la console | écran 03 : une note de particularité écrite par le médecin |
-| `GET /admin/…` | le backoffice | lecture des tables, correction des dossiers, suivi des signaux |
+| `POST /auth/connexion` | la console, le backoffice | ouvre une session : adresse + mot de passe contre l'empreinte argon2id |
+| `GET /auth/moi` | la console, le backoffice | qui est connecté ; un `401` est une réponse normale — « personne » |
+| `POST /auth/deconnexion` | la console, le backoffice | ferme la session et efface le cookie |
+| `GET /admin/…` | le backoffice | lecture des tables, correction des dossiers, suivi des signaux, comptes |
 
-L'ingestion et le backoffice demandent un jeton porteur, comparé à temps constant. L'écriture d'une note par la console, elle, est **ouverte pour l'instant** : elle attend la session médecin, parce qu'un jeton partagé ne dit pas qui a écrit la note — voir les limites. Toutes les requêtes sont préparées avec des paramètres nommés — **aucune concaténation SQL nulle part**, y compris pour le tri : le nom de colonne envoyé par l'écran 04 passe par une table de correspondance, et une clé inconnue retombe sur le tri par défaut au lieu d'atteindre le SQL.
+L'ingestion demande un jeton porteur, comparé à temps constant : une borne est une machine. Tout `/api` exige une session ouverte, tout `/admin` exige en plus le rôle administrateur. Une note de particularité écrite depuis la console porte désormais l'identifiant du médecin connecté, et la fiche affiche sa signature — c'est ce qui manquait, et c'est ce qui rend le dossier défendable. La connexion est freinée après trois échecs, avec un délai qui double, et une adresse inconnue coûte le même temps de calcul qu'une adresse connue : sans cela, la durée de la réponse dirait lesquelles existent. Toutes les requêtes sont préparées avec des paramètres nommés — **aucune concaténation SQL nulle part**, y compris pour le tri : le nom de colonne envoyé par l'écran 04 passe par une table de correspondance, et une clé inconnue retombe sur le tri par défaut au lieu d'atteindre le SQL.
 
 Les filtres sont neutralisés *dans* la requête plutôt qu'en la recomposant :
 

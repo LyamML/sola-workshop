@@ -15,6 +15,10 @@ export function FlagList({ notes }: { notes: ParticularityNote[] }) {
           </span>
           <span className="t">{note.title}</span>
           <span className="d">{note.detail}</span>
+          {/* La signature est la raison d'être de la table `medecins` : une
+              note de dossier dit qui l'a écrite, ou dit qu'elle ne le sait
+              pas. Les deux sont des informations, le silence n'en est pas. */}
+          {note.signature && <span className="sig">{note.signature}</span>}
         </div>
       ))}
     </div>

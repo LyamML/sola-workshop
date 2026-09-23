@@ -21,6 +21,7 @@
 // =============================================================================
 
 import { DatabaseSync } from "node:sqlite";
+import { hacher } from "./hachage.mjs";
 
 const FICHIER = process.env.DB_FILE ?? "sola.db";
 const JOUR_VOL = Number(process.env.JOUR_VOL ?? 4128);
@@ -150,10 +151,48 @@ const POSTES = {
 };
 const SANGS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
-const SOIGNANTS = [
-  "Dr. Oyelaran", "Dr. Ferreira", "Dr. Nakamura", "Inf. Bakker",
-  "Inf. Haddad", "Équipe d'intervention",
+// ---------------------------------------------------------------- comptes --
+//
+//  Les cinq soignants etaient six chaines de caracteres dans `assigne_a`, sans
+//  rien derriere. Ils deviennent des lignes de `medecins` — sauf la sixieme,
+//  « Equipe d'intervention », qui n'est pas une personne et reste du texte
+//  libre. C'est exactement ce que la colonne `assigne_a` garde comme role.
+//
+//  MOTS DE PASSE DE DEMONSTRATION. Ils sont ecrits ici parce que cette base
+//  est synthetique et locale, qu'aucun de ces comptes n'existe ailleurs, et
+//  qu'une soutenance ou personne ne peut se connecter n'a pas lieu. Pour tout
+//  autre usage : `npm run compte`, qui demande le mot de passe au clavier.
+//
+const MEDECINS = [
+  { code: "M-001", titre: "Dr.",  prenom: "Candice", nom: "Oyelaran", poste: "Psychologue de bord" },
+  { code: "M-002", titre: "Dr.",  prenom: "Ines",    nom: "Ferreira", poste: "Medecine generale" },
+  { code: "M-003", titre: "Dr.",  prenom: "Bob",     nom: "Nakamura", poste: "Medecin de bord" },
+  { code: "M-004", titre: "Inf.", prenom: "Jonas",   nom: "Bakker",   poste: "Soins infirmiers" },
+  { code: "M-005", titre: "Inf.", prenom: "Naima",   nom: "Haddad",   poste: "Soins infirmiers" },
 ];
+const MDP_DEMO = "meridien-4128";
+
+//  Le compte passe-partout de l'equipe. Il est administrateur, et c'est le
+//  role qui ouvre TOUT : le backoffice l'exige, la console se contente d'une
+//  session ouverte quelle qu'elle soit. Un compte medecin, lui, n'ouvrirait
+//  que la console.
+//
+//  Ce qu'il ne fait pas : signer une note. `particularites.auteur_id` pointe
+//  sur `medecins`, et une note clinique porte le nom d'un soignant — pas celui
+//  de l'administration. Pour voir une note signee, se connecter avec un des
+//  cinq comptes medecin ci-dessus.
+//
+//  Son mot de passe est court et evident. C'est voulu pour une demonstration
+//  locale, et c'est exactement ce qu'il ne faut pas deployer : sur une
+//  instance accessible a d'autres, supprimer cette ligne.
+const ADMINS = [
+  { prenom: "Root", nom: "Meridien", email: "root@root.com", mdp: "admin" },
+  { prenom: "George", nom: "Abadi", email: "george.abadi@meridien.vol" },
+  { prenom: "Alice", nom: "Rousseau", email: "alice.rousseau@meridien.vol" },
+];
+
+/** Ce qui n'est pas une personne : une equipe, donc pas de compte. */
+const EQUIPE = "Équipe d'intervention";
 
 // --------------------------------------------------------------- calendrier --
 const MS_JOUR = 86400000;
@@ -218,8 +257,60 @@ if (existants >= EQUIPAGE) {
   process.exit(1);
 }
 
+// Argon2 est lent par construction — c'est tout son interet — et il est
+// asynchrone : on calcule les empreintes AVANT d'ouvrir la transaction,
+// plutot que de la laisser ouverte une seconde pour rien. Un sel par compte,
+// donc un appel par compte meme quand le mot de passe est le meme.
+const EMPREINTES = await Promise.all(
+  [...MEDECINS, ...ADMINS].map((c) => hacher(c.mdp ?? MDP_DEMO)),
+);
+
 db.exec("BEGIN");
 try {
+  // -------------------------------------------------------------- comptes --
+  const insMedecin = db.prepare(`
+    INSERT INTO medecins (code, prenom, nom, titre, poste, email, mdp_hash)
+    VALUES (:code, :prenom, :nom, :titre, :poste, :email, :hash)`);
+  const insAdmin = db.prepare(`
+    INSERT INTO admins (prenom, nom, email, mdp_hash)
+    VALUES (:prenom, :nom, :email, :hash)`);
+
+  // Nom affiche -> identifiant, pour que les signaux plus bas pointent sur un
+  // compte au lieu de recopier une chaine.
+  const medecinParNom = new Map();
+  MEDECINS.forEach((m, i) => {
+    const email = `${m.prenom}.${m.nom}@meridien.vol`.toLowerCase();
+    const { lastInsertRowid } = insMedecin.run({ ...m, email, hash: EMPREINTES[i] });
+    medecinParNom.set(`${m.titre} ${m.nom}`, Number(lastInsertRowid));
+  });
+  // `mdp` est retire : il a servi a calculer l'empreinte, et node:sqlite
+  // refuse un parametre nomme que la requete ne connait pas.
+  ADMINS.forEach(({ mdp: _mdp, ...a }, i) =>
+    insAdmin.run({ ...a, hash: EMPREINTES[MEDECINS.length + i] }),
+  );
+  etape("comptes (medecins et administrateurs)", MEDECINS.length + ADMINS.length);
+
+  // Les six signaux du seed SQL nomment leur soignant en toutes lettres : ce
+  // fichier se charge avant que les comptes existent, il ne peut pas pointer
+  // sur un identifiant. On raccroche ici, maintenant qu'ils existent — sans
+  // quoi la console afficherait « Dr. Ferreira » sans savoir de qui il s'agit.
+  const rattacher = db.prepare(
+    "UPDATE signaux SET assigne_id = :id, assigne_a = NULL WHERE assigne_a = :nom",
+  );
+  let nRattaches = 0;
+  for (const [nom, id] of medecinParNom) {
+    nRattaches += rattacher.run({ id, nom }).changes;
+  }
+  if (nRattaches) etape("signaux du seed rattaches a un compte", nRattaches);
+
+  /** Tire un soignant : une personne cinq fois sur six, l'equipe sinon. */
+  const tirerSoignant = () => {
+    const noms = [...medecinParNom.keys()];
+    return rnd() < noms.length / (noms.length + 1)
+      ? { assigne_id: medecinParNom.get(piocher(noms)), assigne_a: null }
+      : { assigne_id: null, assigne_a: EQUIPE };
+  };
+
   // ------------------------------------------------------------- equipage --
   // Les residents scriptes gardent leur module ; on complete chaque module
   // jusqu'a sa population cible.
@@ -292,6 +383,28 @@ try {
          FROM residents ORDER BY id`,
     )
     .all();
+
+  // --------------------------------------------------- medecins traitants --
+  //
+  //  Chaque resident est rattache a un soignant, en tourniquet sur l'ordre des
+  //  identifiants. Repartir par module aurait ete plus joli a lire, mais les
+  //  modules vont de 119 a 280 residents : cinq soignants n'y tiennent pas a
+  //  charge egale. Le tourniquet en donne 248 a chacun et melange les modules,
+  //  ce qui est de toute facon plus juste — un soignant de bord suit des
+  //  personnes, pas un couloir.
+  //
+  //  R-0448 tombe sur le premier compte, Dr. Oyelaran : c'est la psychologue
+  //  de bord, et c'est coherent avec sa fiche. Rien n'est pipe pour autant, il
+  //  est juste le premier de la liste.
+  //
+  const soignants = [...medecinParNom.values()];
+  const insTraitant = db.prepare(
+    "UPDATE residents SET medecin_traitant_id = :mid WHERE id = :rid",
+  );
+  equipage.forEach((r, i) =>
+    insTraitant.run({ mid: soignants[i % soignants.length], rid: r.id }),
+  );
+  etape("residents rattaches a un medecin traitant", equipage.length);
 
   // R-0448 porte la demonstration scriptee : ses quatorze jours de mesures et
   // ses nuits sont ceux des graphiques de l'ecran 03. On ne les regenere pas.
@@ -635,8 +748,9 @@ try {
   const finSignaux = Math.min(1439, Math.max(maintenant - 2, DEBUT_SIGNAUX + 30));
 
   const insSignal = db.prepare(`
-    INSERT INTO signaux (resident_id, severite, motif, origine, ouvert_at, assigne_a, statut)
-    VALUES (:rid, :severite, :motif, :origine, :quand, :assigne, :statut)`);
+    INSERT INTO signaux
+      (resident_id, severite, motif, origine, ouvert_at, assigne_id, assigne_a, statut)
+    VALUES (:rid, :severite, :motif, :origine, :quand, :assigne_id, :assigne_a, :statut)`);
   const majStatut = db.prepare("UPDATE residents SET statut = :statut WHERE id = :rid");
 
   let nSignaux = 0;
@@ -655,20 +769,21 @@ try {
       // personnes est deja beaucoup ; une dizaine ne serait pas credible, et
       // noierait la file de triage sous des cas qui ne racontent rien.
       const [severite, origine, motif] = piocher(SIGNAUX_COURANTS);
-      const assigne = rnd() < 0.62 ? piocher(SOIGNANTS) : null;
+      const assigne = rnd() < 0.62 ? tirerSoignant() : { assigne_id: null, assigne_a: null };
       insSignal.run({
         rid: r.id,
         severite,
         motif,
         origine,
+        ...assigne,
         // Ouverts apres le dernier signal scripte (09:15) et jamais dans le
         // futur. Deux contraintes a la fois : la file de triage trie par
         // gravite puis par anciennete, donc les six scriptes du matin doivent
         // rester en tete ; et l'ecran des alertes recentes affiche des heures,
         // or une alerte ouverte dans huit heures ne veut rien dire.
         quand: aujourdhuiA(entier(DEBUT_SIGNAUX, finSignaux)),
-        assigne,
-        statut: assigne && rnd() < 0.5 ? "en_cours" : "ouvert",
+        statut:
+          (assigne.assigne_id || assigne.assigne_a) && rnd() < 0.5 ? "en_cours" : "ouvert",
       });
       majStatut.run({ rid: r.id, statut: severite === "critique" ? "critique" : "surveillance" });
       nSignaux++;
@@ -684,17 +799,17 @@ try {
     const ouvert = entier(11, 90);
     db.prepare(
       `INSERT INTO signaux
-         (resident_id, severite, motif, origine, ouvert_at, assigne_a, statut,
-          clos_at, clos_motif)
-       VALUES (:rid, :severite, :motif, :origine, :ouvert, :assigne, 'clos',
-               :clos, :raison)`,
+         (resident_id, severite, motif, origine, ouvert_at, assigne_id, assigne_a,
+          statut, clos_at, clos_motif)
+       VALUES (:rid, :severite, :motif, :origine, :ouvert, :assigne_id, :assigne_a,
+               'clos', :clos, :raison)`,
     ).run({
       rid: r.id,
       severite,
       motif,
       origine,
       ouvert: instant(ouvert, entier(0, 23), entier(0, 59)),
-      assigne: piocher(SOIGNANTS),
+      ...tirerSoignant(),
       clos: instant(ouvert - entier(1, 6), entier(8, 19), entier(0, 59)),
       raison: piocher([
         "Entretien réalisé, retour à la normale",
@@ -842,6 +957,182 @@ try {
   }
   etape("conversations dans l'historique de R-0448", CIBLE_LYAM);
 
+  // ------------------------------------------------------ bilans sanguins --
+  //
+  //  Une consultation avec prise de sang toutes les deux semaines, decalee
+  //  d'un resident a l'autre : les 1 240 personnes ne defilent pas le meme
+  //  jour, elles s'etalent sur le cycle. Trois bilans chacune, soit six
+  //  semaines d'historique — assez pour qu'une ferritine basse mise sous
+  //  traitement remonte visiblement d'un bilan au suivant.
+  //
+  //  Les bornes sont celles d'un laboratoire d'adulte, arrondies. Elles sont
+  //  ecrites AVEC chaque resultat (colonnes ref_bas / ref_haut) parce qu'un
+  //  resultat se relit des annees plus tard avec les bornes de son epoque.
+  //
+  const MARQUEURS = [
+    ["cellules_sanguines", "Hémoglobine", "g/dL", 13, 17],
+    ["cellules_sanguines", "Leucocytes", "10⁹/L", 4, 10],
+    ["cellules_sanguines", "Plaquettes", "10⁹/L", 150, 400],
+    ["cellules_sanguines", "Hématocrite", "%", 40, 52],
+    ["fer", "Ferritine", "µg/L", 30, 300],
+    ["fer", "Fer sérique", "µmol/L", 11, 28],
+    ["foie", "ALAT", "U/L", 10, 45],
+    ["foie", "ASAT", "U/L", 10, 40],
+    ["reins", "Créatinine", "µmol/L", 60, 110],
+    ["reins", "Débit de filtration glomérulaire", "mL/min", 90, 140],
+    ["sucre", "Glycémie à jeun", "g/L", 0.7, 1.05],
+    ["sucre", "HbA1c", "%", 4, 5.6],
+    ["thyroide", "TSH", "mUI/L", 0.4, 4],
+    ["thyroide", "T4 libre", "pmol/L", 12, 22],
+    ["electrolytes", "Sodium", "mmol/L", 135, 145],
+    ["electrolytes", "Potassium", "mmol/L", 3.5, 5],
+    ["electrolytes", "Calcium", "mmol/L", 2.2, 2.6],
+    ["inflammation", "CRP", "mg/L", 0, 5],
+    ["inflammation", "Vitesse de sédimentation", "mm/h", 0, 15],
+    ["lipides", "Cholestérol total", "g/L", 1.4, 2],
+    ["lipides", "LDL", "g/L", 0.7, 1.3],
+    ["lipides", "HDL", "g/L", 0.4, 0.8],
+    ["lipides", "Triglycérides", "g/L", 0.5, 1.5],
+    ["vitamines", "Vitamine D", "nmol/L", 50, 125],
+    ["vitamines", "Vitamine B12", "pmol/L", 150, 650],
+    ["vitamines", "Folates", "nmol/L", 7, 45],
+    ["hormones", "Cortisol matinal", "nmol/L", 170, 500],
+    ["hormones", "DHEA-S", "µmol/L", 2, 9],
+  ];
+
+  /**
+   * Le seul marqueur qualitatif du panel, et il est la pour une raison : il
+   * n'a pas de valeur numerique, seulement un resultat en toutes lettres.
+   * C'est le cas que les deux colonnes de `analyses_sang` doivent savoir
+   * porter, et le laisser dans le jeu de demonstration evite qu'on « simplifie »
+   * un jour le schema en une seule colonne REAL.
+   */
+  const QUALITATIF = ["inflammation", "Recherche d'agent infectieux"];
+
+  /** Situe une valeur par rapport a ses bornes. */
+  function interpreter(v, bas, haut) {
+    if (v < bas) return v < bas * 0.7 ? "critique" : "bas";
+    if (v > haut) return v > haut * 1.5 ? "critique" : "eleve";
+    return "normal";
+  }
+
+  const insBilan = db.prepare(`
+    INSERT INTO bilans_sanguins
+      (resident_id, medecin_id, preleve_le, jour_vol, prochain_le, statut,
+       commentaire, source)
+    VALUES (:rid, :mid, :preleve, :jv, :prochain, 'rendu', :commentaire, 'simule')`);
+  const insAnalyse = db.prepare(`
+    INSERT INTO analyses_sang
+      (bilan_id, panel, marqueur, valeur_num, valeur_texte, unite, ref_bas,
+       ref_haut, interpretation)
+    VALUES (:bid, :panel, :marqueur, :num, :texte, :unite, :bas, :haut, :interpretation)`);
+
+  const idsMedecins = [...medecinParNom.values()];
+  const tousResidents = db.prepare("SELECT id, statut FROM residents ORDER BY id").all();
+
+  /**
+   * Indice de fragilite, en ecarts-types : 0 est la moyenne de l'equipage,
+   * au-dessus on va moins bien. Les residents generes en ont un, tire avec
+   * leur profil physiologique. Les treize residents scriptes n'en ont pas —
+   * ils viennent du seed SQL — alors on le deduit de leur statut, plutot que
+   * de leur donner des analyses de manuel alors que l'ecran les montre sous
+   * surveillance.
+   */
+  const fragiliteDe = (r) =>
+    profils.get(r.id)?.fragilite ??
+    (r.statut === "critique" ? 1.7 : r.statut === "surveillance" ? 1.0 : -0.1);
+
+  let nBilans = 0;
+  let nAnalyses = 0;
+  for (const [rang, r] of tousResidents.entries()) {
+    // Le profil physiologique du resident tire aussi ses analyses : quelqu'un
+    // que le bracelet voit mal dormir depuis des semaines n'a pas, par
+    // hasard, une ferritine de manuel.
+    const fragilite = fragiliteDe(r);
+    const decalage = rang % 14;
+
+    for (const rappel of [0, 1, 2]) {
+      const jours = decalage + rappel * 14;
+      const { lastInsertRowid } = insBilan.run({
+        rid: r.id,
+        mid: piocher(idsMedecins),
+        preleve: jour(jours),
+        jv: JOUR_VOL - jours,
+        // Quinze jours plus tard. Pour le bilan le plus recent, cette date
+        // est dans le futur : c'est le prochain rendez-vous, et c'est elle
+        // que la fiche affiche.
+        prochain: jour(jours - 14),
+        commentaire:
+          rnd() < 0.12
+            ? piocher([
+                "Contrôle de suivi, pas de plainte nouvelle.",
+                "Supplémentation en cours, à recontrôler au prochain cycle.",
+                "Prélèvement à jeun respecté.",
+                "Fatigue rapportée en consultation, bilan élargi.",
+              ])
+            : null,
+      });
+      const bid = Number(lastInsertRowid);
+      nBilans++;
+
+      for (const [panel, marqueur, unite, bas, haut] of MARQUEURS) {
+        const milieu = (bas + haut) / 2;
+        const etendue = haut - bas;
+        // La derive suit la fragilite, et s'attenue avec les bilans anciens :
+        // l'ecart se creuse vers aujourd'hui plutot que d'etre constant.
+        const derive = fragilite * etendue * 0.2 * (1 - rappel * 0.25);
+        const sens = ["Ferritine", "Vitamine D", "HDL", "Hémoglobine"].includes(marqueur)
+          ? -1 // ces marqueurs BAISSENT quand ca va moins bien
+          : ["CRP", "Vitesse de sédimentation", "Cortisol matinal", "HbA1c"].includes(marqueur)
+            ? 1 // ceux-la montent
+            : 0; // les autres ne suivent pas l'etat general
+        const brut = milieu + sens * derive + normale(0, etendue * 0.27);
+        const decimales = etendue < 3 ? 2 : etendue < 40 ? 1 : 0;
+        // Un dosage ne rend pas zero : sous le seuil de detection, le
+        // laboratoire ecrit la plus petite valeur qu'il sait lire.
+        const plancher = bas > 0 ? 0 : decimales === 0 ? 1 : 0.1;
+        const v = Math.max(arrondi(brut, decimales), plancher);
+
+        insAnalyse.run({
+          bid,
+          panel,
+          marqueur,
+          num: v,
+          texte: null,
+          unite,
+          bas,
+          haut,
+          interpretation: interpreter(v, bas, haut),
+        });
+        nAnalyses++;
+      }
+
+      insAnalyse.run({
+        bid,
+        panel: QUALITATIF[0],
+        marqueur: QUALITATIF[1],
+        num: null,
+        texte: rnd() < 0.04 ? "Traces, à recontrôler" : "Négatif",
+        unite: null,
+        bas: null,
+        haut: null,
+        interpretation: "normal",
+      });
+      nAnalyses++;
+    }
+  }
+  etape("bilans sanguins (3 par resident, un cycle de 14 jours)", nBilans);
+  etape("analyses du sang", nAnalyses);
+
+  // Trois des six notes de dossier sont signees, trois ne le sont pas.
+  // C'est volontaire : les notes anterieures aux comptes n'ont pas d'auteur
+  // et n'en auront jamais, et l'ecran doit montrer les deux cas plutot que de
+  // laisser croire que la signature est acquise partout.
+  const majAuteur = db.prepare("UPDATE particularites SET auteur_id = :mid WHERE id = :id");
+  const aSigner = db.prepare("SELECT id FROM particularites ORDER BY id LIMIT 3").all();
+  aSigner.forEach((n, i) => majAuteur.run({ id: n.id, mid: idsMedecins[i % idsMedecins.length] }));
+  etape("notes de dossier signees (sur 6)", aSigner.length);
+
   // ------------------------------------------------- mesures a la minute --
   // `mesures` est la table que les bornes remplissent en continu. On en
   // remplit une journee pour quelques residents : c'est ce qui permet de
@@ -915,4 +1206,28 @@ try {
 console.log(`\nJeu de test genere dans ${FICHIER} :\n`);
 console.log(etapes.join("\n"));
 console.log(`\n  en ${((Date.now() - debut) / 1000).toFixed(1)} s`);
+
+// Les comptes ne servent a rien si personne ne sait s'y connecter. On les
+// rappelle ici plutot que dans un fichier : ce sont des comptes de
+// demonstration sur une base synthetique et locale, et ils se regenerent a
+// chaque `npm run db:reset`.
+const colonne = (r, c, email, mdp) =>
+  `  ${r.padEnd(8)} ${c.padEnd(6)} ${email.padEnd(32)} ${mdp}`;
+
+console.log(
+  "\nComptes de demonstration\n\n" +
+    MEDECINS.map((m) =>
+      colonne(
+        "medecin",
+        m.code,
+        `${m.prenom}.${m.nom}@meridien.vol`.toLowerCase(),
+        MDP_DEMO,
+      ),
+    ).join("\n") +
+    "\n" +
+    ADMINS.map((a) => colonne("admin", "—", a.email, a.mdp ?? MDP_DEMO)).join("\n") +
+    "\n\n  L'administrateur ouvre la console ET le backoffice ; le medecin\n" +
+    "  ouvre la console, et c'est lui qui signe les notes de dossier.\n" +
+    "  Pour un compte reel : npm run compte -- medecin\n",
+);
 db.close();

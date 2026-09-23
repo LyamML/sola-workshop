@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { jeton, oublierJeton, poserJeton } from "./api";
+import { ErreurApi, type Compte, api } from "./api";
 import { Apercu } from "./pages/Apercu";
+import { Comptes } from "./pages/Comptes";
 import { Ecrans } from "./pages/Ecrans";
 import { ResidentDetail } from "./pages/ResidentDetail";
 import { Residents } from "./pages/Residents";
@@ -12,14 +13,48 @@ const ONGLETS = [
   ["/", "Aperçu"],
   ["/residents", "Équipage"],
   ["/signaux", "Signaux"],
+  ["/comptes", "Comptes"],
   ["/ecrans", "Écrans et sources"],
   ["/tables", "Tables"],
 ];
 
-export default function App() {
-  const [connecte, setConnecte] = useState(() => jeton().length > 0);
+type Etat =
+  | { phase: "chargement" }
+  | { phase: "dehors"; horsLigne: boolean }
+  | { phase: "dedans"; compte: Compte };
 
-  if (!connecte) return <Connexion onEntre={() => setConnecte(true)} />;
+export default function App() {
+  const [etat, setEtat] = useState<Etat>({ phase: "chargement" });
+
+  useEffect(() => {
+    api
+      .moi()
+      .then((r) => setEtat({ phase: "dedans", compte: r.compte }))
+      // Un 401 est une réponse — « personne » — et tout le reste une panne.
+      .catch((e: unknown) =>
+        setEtat({ phase: "dehors", horsLigne: !(e instanceof ErreurApi) }),
+      );
+  }, []);
+
+  const sortir = useCallback(() => {
+    api
+      .deconnexion()
+      .catch(() => {
+        /* le cookie expire de toute façon ; on rend la main sans bloquer */
+      })
+      .finally(() => setEtat({ phase: "dehors", horsLigne: false }));
+  }, []);
+
+  if (etat.phase === "chargement") return <div className="connexion">Sola…</div>;
+
+  if (etat.phase === "dehors") {
+    return (
+      <Connexion
+        horsLigne={etat.horsLigne}
+        onEntre={(compte) => setEtat({ phase: "dedans", compte })}
+      />
+    );
+  }
 
   return (
     <>
@@ -41,14 +76,10 @@ export default function App() {
             ))}
           </nav>
           <div className="fin">
-            <span>Méridien · J+4 128</span>
-            <button
-              className="bouton mini"
-              onClick={() => {
-                oublierJeton();
-                setConnecte(false);
-              }}
-            >
+            <span>
+              {etat.compte.prenom} {etat.compte.nom} · J+4 128
+            </span>
+            <button className="bouton mini" onClick={sortir}>
               Quitter
             </button>
           </div>
@@ -60,6 +91,7 @@ export default function App() {
         <Route path="/residents" element={<Residents />} />
         <Route path="/residents/:code" element={<ResidentDetail />} />
         <Route path="/signaux" element={<Signaux />} />
+        <Route path="/comptes" element={<Comptes />} />
         <Route path="/ecrans" element={<Ecrans />} />
         <Route path="/tables" element={<Tables />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -69,27 +101,49 @@ export default function App() {
 }
 
 /**
- * Saisie du jeton d'administration.
+ * Connexion d'un administrateur.
  *
- * Ce n'est pas une authentification : il n'y a pas de compte, pas de mot de
- * passe, pas de trace de qui agit. Le jeton vit dans `sessionStorage` et
- * disparaît à la fermeture de l'onglet. C'est assumé pour un prototype, et
- * c'est la première chose à remplacer avant tout usage réel — un vaisseau où
- * l'on ne sait pas qui a modifié un dossier médical n'est pas un vaisseau où
- * l'on peut se soigner.
+ * Le jeton partagé a disparu : il prouvait qu'on connaissait une clé, jamais
+ * qu'on était quelqu'un, et le backoffice écrit dans des dossiers médicaux.
+ * À sa place, un compte de la table `admins`, un mot de passe haché en
+ * argon2id et une session dans un cookie `httpOnly`. Les médecins ne passent
+ * pas cette porte : le serveur réserve `/admin` au rôle administrateur.
  */
-function Connexion({ onEntre }: { onEntre: () => void }) {
-  const [valeur, setValeur] = useState("");
+function Connexion({
+  horsLigne,
+  onEntre,
+}: {
+  horsLigne: boolean;
+  onEntre: (compte: Compte) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [mdp, setMdp] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
+  const [envoi, setEnvoi] = useState(false);
 
-  function envoyer(e: React.FormEvent) {
+  async function envoyer(e: React.FormEvent) {
     e.preventDefault();
-    if (valeur.trim().length < 32) {
-      setErreur("Le jeton d’administration fait au moins 32 caractères.");
-      return;
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      const { compte } = await api.connexion(email.trim(), mdp);
+      if (compte.role !== "admin") {
+        // Le serveur le refuserait de toute façon sur chaque route ; le dire
+        // ici évite un backoffice ouvert sur six pages toutes en erreur.
+        await api.deconnexion().catch(() => {});
+        setMdp("");
+        setErreur("Ce compte est un compte soignant : il ouvre la console, pas le backoffice.");
+        setEnvoi(false);
+        return;
+      }
+      onEntre(compte);
+    } catch (e) {
+      // Le mot de passe est vidé, l'adresse reste : on se trompe de mot de
+      // passe, rarement d'adresse.
+      setMdp("");
+      setErreur(e instanceof ErreurApi ? e.message : "Le serveur de bord ne répond pas.");
+      setEnvoi(false);
     }
-    poserJeton(valeur.trim());
-    onEntre();
   }
 
   return (
@@ -98,26 +152,45 @@ function Connexion({ onEntre }: { onEntre: () => void }) {
         Sola <span>Backoffice</span>
       </div>
       <p className="sous" style={{ marginTop: 10 }}>
-        Outil d’exploitation du serveur de bord. Le jeton est celui de{" "}
-        <code>ADMIN_TOKEN</code>, dans <code>server/.env</code>.
+        Outil d’exploitation du serveur de bord, réservé aux administrateurs. Le
+        premier compte se crée au terminal&nbsp;: <code>npm run compte -- admin</code>.
       </p>
       <form onSubmit={envoyer}>
         <input
-          type="password"
-          placeholder="Jeton d’administration"
-          value={valeur}
-          onChange={(e) => setValeur(e.target.value)}
+          type="email"
+          placeholder="Adresse de bord"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username"
           autoFocus
+          required
+        />
+        <input
+          type="password"
+          placeholder="Mot de passe"
+          value={mdp}
+          onChange={(e) => setMdp(e.target.value)}
+          autoComplete="current-password"
+          required
         />
         {erreur && <div className="message erreur">{erreur}</div>}
-        <button type="submit" className="bouton primaire">
-          Entrer
+        <button type="submit" className="bouton primaire" disabled={envoi}>
+          {envoi ? "Vérification…" : "Entrer"}
         </button>
       </form>
       <div className="avert" style={{ marginTop: 18 }}>
-        Le jeton est conservé le temps de l’onglet uniquement. Il est distinct de
-        celui des bornes de cabine&nbsp;: une borne écrit des mesures, elle ne
-        doit pas pouvoir modifier un dossier.
+        {horsLigne ? (
+          <>
+            Le serveur de bord ne répond pas. Le backoffice lit la base en direct&nbsp;:
+            sans serveur il n’a rien à montrer, et il ne prétendra pas le contraire.
+          </>
+        ) : (
+          <>
+            La session tient douze heures et vit dans un cookie qu’aucun script de la
+            page ne peut lire. Elle est distincte du jeton des bornes de cabine&nbsp;:
+            une borne écrit des mesures, elle ne doit pas pouvoir modifier un dossier.
+          </>
+        )}
       </div>
     </div>
   );

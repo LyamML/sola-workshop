@@ -365,6 +365,61 @@
   margin-right: 7px;
 }
 
+/* Verdict de position de la derniere mesure. La fleche dit le sens, le mot dit
+   le verdict, le gris dit sur quelle regle il s'appuie : la couleur seule ne
+   porte jamais l'information. */
+.legend .etat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+  padding: 3px 10px 3px 8px;
+  border-radius: 99px;
+  background: var(--card-3);
+}
+.legend .etat i {
+  width: auto;
+  height: auto;
+  margin: 0;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1;
+}
+/* Le mot porte le verdict, et il le porte en encre : l'ambre sur son fond
+   ambre tombait a 3,1:1 en clair. La couleur reste sur la fleche et sur le
+   fond de la pastille, ou 3:1 suffit — un repere graphique n'est pas du
+   texte. */
+.legend .etat b {
+  font-weight: 600;
+  color: var(--ink);
+}
+/* `--ink-3` tombait a 3,5:1 sur ces fonds teintes — lisible pour un oeil
+   repose, pas pour une garde de nuit. `--ink-2` reste secondaire par la taille
+   et la graisse, et passe a 6,2:1. */
+.legend .etat em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+.legend .etat.haut,
+.legend .etat.bas {
+  background: var(--watch-soft);
+}
+.legend .etat.haut i,
+.legend .etat.bas i {
+  color: var(--watch);
+}
+/* `--accent-2` et non `--accent` : le ton vif tombait a 2,8:1 sur ce fond,
+   sous le seuil des reperes graphiques. Le jeton foncé en clair, clair en
+   sombre, passe dans les deux. */
+.legend .etat.dans i {
+  color: var(--accent-2);
+}
+.legend .etat.sans i {
+  color: var(--ink-2);
+}
+
 /* --------------------------------------------------------------- barres --- */
 .bars {
   display: flex;
@@ -617,18 +672,22 @@
 
 /* --------------------------------------------------- histogramme sommeil -- */
 .sleep {
-  --plot: 112px;
+  --haut: 10px;
   --labels: 18px;
   display: flex;
   align-items: flex-end;
   gap: 5px;
   position: relative;
-  height: calc(var(--plot) + var(--labels) + 10px);
-  padding: 10px 0 var(--labels);
+  /* Les deux cartes de la rangee sont etirees a la hauteur de la plus grande :
+     sans ce `flex`, le graphe garde sa taille et laisse le reste de la carte
+     vide. Il prend la place au lieu de la laisser. */
+  flex: 1;
+  min-height: calc(112px + var(--labels) + var(--haut));
+  padding: var(--haut) 0 var(--labels);
 }
 .sleep .col {
   flex: 1;
-  height: var(--plot);
+  align-self: stretch;
   display: flex;
   justify-content: center;
   align-items: flex-end;
@@ -637,12 +696,54 @@
 .sleep .stick {
   width: 100%;
   max-width: 20px;
+  height: var(--h);
   border-radius: 99px;
   background: var(--accent);
   transition: height 0.6s;
 }
 .sleep .stick.low {
   background: var(--watch);
+}
+.sleep .col:hover .stick {
+  background: var(--accent-2);
+}
+.sleep .col:hover .stick.low {
+  background: var(--watch);
+  filter: brightness(1.08);
+}
+
+/* Etiquette de survol, accrochee au sommet du baton par la meme variable que sa
+   hauteur. Masquee a l'oeil, pas au lecteur d'ecran : `opacity` plutot que
+   `display`. */
+.sleep .val {
+  position: absolute;
+  bottom: var(--h);
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 5px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--card-3);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  /* Au-dessus du trait d'objectif et de son etiquette opaque, qui sinon
+     avalent la valeur : ce qu'on designe doit rester lisible, meme quand ca
+     recouvre un instant un reperage permanent. */
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+.sleep .col:hover .val {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sleep .stick,
+  .sleep .val {
+    transition: none;
+  }
 }
 .sleep .cl {
   position: absolute;
@@ -658,8 +759,19 @@
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1.5px dashed var(--line-2);
-  bottom: calc(var(--labels) + var(--plot) * 0.778);
+  /* 2px et non 1.5 : a 125 % de zoom, Chrome rabat 1.5 px sur un seul pixel
+     ecran et le trait disparait presque. Et `--ink-3` plutot que `--line-2` :
+     un ton de bordure se voit sur le fond de la carte, pas sur un baton
+     sature. Passe devant les batons, le trait doit se voir sur les deux. */
+  border-top: 2px dashed var(--ink-3);
+  /* Le pourcentage se compte sur la boite du graphe, marges interieures
+     comprises : on les retranche pour retrouver la hauteur tracable, puis on se
+     place aux 7 heures de l'echelle qui en compte 9. */
+  bottom: calc(var(--labels) + (100% - var(--labels) - var(--haut)) * 7 / 9);
+  /* Devant les batons : une colonne est positionnee, donc elle recouvre tout
+     element positionne sans z-index. */
+  z-index: 1;
+  pointer-events: none;
 }
 .target span {
   position: absolute;
@@ -1291,4 +1403,254 @@
 .btn.mini:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* ------------------------------------------------- signature d'une note -- */
+.flag .sig {
+  /* La colonne 1 est occupée par l'icône, qui s'étend sur deux rangées : sans
+     cette ligne, la signature repartirait sous l'icône. */
+  grid-column: 2;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------- bilan sanguin -- */
+.bilan-note {
+  margin: 12px 0 0;
+  padding: 11px 15px;
+  border-radius: var(--r-sm);
+  background: var(--card-2);
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 9px;
+  margin-top: 14px;
+  align-items: start;
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  overflow: hidden;
+}
+.panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 15px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.panel > summary::-webkit-details-marker {
+  display: none;
+}
+.panel > summary::before {
+  content: "›";
+  color: var(--ink-3);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.panel[open] > summary::before {
+  transform: rotate(90deg);
+}
+.panel > summary:hover {
+  background: var(--card-2);
+}
+.panel .nom {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.panel > summary .sub {
+  font-size: 11px;
+}
+.dosages {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.dosages tr {
+  border-top: 1px solid var(--line);
+}
+.dosages th {
+  padding: 8px 4px 8px 15px;
+  text-align: left;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.dosages .valeur {
+  padding: 8px 6px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.dosages .valeur.watch {
+  color: var(--watch);
+  font-weight: 500;
+}
+.dosages .valeur.crit {
+  color: var(--crit);
+  font-weight: 500;
+}
+.dosages .unite {
+  color: var(--ink-3);
+}
+.dosages .mention {
+  font-family: var(--ui);
+  font-size: 10.5px;
+}
+.dosages .ref {
+  padding: 8px 15px 8px 6px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+.bilan-pied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------ connexion -- */
+.chargement {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: var(--ink-3);
+}
+.connexion {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: clamp(60px, 14vh, 130px) 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.connexion h1 {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.connexion .sous {
+  margin: -8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.connexion form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--sh-1);
+}
+.connexion label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.connexion label span {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.connexion input {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+.connexion input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.connexion .btn {
+  justify-content: center;
+  margin-top: 4px;
+}
+.connexion .message.erreur {
+  padding: 9px 13px;
+  border-radius: var(--r-sm);
+  background: var(--crit-soft);
+  color: var(--crit);
+  font-size: 12.5px;
+}
+.hors-ligne {
+  padding: 15px 18px;
+  border-radius: var(--r);
+  background: var(--watch-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--watch) 72%, var(--ink));
+}
+.hors-ligne p {
+  margin: 0 0 12px;
+}
+
+/* -------------------------------------------- compte connecté, en-tête -- */
+.qui {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.qui .nom {
+  display: none;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.qui .nom span {
+  font-size: 12px;
+  font-weight: 500;
+}
+.qui .nom button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 10.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.qui .nom button:hover {
+  color: var(--accent);
+}
+/* Le nom n'apparaît qu'au-delà de la largeur où la barre respire ; en dessous,
+   l'avatar et son title suffisent. */
+@media (min-width: 1100px) {
+  .qui .nom {
+    display: flex;
+  }
 }

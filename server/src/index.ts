@@ -1,8 +1,9 @@
 import express from "express";
-import { authAdmin, authBorne } from "./auth.js";
+import { authBorne, exigeAdmin, exigeSoignant, session } from "./auth.js";
 import { config } from "./config.js";
 import { ping } from "./db.js";
 import { adminApi } from "./routes/admin.js";
+import { authApi } from "./routes/auth.js";
 import { consoleApi } from "./routes/console.js";
 import { ingest } from "./routes/ingest.js";
 
@@ -10,8 +11,9 @@ import { ingest } from "./routes/ingest.js";
  * Serveur de bord de Sola.
  *
  *   POST /ingest/*   ecrit par les bornes de cabine     (jeton borne)
- *   GET  /api/*      lu par la console medicale
- *   /admin/*         backoffice : lecture et correction (jeton admin)
+ *   /auth/*          connexion des personnes            (ouvert)
+ *   GET  /api/*      console medicale                   (session medecin ou admin)
+ *   /admin/*         backoffice : lecture et correction (session admin)
  *   GET  /health     supervision
  *
  * Le service ne sert pas les interfaces : la borne et la console restent deux
@@ -37,6 +39,11 @@ app.use((req, res, next) => {
   }
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  // Le cookie de session ne traverse une origine differente que si le serveur
+  // l'autorise explicitement. C'est pour cela que la liste d'origines est
+  // nommee et jamais `*` : les deux vont ensemble, le navigateur refuse
+  // `Allow-Credentials` avec une origine joker.
+  res.header("Access-Control-Allow-Credentials", "true");
   res.header("Vary", "Origin");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
@@ -57,7 +64,12 @@ app.get("/", (_req, res) => {
       "POST /ingest/conversation": "resume clinique, jamais de verbatim (jeton requis)",
       "POST /ingest/evenement": "chute, secousse, bouton d'urgence (jeton requis)",
       "POST /api/residents/:code/particularites":
-        "note de particularite ecrite depuis la fiche (ouvert, en attente de la session medecin)",
+        "note de particularite, signee par la session medecin",
+    },
+    connexion: {
+      "POST /auth/connexion": "e-mail et mot de passe, pose le cookie de session",
+      "POST /auth/deconnexion": "ferme la session en cours",
+      "GET /auth/moi": "compte connecte, ou 401",
     },
     lecture: {
       "GET /api/crew": "ecran 02 — sante de l'equipage",
@@ -89,9 +101,14 @@ app.get("/health", (_req, res) => {
   });
 });
 
+// La session est resolue pour tout le monde, avant les gardes : une route
+// ouverte peut vouloir savoir qui appelle sans l'exiger.
+app.use(session);
+
 app.use("/ingest", authBorne, ingest);
-app.use("/api", consoleApi);
-app.use("/admin", authAdmin, adminApi);
+app.use("/auth", authApi);
+app.use("/api", exigeSoignant, consoleApi);
+app.use("/admin", exigeAdmin, adminApi);
 
 app.use((_req, res) => {
   res.status(404).json({ erreur: "Route inconnue." });

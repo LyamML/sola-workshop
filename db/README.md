@@ -30,10 +30,10 @@ contient vient de `db/serveur/` et de `scripts/db-demo.mjs`, tous deux versionn�
 
 | Fichier | Rôle |
 |---|---|
-| `serveur/01-schema.sql` | les 12 tables, en `STRICT` |
+| `serveur/01-schema.sql` | les 17 tables, en `STRICT` |
 | `serveur/02-vues.sql` | les agrégats des écrans, une vue par bloc |
 | `serveur/03-seed.sql` | les 13 résidents scriptés des maquettes |
-| `scripts/db-demo.mjs` | les 1 227 autres, et environ 79 000 lignes de données |
+| `scripts/db-demo.mjs` | les 1 227 autres, les comptes, et environ 190 000 lignes de données |
 | `scripts/db-rollup.mjs` | agrège les mesures à la minute en une ligne par jour |
 
 `db:load` s'arrête aux fichiers SQL ; `db:demo` ajoute la population ; `db:reset`
@@ -60,7 +60,7 @@ Quatre chemins, du plus rapide au plus complet.
 npm run db:sql
 ```
 
-affiche les 12 tables, les 6 vues et le nombre de lignes de chacune. Avec une requête :
+affiche les 17 tables, les 6 vues et le nombre de lignes de chacune. Avec une requête :
 
 ```bash
 npm run db:sql "SELECT * FROM v_depistage_jour"
@@ -100,9 +100,20 @@ Ce calcul est fait une fois par nuit par `db:rollup`, et le résultat est écrit
 Le refaire à chaque affichage coûterait 1,8 million de lignes par requête, pour
 un résultat qui ne change plus.
 
-## Les douze tables
+## Les dix-sept tables
+
+**Comptes** — `medecins`, `admins`, `sessions`. Elles viennent en tête du
+schéma parce que `particularites` et `signaux` les référencent : une note de
+dossier porte le nom de celui qui l'a écrite, et un signal est assigné à
+quelqu'un plutôt qu'à une chaîne de caractères. `mdp_hash` contient une
+empreinte **argon2id**, jamais un mot de passe. `sessions.id` est le SHA-256 du
+jeton posé dans le cookie, pas le jeton : une copie de la base ne donne accès à
+aucune session ouverte. On désactive un compte (`actif = 0`), on ne le supprime
+pas — une note signée par un soignant parti perdrait son auteur.
 
 **Identité** — `residents`, `bracelets`, `particularites` (allergies, contre-indications, antécédents : une seule liste, parce que c'est une seule liste à l'écran), `suivis` (traitements, rendez-vous, personne de confiance).
+
+`residents.medecin_traitant_id` est le soignant qui suit la personne au long cours. Il ne se confond avec aucune des trois autres façons dont un compte apparaît dans un dossier : `particularites.auteur_id` dit qui a signé une note, `bilans_sanguins.medecin_id` qui a prélevé ce jour-là, `signaux.assigne_id` à qui revient un signal ouvert. Les trois sont des actes, datés ; celui-ci est un rattachement, et il dure. La colonne est nullable parce qu'un résident peut être entre deux affectations, et sans `ON DELETE` : on désactive un médecin, on ne l'efface pas sous ses résidents.
 
 **Constantes** — `mesures` reçoit une ligne par minute et par résident ; à 1 240 résidents cela fait 1,8 million de lignes par jour. La console ne la lit jamais : elle lit `mesures_jour`, l'agrégat quotidien produit par `npm run db:rollup`. C'est ce qui permet aux huit tuiles et à leurs graphiques 14 jours de sortir en une seule requête.
 
@@ -112,7 +123,13 @@ un résultat qui ne change plus.
 
 **Conversations** — `conversations` + `conversation_tags`. Résumé, durée, sévérité, nombre d'actions proposées et acceptées, et `resident_notifie_at` : on horodate la notification envoyée au résident, parce qu'une promesse non tracée n'est pas une promesse.
 
-**Triage** — `signaux` (la file du médecin) et `evenements` (chutes et secousses, horodatées à la seconde).
+**Triage** — `signaux` (la file du médecin) et `evenements` (chutes et secousses, horodatées à la seconde). Un signal est assigné soit à un compte (`assigne_id`), soit à ce qui n'est pas une personne (`assigne_a`, « Équipe d'intervention ») ; jamais aux deux à la fois.
+
+**Sang** — `bilans_sanguins` porte l'en-tête d'un rendez-vous (qui a prélevé, quand, quand est le suivant), `analyses_sang` les dosages, un par ligne. Le rendez-vous a lieu toutes les deux semaines : prise de sang et consultation.
+
+Une ligne d'`analyses_sang` a **deux colonnes de valeur**, `valeur_num REAL` et `valeur_texte TEXT`, avec un `CHECK` qui en exige au moins une. C'est la réponse à une question ouverte de l'équipe : on ne sait pas encore quel type l'automate rendra pour chaque marqueur. La plupart sont des nombres — on veut pouvoir les trier, les moyenner et les comparer aux bornes ; quelques-uns sont qualitatifs (« négatif », « traces ») et n'ont pas de nombre à donner. Le bilan de bord compte 29 marqueurs, dont 28 numériques : tout mettre en `VARCHAR` aurait coûté le tri et la comparaison sur ces 28 pour accommoder le vingt-neuvième.
+
+Les bornes de référence (`ref_bas`, `ref_haut`) sont gardées **avec** le dosage plutôt que dans une table de normes : une norme qui change l'an prochain ne doit pas réécrire un résultat d'hier.
 
 ## Deux règles de modélisation qu'on s'est données
 

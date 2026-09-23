@@ -43,7 +43,6 @@ export function Sparkline({ values, width = 78, height = 30, tone, fond = false 
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <path d={`${d} L${width} ${height} L0 ${height} Z`} fill={color} opacity="0.09" />
         <path
           d={d}
           fill="none"
