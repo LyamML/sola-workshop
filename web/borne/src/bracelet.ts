@@ -51,6 +51,12 @@ export interface BraceletReading {
 
 export interface BraceletHandlers {
   onReading: (r: BraceletReading) => void;
+  /**
+   * Chaque trame JSON du service Sola, telle que le bracelet l'a publiée, avec
+   * sa série lue dans le nom BLE — `SOLA-BR-0448` donne `BR-0448` —, ou null
+   * si le nom ne la porte pas.
+   */
+  onTrame?: (trame: Record<string, unknown>, serie: string | null) => void;
   onDisconnect?: () => void;
 }
 
@@ -104,6 +110,10 @@ export async function connectBracelet(handlers: BraceletHandlers): Promise<() =>
     optionalServices: [UUID_BAS, UUID_SOLA_SVC],
   });
 
+  // Le nom BLE est le seul lien entre l'appareil appairé et la ligne
+  // `bracelets` du serveur : le firmware s'annonce « SOLA- » suivi de sa série.
+  const serie = /^SOLA-(BR-\d{4})$/.exec(device.name ?? "")?.[1] ?? null;
+
   const server = await device.gatt!.connect();
 
   // État courant : les deux caractéristiques notifient séparément, on les
@@ -155,6 +165,11 @@ export async function connectBracelet(handlers: BraceletHandlers): Promise<() =>
           shakes: json.shake,
           quality: json.q,
         });
+        // Transmise telle quelle, zéros compris : c'est le serveur qui décide
+        // de ce qui fait une mesure, pas l'interface.
+        if (json !== null && typeof json === "object" && !Array.isArray(json)) {
+          handlers.onTrame?.(json, serie);
+        }
       } catch {
         /* trame tronquée : on garde la lecture précédente */
       }

@@ -60,6 +60,8 @@ app.get("/", (_req, res) => {
     service: "sola-server",
     ecriture: {
       "POST /ingest/mesure": "lot de constantes du bracelet (jeton requis)",
+      "POST /ingest/bracelet":
+        "trames brutes du bracelet, une par seconde, resumees a la minute (jeton requis)",
       "POST /ingest/nuit": "duree de sommeil estimee (jeton requis)",
       "POST /ingest/conversation": "resume clinique, jamais de verbatim (jeton requis)",
       "POST /ingest/evenement": "chute, secousse, bouton d'urgence (jeton requis)",
