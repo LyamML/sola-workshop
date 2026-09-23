@@ -95,6 +95,11 @@ export default defineConfig({
   plugins: [react()],
   // Web Bluetooth exige un contexte sécurisé : localhost en fait partie,
   // donc le serveur de développement suffit, sans certificat.
-  server: { port: 5173, proxy: { ...ollama, ...bord } },
+  //
+  // strictPort : un port pris fait échouer Vite au lieu de le décaler d'un
+  // cran sans rien dire. Décalée sur 5178, la borne laisserait 5173 à l'ancien
+  // serveur qui le tient encore, et c'est lui qu'on ouvrirait. `vite preview`
+  // hérite du refus : preview.strictPort vaut server.strictPort par défaut.
+  server: { port: 5173, strictPort: true, proxy: { ...ollama, ...bord } },
   preview: { port: 5173, proxy: { ...ollama, ...bord } },
 });
