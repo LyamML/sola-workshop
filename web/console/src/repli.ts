@@ -9,6 +9,7 @@ import {
   WELLBEING,
 } from "./data/crew";
 import {
+  BLOOD_REPORTS,
   CONVERSATIONS,
   DAY_LABELS,
   DAY_TIPS,
@@ -58,6 +59,7 @@ export const REPLI_RESIDENT: ReturnType<typeof adapterResident> = {
   totalConversations: TOTAL_CONVERSATIONS,
   particularities: PARTICULARITIES,
   followUp: FOLLOW_UP,
+  bloodReports: BLOOD_REPORTS,
   dayLabels: DAY_LABELS,
   dayTips: DAY_TIPS,
 };

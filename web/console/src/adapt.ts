@@ -1,9 +1,13 @@
-import type { CrewApi, ResidentApi, SeveriteApi } from "./api";
+import type { BilanApi, CrewApi, ResidentApi, SeveriteApi } from "./api";
 import type {
   BarRow,
+  BloodMarker,
+  BloodReport,
   ConversationSummary,
+  EtatConstante,
   Kpi,
   ParticularityNote,
+  SensEcart,
   Severity,
   TriageSignal,
   VitalSign,
@@ -263,14 +267,6 @@ function dateIlYA(n: number): string {
 
 // =========================================================== écran 03 =====
 
-/**
- * Constantes réellement mesurées par le bracelet KY-039. Ce n'est pas une
- * donnée mais une propriété du matériel : deux capteurs, huit constantes
- * affichées, et l'interface doit dire lesquelles sont estimées. Mieux vaut
- * deux mesures honnêtes que huit chiffres dont on ignore l'origine.
- */
-const MESUREES = new Set(["hr", "hrv"]);
-
 interface DefinitionVital {
   key: string;
   label: string;
@@ -282,7 +278,23 @@ interface DefinitionVital {
   decimales: number;
   /** Seuil au-delà (ou en deçà) duquel la tuile passe en ambre. */
   alerte?: (valeur: number, base: number) => boolean;
-  reference: (valeur: number, base: number, mini: number, maxi: number) => string;
+  /**
+   * Le verdict affiché sous le graphe. Il s'appuie sur la MEME regle que
+   * `alerte` : une tuile ambre et un graphe qui annonce « dans la norme » se
+   * contrediraient, et c'est la console qui perdrait sa credibilite.
+   */
+  etat: (valeur: number, base: number) => EtatConstante;
+}
+
+/** Assemble un verdict a partir du sens et de la regle qui l'a produit. */
+function verdict(sens: SensEcart, repere: string): EtatConstante {
+  const mot = {
+    haut: "Trop élevée",
+    bas: "Trop basse",
+    dans: "Dans la norme",
+    sans: "Sans seuil",
+  }[sens];
+  return { sens, verdict: mot, repere };
 }
 
 const VITAUX: DefinitionVital[] = [
@@ -290,44 +302,61 @@ const VITAUX: DefinitionVital[] = [
     key: "hr", label: "Fréquence cardiaque au repos", unit: "bpm",
     champ: "fc_repos_bpm", titre: "FC de repos", suffixe: " bpm", pas: 5, decimales: 0,
     alerte: (v) => v > 75,
-    reference: (_v, _b, mini, maxi) => `base perso ${Math.round(mini)}–${Math.round(maxi)}`,
+    etat: (v, base) => verdict(v > 75 ? "haut" : "dans", `seuil 75 bpm · base ${entier(Math.round(base))}`),
   },
   {
     key: "spo2", label: "Oxygénation du sang", unit: "%",
     champ: "spo2_pct", titre: "SpO₂", suffixe: " %", pas: 2, decimales: 0,
     alerte: (v) => v < 95,
-    reference: () => "norme ≥ 95",
+    etat: (v, base) => verdict(v < 95 ? "bas" : "dans", `seuil 95 % · base ${entier(Math.round(base))}`),
   },
   {
     key: "resp", label: "Fréquence respiratoire", unit: "/min",
     champ: "resp_min", titre: "Respiration", suffixe: " /min", pas: 2, decimales: 0,
-    reference: () => "norme 12–18",
+    // La norme 12–18 existait deja, mais rien ne la faisait respecter : sans
+    // cette alerte, le graphe aurait annonce « trop élevée » sur une tuile
+    // restee neutre.
+    alerte: (v) => v > 18 || v < 12,
+    etat: (v, base) =>
+      verdict(
+        v > 18 ? "haut" : v < 12 ? "bas" : "dans",
+        `norme 12–18 /min · base ${entier(Math.round(base))}`,
+      ),
   },
   {
     key: "hrv", label: "Variabilité cardiaque · RMSSD", unit: "ms",
     champ: "rmssd_ms", titre: "Variabilité cardiaque", suffixe: " ms", pas: 5, decimales: 0,
     alerte: (v, base) => v < base * 0.8,
-    reference: (v, base) =>
-      `base perso ${Math.round(base)} · ${v < base ? "−" : "+"}${Math.round(
-        Math.abs((v - base) / base) * 100,
-      )} %`,
+    etat: (v, base) =>
+      verdict(
+        v < base * 0.8 ? "bas" : "dans",
+        `seuil ${entier(Math.round(base * 0.8))} ms · base ${entier(Math.round(base))}`,
+      ),
   },
   {
     key: "temp", label: "Température cutanée", unit: "°C",
     champ: "temp_c", titre: "Température cutanée", suffixe: " °C", pas: 0.5, decimales: 1,
-    reference: (_v, _b, mini, maxi) => `base perso ${fr(mini)}–${fr(maxi)}`,
+    // Aucun seuil publie pour une temperature CUTANEE, qui n'est pas la
+    // temperature corporelle : on l'ecrit au lieu de laisser croire a une
+    // normale.
+    etat: (_v, base) => verdict("sans", `base perso ${fr(base, 1)} °C`),
   },
   {
     key: "eda", label: "Activité électrodermale", unit: "µS",
     champ: "eda_us", titre: "Activité électrodermale", suffixe: " µS", pas: 0.5, decimales: 1,
     alerte: (v, base) => v > base * 1.3,
-    reference: (v, base) => `base perso ${fr(base)} · ${v > base ? "élevée" : "normale"}`,
+    etat: (v, base) =>
+      verdict(
+        v > base * 1.3 ? "haut" : "dans",
+        `seuil ${fr(base * 1.3, 1)} µS · base ${fr(base, 1)}`,
+      ),
   },
   {
     key: "steps", label: "Pas sur 24 h",
     champ: "pas", titre: "Activité", suffixe: " pas", pas: 500, decimales: 0,
     alerte: (v) => v < 4000,
-    reference: () => "objectif 8 000",
+    etat: (v, base) =>
+      verdict(v < 4000 ? "bas" : "dans", `plancher 4 000 pas · base ${entier(Math.round(base))}`),
   },
 ];
 
@@ -350,10 +379,8 @@ export function adapterResident(d: ResidentApi) {
       label: def.label,
       unit: def.unit,
       value: def.key === "steps" ? entier(valeur) : fr(valeur, def.decimales),
-      reference: def.reference(valeur, base, Math.min(...serie), Math.max(...serie)),
       spark: serie.slice(-7),
       watch: def.alerte?.(valeur, base) ?? false,
-      measured: MESUREES.has(def.key),
       chart: {
         title: def.titre,
         subtitle: `${c.length} derniers jours · ${def.unit ?? "pas"}`,
@@ -362,6 +389,7 @@ export function adapterResident(d: ResidentApi) {
         max,
         ticks,
         refLine: Math.round(base * 10) / 10,
+        etat: def.etat(valeur, base),
         unitSuffix: def.suffixe,
       },
     };
@@ -372,14 +400,13 @@ export function adapterResident(d: ResidentApi) {
   const chutes = c.map(
     (l) => d.evenements.filter((e) => e.jour === l.jour).reduce((a, e) => a + e.n, 0),
   );
+  const totalChutes = chutes.reduce((a, b) => a + b, 0);
   vitals.push({
     key: "falls",
     label: "Secousses et chutes",
     unit: "évt",
     value: String(chutes.at(-1) ?? 0),
-    reference: `${chutes.reduce((a, b) => a + b, 0)} sur la période`,
     spark: chutes.slice(-7),
-    measured: false,
     chart: {
       title: "Secousses détectées",
       subtitle: `${c.length} derniers jours · événements`,
@@ -387,6 +414,9 @@ export function adapterResident(d: ResidentApi) {
       min: 0,
       max: Math.max(3, ...chutes),
       ticks: [0, 1, 2, 3],
+      etat: totalChutes
+        ? { sens: "haut", verdict: `${totalChutes} sur la période`, repere: "toute secousse remonte" }
+        : { sens: "dans", verdict: "Aucune secousse", repere: `sur ${c.length} jours` },
       unitSuffix: " évt",
     },
   });
@@ -421,6 +451,11 @@ export function adapterResident(d: ResidentApi) {
     title: p.titre,
     detail: p.detail,
     level: p.niveau === "critique" ? "crit" : p.niveau === "surveillance" ? "watch" : undefined,
+    // Une note non signée s'écrit « non signée », et pas rien du tout : c'est
+    // une information pour le médecin qui la lit, pas un détail d'affichage.
+    signature: p.auteur
+      ? `${p.auteur}${p.constate_le ? ` · ${dateCourte(p.constate_le)}` : ""}`
+      : "note non signée",
   }));
 
   const ICONES_SUIVI: Record<string, string> = {
@@ -439,6 +474,13 @@ export function adapterResident(d: ResidentApi) {
   const statut =
     r.statut === "critique" ? "Critique" : r.statut === "surveillance" ? "Surveillance" : "Suivi";
 
+  // « suivi par Dr. Oyelaran » : le médecin traitant, celui qui suit le
+  // résident au long cours — pas celui qui a prélevé tel bilan. La mention
+  // disparaît si personne n'est rattaché, plutôt que d'afficher un tiret.
+  const suiviPar = r.traitant_nom
+    ? ` · suivi par ${[r.traitant_titre, r.traitant_nom].filter(Boolean).join(" ")}`
+    : "";
+
   const tips = c.map((_, i) => (i === c.length - 1 ? "Aujourd’hui" : `J−${c.length - 1 - i}`));
 
   return {
@@ -449,7 +491,7 @@ export function adapterResident(d: ResidentApi) {
       status: statut,
       meta: `${r.age} ans · ${r.poste} · Module ${r.cabine} · embarqué au J+${entier(
         r.embarque_jour_vol,
-      )}`,
+      )}${suiviPar}`,
       device: d.bracelet
         ? `bracelet ${d.bracelet.serie} · batterie ${batterie ?? "?"} % · synchro ${depuis(
             d.bracelet.synchro_at,
@@ -462,7 +504,100 @@ export function adapterResident(d: ResidentApi) {
     totalConversations: d.conversations_total,
     particularities,
     followUp,
+    bloodReports: adapterBilans(d.bilans ?? []),
     dayLabels: etiquettes(tips),
     dayTips: tips,
   };
+}
+
+// ----------------------------------------------------------- bilan sanguin --
+/** Libellés des onze panels. Les clés sont celles du CHECK de `analyses_sang`. */
+const PANELS: Record<string, string> = {
+  cellules_sanguines: "Cellules sanguines",
+  fer: "Fer",
+  foie: "Foie",
+  reins: "Reins",
+  sucre: "Sucre",
+  thyroide: "Thyroïde",
+  electrolytes: "Électrolytes",
+  inflammation: "Infection et inflammation",
+  lipides: "Lipides",
+  vitamines: "Vitamines",
+  hormones: "Hormones",
+};
+
+/** « 2026-09-22 » -> « 22/09 ». */
+function dateCourte(iso: string): string {
+  const [, mois, jour] = iso.split("-");
+  return jour && mois ? `${jour}/${mois}` : iso;
+}
+
+/** Nombre de jours entre aujourd'hui et une date ISO, positif dans le futur. */
+function joursAvant(iso: string): number {
+  const cible = new Date(`${iso}T12:00:00`).getTime();
+  const maintenant = new Date().setHours(12, 0, 0, 0);
+  return Math.round((cible - maintenant) / 86400000);
+}
+
+/**
+ * Regroupe les dosages par panel et les met en forme.
+ *
+ * Le serveur envoie une ligne par marqueur, dans l'ordre du panel ; la console
+ * les empile dans cet ordre plutôt que de les trier à nouveau — un bilan se
+ * lit toujours dans le même ordre, c'est ce qui permet de le parcourir vite.
+ */
+function adapterBilans(bilans: BilanApi[]): BloodReport[] {
+  return bilans.map((b) => {
+    const parPanel = new Map<string, BloodMarker[]>();
+
+    for (const a of b.analyses) {
+      const valeur =
+        a.valeur_num !== null
+          ? String(a.valeur_num).replace(".", ",")
+          : (a.valeur_texte ?? "—");
+      const reference =
+        a.ref_bas !== null && a.ref_haut !== null
+          ? `${String(a.ref_bas).replace(".", ",")}–${String(a.ref_haut).replace(".", ",")}`
+          : // Un marqueur qualitatif n'a pas de bornes à comparer : on écrit la
+            // norme attendue plutôt qu'un intervalle vide.
+            "négatif attendu";
+
+      const liste = parPanel.get(a.panel) ?? [];
+      liste.push({
+        label: a.marqueur,
+        value: valeur,
+        unit: a.unite ?? "",
+        reference,
+        level: a.interpretation,
+      });
+      parPanel.set(a.panel, liste);
+    }
+
+    const panels = [...parPanel.entries()].map(([cle, markers]) => ({
+      key: cle,
+      label: PANELS[cle] ?? cle,
+      markers,
+      flagged: markers.filter((m) => m.level !== "normal").length,
+    }));
+
+    const dans = b.prochain_le ? joursAvant(b.prochain_le) : null;
+
+    return {
+      date: dateCourte(b.preleve_le),
+      dayLabel: `J+${entier(b.jour_vol)}`,
+      doctor: b.medecin,
+      comment: b.commentaire,
+      next:
+        dans === null
+          ? null
+          : dans > 0
+            ? `prochaine prise de sang dans ${dans} j`
+            : dans === 0
+              ? "prise de sang prévue aujourd’hui"
+              : `prise de sang en retard de ${-dans} j`,
+      simulated: b.source === "simule",
+      panels,
+      flagged: panels.reduce((n, p) => n + p.flagged, 0),
+    };
+  });
 }

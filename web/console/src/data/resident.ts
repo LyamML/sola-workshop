@@ -1,11 +1,12 @@
-import type { ConversationSummary, ParticularityNote, VitalSign } from "../types";
+import type { BloodReport, ConversationSummary, ParticularityNote, VitalSign } from "../types";
 
 /**
  * Fiche du résident R-0448 — jeu de démonstration.
  *
- * `measured: true` marque les constantes que le bracelet KY-039 mesure
- * réellement. Les autres sont simulées et l'interface le dit : mieux vaut
- * deux mesures honnêtes que huit chiffres dont on ignore l'origine.
+ * Sur les huit constantes affichées, le bracelet KY-039 n'en mesure vraiment
+ * que deux — la fréquence cardiaque et sa variabilité. Les autres sont
+ * estimées, et la limite est écrite dans le README plutôt que sur chaque
+ * tuile.
  */
 
 export const RESIDENT = {
@@ -13,7 +14,7 @@ export const RESIDENT = {
   initials: "LM",
   name: "Lyam Mafray",
   status: "Surveillance · 3 j",
-  meta: "28 ans · Technicien hydroponie · Module C-12 · embarqué au J+0",
+  meta: "28 ans · Technicien hydroponie · Module C-12 · embarqué au J+0 · suivi par Dr. Oyelaran",
   device: "bracelet BR-0448 · batterie 61 % (≈ 4 j) · synchro il y a 2 min",
 };
 
@@ -32,9 +33,7 @@ export const VITALS: VitalSign[] = [
     label: "Fréquence cardiaque au repos",
     value: "62",
     unit: "bpm",
-    reference: "base perso 55–70",
     spark: [60, 61, 63, 62, 64, 63, 62],
-    measured: true,
     chart: {
       title: "FC de repos",
       subtitle: "14 derniers jours · bpm",
@@ -43,6 +42,7 @@ export const VITALS: VitalSign[] = [
       max: 75,
       ticks: [55, 65, 75],
       refLine: 62,
+      etat: { sens: "dans", verdict: "Dans la norme", repere: "seuil 75 bpm · base 62" },
       unitSuffix: " bpm",
     },
   },
@@ -51,9 +51,7 @@ export const VITALS: VitalSign[] = [
     label: "Oxygénation du sang",
     value: "97",
     unit: "%",
-    reference: "norme ≥ 95",
     spark: [98, 97, 98, 97, 97, 96, 97],
-    measured: false,
     chart: {
       title: "SpO₂",
       subtitle: "14 derniers jours · %",
@@ -62,6 +60,7 @@ export const VITALS: VitalSign[] = [
       max: 100,
       ticks: [94, 97, 100],
       refLine: 97,
+      etat: { sens: "dans", verdict: "Dans la norme", repere: "seuil 95 % · base 97" },
       unitSuffix: " %",
     },
   },
@@ -70,9 +69,7 @@ export const VITALS: VitalSign[] = [
     label: "Fréquence respiratoire",
     value: "14",
     unit: "/min",
-    reference: "norme 12–18",
     spark: [13, 14, 13, 14, 15, 14, 14],
-    measured: false,
     chart: {
       title: "Respiration",
       subtitle: "14 derniers jours · cycles/min",
@@ -81,6 +78,7 @@ export const VITALS: VitalSign[] = [
       max: 20,
       ticks: [12, 16, 20],
       refLine: 14,
+      etat: { sens: "dans", verdict: "Dans la norme", repere: "norme 12–18 /min · base 14" },
       unitSuffix: " /min",
     },
   },
@@ -89,10 +87,8 @@ export const VITALS: VitalSign[] = [
     label: "Variabilité cardiaque · RMSSD",
     value: "31",
     unit: "ms",
-    reference: "base perso 48 · −35 %",
     spark: [46, 44, 41, 37, 34, 33, 31],
     watch: true,
-    measured: true,
     chart: {
       title: "Variabilité cardiaque",
       subtitle: "14 derniers jours · RMSSD, ms",
@@ -101,6 +97,7 @@ export const VITALS: VitalSign[] = [
       max: 55,
       ticks: [30, 40, 50],
       refLine: 48,
+      etat: { sens: "bas", verdict: "Trop basse", repere: "seuil 38 ms · base 48" },
       unitSuffix: " ms",
     },
   },
@@ -109,9 +106,7 @@ export const VITALS: VitalSign[] = [
     label: "Température cutanée",
     value: "34,1",
     unit: "°C",
-    reference: "base perso 34,0–34,6",
     spark: [34.4, 34.3, 34.2, 34.2, 34.1, 34.0, 34.1],
-    measured: false,
     chart: {
       title: "Température cutanée",
       subtitle: "14 derniers jours · °C",
@@ -120,6 +115,7 @@ export const VITALS: VitalSign[] = [
       max: 35,
       ticks: [34, 34.5, 35],
       refLine: 34.3,
+      etat: { sens: "sans", verdict: "Sans seuil", repere: "base perso 34,3 °C" },
       unitSuffix: " °C",
     },
   },
@@ -128,10 +124,8 @@ export const VITALS: VitalSign[] = [
     label: "Activité électrodermale",
     value: "3,8",
     unit: "µS",
-    reference: "base perso 1,8–2,6 · élevée",
     spark: [2.1, 2.3, 2.6, 3.0, 3.3, 3.6, 3.8],
     watch: true,
-    measured: false,
     chart: {
       title: "Activité électrodermale",
       subtitle: "14 derniers jours · µS",
@@ -140,6 +134,7 @@ export const VITALS: VitalSign[] = [
       max: 4.5,
       ticks: [1.5, 3, 4.5],
       refLine: 2.2,
+      etat: { sens: "haut", verdict: "Trop élevée", repere: "seuil 2,9 µS · base 2,2" },
       unitSuffix: " µS",
     },
   },
@@ -147,9 +142,7 @@ export const VITALS: VitalSign[] = [
     key: "steps",
     label: "Pas sur 24 h",
     value: "6 240",
-    reference: "objectif 8 000",
     spark: [8100, 7600, 7900, 7200, 6800, 6500, 6240],
-    measured: false,
     chart: {
       title: "Activité",
       subtitle: "14 derniers jours · pas",
@@ -158,6 +151,7 @@ export const VITALS: VitalSign[] = [
       max: 9500,
       ticks: [6000, 7500, 9000],
       refLine: 8000,
+      etat: { sens: "dans", verdict: "Dans la norme", repere: "plancher 4 000 pas · base 8 000" },
       unitSuffix: " pas",
     },
   },
@@ -166,9 +160,7 @@ export const VITALS: VitalSign[] = [
     label: "Secousses et chutes",
     value: "0",
     unit: "évt",
-    reference: "dernier : J+3 902",
     spark: [0, 0, 0, 0, 0, 0, 0],
-    measured: false,
     chart: {
       title: "Secousses détectées",
       subtitle: "14 derniers jours · événements",
@@ -176,6 +168,7 @@ export const VITALS: VitalSign[] = [
       min: 0,
       max: 3,
       ticks: [0, 1, 2, 3],
+      etat: { sens: "dans", verdict: "Aucune secousse", repere: "sur 14 jours" },
       unitSuffix: " évt",
     },
   },
@@ -243,6 +236,7 @@ export const PARTICULARITIES: ParticularityNote[] = [
   {
     icon: "!",
     title: "Arachide — allergie sévère",
+    signature: "Dr. Oyelaran",
     detail:
       "Choc anaphylactique en 2076. Auto-injecteur d’adrénaline en cabine C-12 et à l’infirmerie B. Régime tracé à la cuisine centrale.",
     level: "crit",
@@ -250,30 +244,35 @@ export const PARTICULARITIES: ParticularityNote[] = [
   {
     icon: "!",
     title: "AINS — proscrits",
+    signature: "Dr. Ferreira",
     detail: "Antécédent d’ulcère gastrique (2078). Paracétamol en première intention.",
     level: "crit",
   },
   {
     icon: "△",
     title: "Pénicilline — allergie",
+    signature: "Dr. Nakamura",
     detail: "Éruption cutanée généralisée. Alternative : macrolides.",
     level: "watch",
   },
   {
     icon: "△",
     title: "Asthme d’effort",
+    signature: "note non signée",
     detail: "Salbutamol à la demande. Dernière crise : J+3 840, sans hospitalisation.",
     level: "watch",
   },
   {
     icon: "i",
     title: "Épisode dépressif caractérisé (2077)",
+    signature: "note non signée",
     detail:
       "Rémission complète sous suivi. Facteur de vulnérabilité à considérer dans l’interprétation des signaux actuels — pas un diagnostic en cours.",
   },
   {
     icon: "i",
     title: "Intolérance au lactose · lentilles −3,5 / −3,75",
+    signature: "note non signée",
     detail: "Groupe sanguin O−. Vaccination de bord à jour, rappel au J+4 300.",
   },
 ];
@@ -300,5 +299,137 @@ export const FOLLOW_UP: ParticularityNote[] = [
     title: "Amara Mafray · sœur · C-15",
     detail:
       "Personne de confiance déclarée, joignable en urgence. Autorisation donnée par le résident au J+4 001.",
+  },
+];
+
+/**
+ * Bilan sanguin — repli.
+ *
+ * Un seul bilan ici, le dernier, la ou l'API en sert trois : le repli sert a
+ * ce que l'ecran ne soit jamais vide, pas a rejouer six semaines d'historique
+ * dans un fichier TypeScript. Le selecteur de dates n'a donc qu'une entree
+ * tant que le serveur ne repond pas, et l'en-tete dit pourquoi.
+ *
+ * Les valeurs sont celles que `scripts/db-demo.mjs` produit pour R-0448 : si
+ * vous changez le générateur, regénérez ce bloc, sinon les deux versions du
+ * même écran divergent.
+ */
+export const BLOOD_REPORTS: BloodReport[] = [
+  {
+    date: "22/09",
+    dayLabel: "J+4 128",
+    doctor: "Inf. Bakker",
+    comment: null,
+    next: "prochaine prise de sang dans 14 j",
+    simulated: true,
+    flagged: 2,
+    panels: [
+    {
+      key: "cellules_sanguines",
+      label: "Cellules sanguines",
+      flagged: 0,
+      markers: [
+        { label: "Hémoglobine", value: "15,4", unit: "g/dL", reference: "13–17", level: "normal" },
+        { label: "Leucocytes", value: "8,3", unit: "10⁹/L", reference: "4–10", level: "normal" },
+        { label: "Plaquettes", value: "342", unit: "10⁹/L", reference: "150–400", level: "normal" },
+        { label: "Hématocrite", value: "42,7", unit: "%", reference: "40–52", level: "normal" },
+      ],
+    },
+    {
+      key: "fer",
+      label: "Fer",
+      flagged: 0,
+      markers: [
+        { label: "Ferritine", value: "125", unit: "µg/L", reference: "30–300", level: "normal" },
+        { label: "Fer sérique", value: "19,6", unit: "µmol/L", reference: "11–28", level: "normal" },
+      ],
+    },
+    {
+      key: "foie",
+      label: "Foie",
+      flagged: 0,
+      markers: [
+        { label: "ALAT", value: "29,9", unit: "U/L", reference: "10–45", level: "normal" },
+        { label: "ASAT", value: "24,3", unit: "U/L", reference: "10–40", level: "normal" },
+      ],
+    },
+    {
+      key: "reins",
+      label: "Reins",
+      flagged: 0,
+      markers: [
+        { label: "Créatinine", value: "98", unit: "µmol/L", reference: "60–110", level: "normal" },
+        { label: "Débit de filtration glomérulaire", value: "130", unit: "mL/min", reference: "90–140", level: "normal" },
+      ],
+    },
+    {
+      key: "sucre",
+      label: "Sucre",
+      flagged: 0,
+      markers: [
+        { label: "Glycémie à jeun", value: "0,72", unit: "g/L", reference: "0,7–1,05", level: "normal" },
+        { label: "HbA1c", value: "4,78", unit: "%", reference: "4–5,6", level: "normal" },
+      ],
+    },
+    {
+      key: "thyroide",
+      label: "Thyroïde",
+      flagged: 0,
+      markers: [
+        { label: "TSH", value: "1,7", unit: "mUI/L", reference: "0,4–4", level: "normal" },
+        { label: "T4 libre", value: "13,5", unit: "pmol/L", reference: "12–22", level: "normal" },
+      ],
+    },
+    {
+      key: "electrolytes",
+      label: "Électrolytes",
+      flagged: 0,
+      markers: [
+        { label: "Sodium", value: "138,4", unit: "mmol/L", reference: "135–145", level: "normal" },
+        { label: "Potassium", value: "4,49", unit: "mmol/L", reference: "3,5–5", level: "normal" },
+        { label: "Calcium", value: "2,3", unit: "mmol/L", reference: "2,2–2,6", level: "normal" },
+      ],
+    },
+    {
+      key: "inflammation",
+      label: "Infection et inflammation",
+      flagged: 0,
+      markers: [
+        { label: "CRP", value: "1", unit: "mg/L", reference: "0–5", level: "normal" },
+        { label: "Vitesse de sédimentation", value: "0,1", unit: "mm/h", reference: "0–15", level: "normal" },
+        { label: "Recherche d'agent infectieux", value: "Négatif", unit: "", reference: "négatif attendu", level: "normal" },
+      ],
+    },
+    {
+      key: "lipides",
+      label: "Lipides",
+      flagged: 1,
+      markers: [
+        { label: "Cholestérol total", value: "1,7", unit: "g/L", reference: "1,4–2", level: "normal" },
+        { label: "LDL", value: "1", unit: "g/L", reference: "0,7–1,3", level: "normal" },
+        { label: "HDL", value: "0,81", unit: "g/L", reference: "0,4–0,8", level: "eleve" },
+        { label: "Triglycérides", value: "0,71", unit: "g/L", reference: "0,5–1,5", level: "normal" },
+      ],
+    },
+    {
+      key: "vitamines",
+      label: "Vitamines",
+      flagged: 1,
+      markers: [
+        { label: "Vitamine D", value: "100", unit: "nmol/L", reference: "50–125", level: "normal" },
+        { label: "Vitamine B12", value: "711", unit: "pmol/L", reference: "150–650", level: "eleve" },
+        { label: "Folates", value: "13,3", unit: "nmol/L", reference: "7–45", level: "normal" },
+      ],
+    },
+    {
+      key: "hormones",
+      label: "Hormones",
+      flagged: 0,
+      markers: [
+        { label: "Cortisol matinal", value: "172", unit: "nmol/L", reference: "170–500", level: "normal" },
+        { label: "DHEA-S", value: "8", unit: "µmol/L", reference: "2–9", level: "normal" },
+      ],
+    },
+    ],
   },
 ];

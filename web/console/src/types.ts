@@ -47,16 +47,29 @@ export interface TriageSignal {
   unassigned?: boolean;
 }
 
+/**
+ * De quel côté la dernière mesure tombe par rapport à la règle qui la juge.
+ * `sans` couvre les constantes pour lesquelles aucun seuil n'est défini : on
+ * le dit plutôt que de laisser croire à une normale.
+ */
+export type SensEcart = "haut" | "bas" | "dans" | "sans";
+
+/** Le verdict affiché sous le graphe d'une constante. */
+export interface EtatConstante {
+  sens: SensEcart;
+  /** En clair : « Trop élevée », « Dans la norme »… */
+  verdict: string;
+  /** La règle et la base personnelle, pour qu'on voie sur quoi il s'appuie. */
+  repere: string;
+}
+
 export interface VitalSign {
   key: string;
   label: string;
   value: string;
   unit?: string;
-  reference: string;
   spark: number[];
   watch?: boolean;
-  /** Constante réellement mesurée par le bracelet, ou valeur simulée. */
-  measured: boolean;
   chart: {
     title: string;
     subtitle: string;
@@ -65,6 +78,8 @@ export interface VitalSign {
     max: number;
     ticks: number[];
     refLine?: number;
+    /** Position de la dernière mesure : c'est la légende du graphe. */
+    etat?: EtatConstante;
     unitSuffix: string;
   };
 }
@@ -87,4 +102,38 @@ export interface ParticularityNote {
   title: string;
   detail: string;
   level?: "crit" | "watch";
+  /** « Dr. Nakamura · 12/09 », ou absent quand la note n'est pas signée. */
+  signature?: string;
+}
+
+/**
+ * Bilan sanguin tel que la fiche l'affiche : les dosages sont déjà groupés par
+ * panel et formatés. La virgule décimale et l'écriture des bornes de référence
+ * sont de la présentation, elles restent ici.
+ */
+export interface BloodPanel {
+  key: string;
+  label: string;
+  markers: BloodMarker[];
+  /** Nombre de marqueurs hors bornes dans ce panel. */
+  flagged: number;
+}
+
+export interface BloodMarker {
+  label: string;
+  value: string;
+  unit: string;
+  reference: string;
+  level: "normal" | "bas" | "eleve" | "critique";
+}
+
+export interface BloodReport {
+  date: string;
+  dayLabel: string;
+  doctor: string | null;
+  comment: string | null;
+  next: string | null;
+  simulated: boolean;
+  panels: BloodPanel[];
+  flagged: number;
 }

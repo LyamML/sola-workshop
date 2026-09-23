@@ -4,14 +4,12 @@ import { api, type Signal } from "../api";
 import { Cadre, Etat, Puce, horodatage, nombre } from "../components/Base";
 import { useChargement } from "../hooks";
 
-const SOIGNANTS = [
-  "Dr. Oyelaran",
-  "Dr. Ferreira",
-  "Dr. Nakamura",
-  "Inf. Bakker",
-  "Inf. Haddad",
-  "Équipe d’intervention",
-];
+/**
+ * La seule assignation qui ne soit pas une personne. Elle reste du texte
+ * libre : il n'y a pas de compte « équipe », et en inventer un ferait signer
+ * des notes par personne.
+ */
+const EQUIPE = "Équipe d’intervention";
 
 /**
  * La file de triage, en version travail.
@@ -28,6 +26,12 @@ export function Signaux() {
     () => api.signaux(filtre),
     [filtre],
   );
+
+  // Les soignants viennent des comptes, plus d'une liste écrite en dur :
+  // assigner un signal à quelqu'un qui n'a pas de compte, c'est l'assigner à
+  // personne.
+  const { donnees: comptes } = useChargement(() => api.comptes(), []);
+  const medecins = (comptes?.lignes ?? []).filter((c) => c.role === "medecin" && c.actif);
 
   async function agir(id: number, champs: Parameters<typeof api.modifierSignal>[1]) {
     setMessage(null);
@@ -126,23 +130,29 @@ export function Signaux() {
                         <span style={{ color: "var(--ink-3)" }}>{s.assigne_a ?? "—"}</span>
                       ) : (
                         <select
-                          value={s.assigne_a ?? ""}
-                          onChange={(e) =>
-                            agir(s.id, {
-                              assigne_a: e.target.value || null,
-                              statut: e.target.value ? "en_cours" : "ouvert",
-                            })
-                          }
+                          value={s.assigne_id ? `m:${s.assigne_id}` : s.assigne_a ? "equipe" : ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            // Trois cas, un seul champ : un compte, l'équipe,
+                            // ou rien. Le serveur vide l'autre colonne.
+                            agir(
+                              s.id,
+                              v.startsWith("m:")
+                                ? { assigne_id: Number(v.slice(2)), statut: "en_cours" }
+                                : v === "equipe"
+                                  ? { assigne_a: EQUIPE, statut: "en_cours" }
+                                  : { assigne_a: null, statut: "ouvert" },
+                            );
+                          }}
                         >
                           <option value="">Non assigné</option>
-                          {SOIGNANTS.map((n) => (
-                            <option key={n} value={n}>
-                              {n}
+                          {medecins.map((m) => (
+                            <option key={m.id} value={`m:${m.id}`}>
+                              {m.titre ? `${m.titre} ` : ""}
+                              {m.nom}
                             </option>
                           ))}
-                          {s.assigne_a && !SOIGNANTS.includes(s.assigne_a) && (
-                            <option value={s.assigne_a}>{s.assigne_a}</option>
-                          )}
+                          <option value="equipe">{EQUIPE}</option>
                         </select>
                       )}
                     </td>

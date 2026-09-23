@@ -1,4 +1,5 @@
 import { Link, NavLink } from "react-router-dom";
+import { useCompte } from "../session";
 
 const NAV = [
   { to: "/", label: "Équipage", end: true },
@@ -7,6 +8,17 @@ const NAV = [
 ];
 
 export function AppBar() {
+  const { compte, deconnecter } = useCompte();
+
+  // Sans compte, la console tourne sur le jeu de démonstration : l'avatar le
+  // dit au lieu d'afficher les initiales d'un soignant qui n'est pas là.
+  const nom = compte
+    ? `${compte.titre ? `${compte.titre} ` : ""}${compte.prenom} ${compte.nom}`
+    : "Mode démonstration";
+  const initiales = compte
+    ? `${compte.prenom[0] ?? ""}${compte.nom[0] ?? ""}`
+    : "··";
+
   return (
     <header className="appbar">
       <div className="app">
@@ -48,8 +60,18 @@ export function AppBar() {
               </svg>
               Rechercher un résident…
             </Link>
-            <div className="avatar" title="Dr. A. Ferreira">
-              AF
+            <div className="qui">
+              <div className="avatar" title={nom}>
+                {initiales}
+              </div>
+              <div className="nom">
+                <span>{nom}</span>
+                {compte && (
+                  <button type="button" onClick={deconnecter}>
+                    Se déconnecter
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

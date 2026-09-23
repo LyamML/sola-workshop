@@ -18,8 +18,13 @@ async function lire<T>(chemin: string): Promise<T> {
   const arret = new AbortController();
   const minuteur = setTimeout(() => arret.abort(), DELAI_MS);
   try {
-    const reponse = await fetch(`${BASE}${chemin}`, { signal: arret.signal });
-    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+    // `credentials: "include"` : le cookie de session est posé par le serveur
+    // sur un autre port, et sans cette option le navigateur ne le renvoie pas.
+    const reponse = await fetch(`${BASE}${chemin}`, {
+      signal: arret.signal,
+      credentials: "include",
+    });
+    if (!reponse.ok) throw new ErreurApi(reponse.status, `HTTP ${reponse.status}`);
     return (await reponse.json()) as T;
   } finally {
     clearTimeout(minuteur);
@@ -28,16 +33,13 @@ async function lire<T>(chemin: string): Promise<T> {
 
 // ---------------------------------------------------------------- écriture --
 /**
- * La lecture est ouverte. L'écriture l'est aussi, provisoirement.
+ * Lecture comme écriture passent par la session.
  *
- * Elle passait par le jeton du backoffice : le médecin devait recopier une clé
- * de 64 caractères pour écrire une ligne dans un dossier. C'était doublement
- * faux — une console de soin doit s'ouvrir sans cérémonie, et surtout un jeton
- * partagé ne dit pas QUI a écrit la note, ce qui est précisément ce qu'un
- * dossier médical doit retenir.
- *
- * La porte sera la session médecin (table `medecins`). D'ici là, la note part
- * sans auteur : c'est la limite à ne pas oublier au moment de la présenter.
+ * Le médecin se connecte une fois, avec son adresse et son mot de passe ; le
+ * serveur pose un cookie `httpOnly` qu'aucun script de la page ne peut lire.
+ * C'est ce cookie qui dit QUI écrit, et c'est pour cela qu'une note de dossier
+ * porte enfin un nom — ce qu'un jeton partagé, recopié à la main dans un
+ * champ, ne pouvait pas faire.
  */
 
 /** Porte le code HTTP, pour distinguer un refus d'une donnée invalide. */
@@ -57,6 +59,7 @@ async function poster<T>(chemin: string, corps: unknown): Promise<T> {
   const reponse = await fetch(`${BASE}${chemin}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(corps),
   });
   const donnees = (await reponse.json().catch(() => ({}))) as { erreur?: string };
@@ -74,7 +77,28 @@ export interface NouvelleNote {
   niveau: Niveau;
 }
 
+export interface Compte {
+  role: "medecin" | "admin";
+  id: number;
+  prenom: string;
+  nom: string;
+  email: string;
+  /** Matricule M-007 — les médecins seuls en ont un. */
+  code: string | null;
+  titre: string | null;
+}
+
 export const api = {
+  /**
+   * Qui est connecté. Appelé au chargement : sa réponse décide entre les
+   * écrans et le formulaire de connexion. Un 401 est une réponse normale ici,
+   * pas une panne — c'est simplement « personne ».
+   */
+  moi: () => lire<{ compte: Compte }>("/auth/moi"),
+  connexion: (email: string, mdp: string) =>
+    poster<{ compte: Compte }>("/auth/connexion", { email, mdp }),
+  deconnexion: () => poster<{ ok: true }>("/auth/deconnexion", {}),
+
   crew: () => lire<CrewApi>("/api/crew"),
   resident: (code: string) => lire<ResidentApi>(`/api/residents/${code}`),
 
@@ -140,6 +164,14 @@ export interface ResidentApi {
     statut: "ok" | "surveillance" | "critique";
     embarque_jour_vol: number;
     age: number;
+    /**
+     * Le médecin traitant. Null tant qu'aucun soignant n'est rattaché : on
+     * n'invente pas un nom pour remplir la ligne.
+     */
+    traitant_code: string | null;
+    traitant_titre: string | null;
+    traitant_prenom: string | null;
+    traitant_nom: string | null;
   };
   bracelet: {
     serie: string;
@@ -174,7 +206,41 @@ export interface ResidentApi {
     tags: string[];
   }[];
   conversations_total: number;
-  particularites: { type: string; niveau: SeveriteApi; titre: string; detail: string }[];
+  particularites: {
+    type: string;
+    niveau: SeveriteApi;
+    titre: string;
+    detail: string;
+    constate_le: string | null;
+    /** Null pour les notes antérieures aux comptes : elles n'ont pas d'auteur. */
+    auteur: string | null;
+  }[];
   suivis: { type: string; titre: string; detail: string }[];
   etat_mental: { evalue_le: string; score_moral: number | null }[];
+  bilans: BilanApi[];
+}
+
+/** Une consultation avec prise de sang, et ses dosages. */
+export interface BilanApi {
+  id: number;
+  preleve_le: string;
+  jour_vol: number;
+  prochain_le: string | null;
+  statut: "planifie" | "preleve" | "rendu";
+  commentaire: string | null;
+  source: "analyse" | "simule";
+  medecin: string | null;
+  analyses: AnalyseApi[];
+}
+
+export interface AnalyseApi {
+  panel: string;
+  marqueur: string;
+  /** L'un des deux est renseigné : un dosage chiffré, ou un résultat en toutes lettres. */
+  valeur_num: number | null;
+  valeur_texte: string | null;
+  unite: string | null;
+  ref_bas: number | null;
+  ref_haut: number | null;
+  interpretation: "normal" | "bas" | "eleve" | "critique";
 }

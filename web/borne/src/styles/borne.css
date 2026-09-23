@@ -1,8 +1,19 @@
 /* =============================================================================
    Sola — borne de cabine (écran 01)
+
+   Deux règles tiennent toute cette feuille :
+
+   · La borne est un mur, pas une page. Elle occupe exactement l'écran et ne
+     défile jamais — `position: fixed` plus une grille en trois rangées dont
+     seule celle du milieu est élastique. Tout ce qui pourrait déborder est
+     borné (la trace se coupe en haut, les cartes sont limitées à deux).
+   · La borne n'a pas de commande. On lui parle. Les seuls boutons de l'écran
+     sont ceux d'une question posée par Sola — pour qui est debout devant elle
+     et préfère le doigt à la voix — et le bandeau de démonstration, qui
+     s'efface au repos parce qu'il ne fait pas partie de l'appareil.
+
    Palette assumée en monochrome sombre : c'est un appareil mural qui éclaire
    une cabine, il garde le même rendu quel que soit le thème de la machine.
-   Styles portés tels quels depuis la maquette de référence.
    ========================================================================== */
 
 :root {
@@ -18,6 +29,7 @@ html,
 body,
 #root {
   height: 100%;
+  overflow: hidden;
 }
 html {
   -webkit-text-size-adjust: 100%;
@@ -30,6 +42,7 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 h1,
 h2,
@@ -76,29 +89,29 @@ button {
   --b-warm: #e8c48a;
   --b-crit: #e2776a;
 
-  position: relative;
-  /* La borne est un mur : pas de défilement horizontal, et un défilement
-     vertical qui ne sert que lorsqu'une carte dépasse la hauteur de l'écran. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 26px 20px 44px;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  display: grid;
+  /* Entête et pied se dimensionnent sur leur contenu ; la scène prend ce qui
+     reste, et `minmax(0, 1fr)` l'empêche de pousser au-delà de l'écran. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Une piste implicite `auto` se dimensionne sur son contenu maximal et
+     déborde la borne : la colonne est déclarée, et bornée. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding: 22px 20px 18px;
   color: var(--b-ink);
   background: var(--b-bg);
   transition: background 0.8s ease;
 }
 .borne::before {
   content: "";
-  /* Fixe plutôt qu'absolu : la lueur reste centrée sur l'écran même quand le
-     contenu défile. */
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   background: radial-gradient(
-    64% 52% at 50% 40%,
+    64% 52% at 50% 42%,
     rgba(79, 209, 188, 0.16) 0%,
     rgba(79, 209, 188, 0) 70%
   );
@@ -110,7 +123,7 @@ button {
 }
 .borne.mode-alerte::before {
   background: radial-gradient(
-    64% 52% at 50% 40%,
+    64% 52% at 50% 42%,
     rgba(226, 119, 106, 0.2) 0%,
     rgba(226, 119, 106, 0) 70%
   );
@@ -121,7 +134,7 @@ button {
 }
 .borne.mode-calme::before {
   background: radial-gradient(
-    64% 52% at 50% 40%,
+    64% 52% at 50% 42%,
     rgba(232, 196, 138, 0.17) 0%,
     rgba(232, 196, 138, 0) 70%
   );
@@ -131,10 +144,11 @@ button {
   z-index: 1;
 }
 
+/* ----------------------------------------------------------- entête ------- */
 .b-status {
   display: flex;
   align-items: center;
-  gap: 8px 18px;
+  gap: 6px 18px;
   flex-wrap: wrap;
   justify-content: center;
   font-family: var(--mono);
@@ -142,7 +156,6 @@ button {
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--b-ink3);
-  margin-bottom: auto;
 }
 .b-status span {
   display: flex;
@@ -160,18 +173,33 @@ button {
   color: var(--b-warm);
 }
 
-/* ------------------------------------------------------------ compagnon --- */
-.b-stage {
+/* ------------------------------------------------------------- scène ------ */
+.b-scene {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 26px;
-  padding-block: 30px;
-  width: 100%;
 }
+.b-centre {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* Le compagnon occupe la place disponible, la trace prend la sienne en bas
+     et ne bouge plus : c'est ce qui rend la borne stable à l'œil. */
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 14px;
+}
+.b-avatar {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* -------------------------------------------------------- compagnon ------- */
 .sola-wrap {
   position: relative;
-  width: min(300px, 62vw);
+  width: min(40vh, 340px, 62vw);
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
@@ -234,6 +262,64 @@ button {
   animation: auraBreathe 9.5s ease-in-out infinite;
 }
 
+/* Le chat en pixels, en trois états empilés.
+
+   Leur boîte utile ne fait que 150 × 120 sur une toile de 320 × 320, et elle
+   est décalée vers le haut : on l'agrandit et on la recentre ici plutôt que de
+   retoucher les fichiers. Le recadrage porte sur le conteneur, pas sur chaque
+   image — c'est ce qui garantit que la tête ne bouge pas quand la bouche
+   s'ouvre. Il est repris dans les images-clés : une animation de `transform`
+   remplace la déclaration statique, elle ne s'y ajoute pas, et celle-ci ne
+   sert donc qu'au mode « animations réduites ». */
+.cat-pixels {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform: translate(3.2%, 11.8%) scale(1.84);
+  filter: drop-shadow(0 0 26px color-mix(in srgb, var(--b-glow) 45%, transparent));
+  animation: gifBreathe 4.6s ease-in-out infinite;
+}
+@keyframes gifBreathe {
+  0%,
+  100% {
+    transform: translate(3.2%, 11.8%) scale(1.84);
+  }
+  50% {
+    transform: translate(3.2%, 10.2%) scale(1.89);
+  }
+}
+.is-thinking .cat-pixels {
+  animation-duration: 2.2s;
+}
+.cat-pixels .etat {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+/* Le repos est l'état par défaut : c'est aussi celui de la réflexion, où Sola
+   n'écoute plus et ne parle pas encore. */
+.cat-pixels .repos {
+  opacity: 1;
+}
+.is-listening .cat-pixels .repos,
+.is-speaking .cat-pixels .repos {
+  opacity: 0;
+}
+.is-listening .cat-pixels .ecoute {
+  opacity: 1;
+}
+.is-speaking .cat-pixels .parle {
+  opacity: 1;
+}
+
+/* Le chat vectoriel d'origine. Il n'est plus monté par défaut — voir
+   `SolaAvatar` — mais ses règles restent, sinon la bascule ne rendrait rien. */
 .cat {
   position: relative;
   width: 76%;
@@ -351,7 +437,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  height: 30px;
+  height: 22px;
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -362,119 +448,128 @@ button {
   width: 3px;
   border-radius: 99px;
   background: var(--b-glow);
-  height: 5px;
+  height: 4px;
   animation: waveBar 1s ease-in-out infinite;
   opacity: 0.85;
 }
 @keyframes waveBar {
   0%,
   100% {
-    height: 5px;
+    height: 4px;
   }
   50% {
-    height: var(--h, 20px);
+    height: var(--h, 18px);
   }
 }
 
-/* -------------------------------------------------------------- parole ---- */
-.b-speech {
-  min-height: 118px;
-  max-width: 660px;
-  width: 100%;
-  text-align: center;
+/* ------------------------------------------------- trace de l'échange ----- */
+/* Ce que la borne dit est d'abord entendu ; l'écrit est là pour être relu d'un
+   coup d'œil. D'où une pile ancrée en bas : le dernier tour de parole est gros
+   et net, les précédents s'estompent vers le haut et sortent du cadre. */
+.b-trace {
+  width: min(820px, 100%);
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  /* Une hauteur plancher, pas seulement un plafond : le dégradé du haut mange
+     52 px, et sans plancher il effacerait la seule ligne d'une trace courte.
+     Elle fige aussi la place du compagnon, qui ne remonte plus à chaque tour. */
+  min-height: min(28vh, 200px);
+  max-height: min(38vh, 300px);
+  overflow: hidden;
+  text-align: center;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
 }
-.b-who {
+.b-ligne {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--b-ink3);
+  opacity: 0.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  animation: ligneIn 0.45s cubic-bezier(0.2, 0.8, 0.3, 1);
+  transition: opacity 0.4s ease, color 0.4s ease;
+}
+@keyframes ligneIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.b-ligne .qui {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--b-ink3);
-  transition: color 0.3s;
+  margin-right: 10px;
+  opacity: 0.7;
 }
-.is-listening .b-who {
-  color: var(--b-glow);
-}
-.b-line {
-  font-size: clamp(19px, 3.1vw, 26px);
+.b-ligne.vive {
+  opacity: 1;
+  color: var(--b-ink);
+  font-size: clamp(18px, 2.4vw, 25px);
   font-weight: 300;
   line-height: 1.45;
   letter-spacing: -0.01em;
-  transition: opacity 0.35s ease, transform 0.35s ease;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
 }
-.b-line.out {
-  opacity: 0;
-  transform: translateY(7px);
+.b-ligne.vive .qui {
+  display: block;
+  margin: 0 0 9px;
+  color: var(--b-ink3);
+  letter-spacing: 0.16em;
+  opacity: 1;
 }
-.b-line.user {
+.b-ligne.vive.resident {
   color: var(--b-ink2);
   font-weight: 400;
-  font-size: clamp(16px, 2.4vw, 20px);
+  font-size: clamp(16px, 2vw, 20px);
 }
-.b-hint {
-  font-size: 12.5px;
+.b-ligne.vive.resident .qui {
+  color: var(--b-glow);
+}
+/* Ce qui est encore en train d'être dit : affiché, mais donné pour provisoire. */
+.b-ligne.encours {
   color: var(--b-ink3);
+  animation: none;
 }
 
-/* --------------------------------------------------------- bouton micro --- */
-.b-mic {
-  width: 74px;
-  height: 74px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, var(--b-glow) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--b-glow) 40%, transparent);
-  transition: 0.22s;
-  flex: none;
-}
-.b-mic:hover {
-  background: color-mix(in srgb, var(--b-glow) 26%, transparent);
-  transform: scale(1.04);
-}
-.b-mic svg {
-  width: 26px;
-  height: 26px;
-  fill: none;
-  stroke: var(--b-glow);
-  stroke-width: 1.7;
-  stroke-linecap: round;
-}
-.is-listening .b-mic {
-  background: var(--b-glow);
-  border-color: var(--b-glow);
-}
-.is-listening .b-mic svg {
-  stroke: #0d1618;
-}
-
-/* ------------------------------------------------- carte contextuelle ----- */
-.b-cards {
+/* ------------------------------------------------- cartes d'information --- */
+/* Ce que Sola vient de faire, posé dans le coin comme une notification. En
+   absolu : une carte qui apparaît ne doit pas déplacer le compagnon. */
+.b-notes {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(330px, 34vw);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  width: 100%;
+  gap: 10px;
+  z-index: 2;
+  pointer-events: none;
 }
 .b-card {
-  width: min(560px, 100%);
-  border-radius: 20px;
-  padding: 18px 20px;
+  border-radius: 18px;
+  padding: 15px 17px;
   background: var(--b-card);
   border: 1px solid var(--b-line);
   backdrop-filter: blur(14px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 11px;
   animation: cardIn 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 @keyframes cardIn {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(-12px);
   }
   to {
     opacity: 1;
@@ -496,8 +591,28 @@ button {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  flex: none;
   background: var(--b-glow);
 }
+.b-card p {
+  font-size: 13.5px;
+  color: var(--b-ink2);
+  line-height: 1.55;
+  text-align: left;
+}
+.b-card p b {
+  color: var(--b-ink);
+}
+.b-card.warm {
+  border-color: color-mix(in srgb, var(--b-warm) 36%, transparent);
+}
+.b-card.warm .tag {
+  color: var(--b-warm);
+}
+.b-card.warm .tag::before {
+  background: var(--b-warm);
+}
+
 .b-person {
   display: flex;
   align-items: center;
@@ -505,8 +620,8 @@ button {
   text-align: left;
 }
 .b-person .av {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   flex: none;
   display: grid;
@@ -524,144 +639,283 @@ button {
   font-size: 13px;
   color: var(--b-ink2);
 }
-.b-card p {
-  font-size: 14px;
-  color: var(--b-ink2);
-  line-height: 1.6;
-  text-align: left;
-}
-.b-card p b {
-  color: var(--b-ink);
-}
-.b-card.warm {
-  border-color: color-mix(in srgb, var(--b-warm) 36%, transparent);
-}
-.b-card.warm .tag {
-  color: var(--b-warm);
-}
-.b-card.warm .tag::before {
-  background: var(--b-warm);
-}
-.b-acts {
-  display: flex;
-  gap: 9px;
-  flex-wrap: wrap;
-}
-.b-acts button {
-  padding: 9px 17px;
-  border-radius: 99px;
-  font-size: 13.5px;
-  font-weight: 500;
-  border: 1px solid color-mix(in srgb, var(--b-glow) 40%, transparent);
-  color: var(--b-glow);
-  transition: 0.18s;
-}
-.b-acts button:hover {
-  background: color-mix(in srgb, var(--b-glow) 18%, transparent);
-}
-.b-acts button.ghost {
-  border-color: var(--b-line);
-  color: var(--b-ink3);
-}
-.b-acts button.ghost:hover {
-  background: var(--b-card);
-  color: var(--b-ink2);
-}
-.b-acts button.done {
-  background: var(--b-glow);
-  color: #0d1618;
-  border-color: var(--b-glow);
-}
 
-/* ------------------------------------------------------- pied de borne ---- */
-.b-foot {
+/* -------------------------------------------------------- la question ----- */
+/* Sola demande à voix haute ; la fenêtre reprend la question par écrit et
+   affiche, sous chaque choix, le mot qui suffit à le dire. Le doigt et la voix
+   mènent au même endroit. */
+.b-pop-fond {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  /* Ancrée en bas plutôt qu'au centre : la question se pose sous le compagnon,
+     qui reste visible en train de la poser. */
+  place-items: end center;
+  padding: 10px;
+  background: color-mix(in srgb, var(--b-bg) 72%, transparent);
+  backdrop-filter: blur(7px);
+  animation: fondIn 0.32s ease;
+}
+@keyframes fondIn {
+  from {
+    opacity: 0;
+  }
+}
+.b-pop {
+  width: min(580px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  border-radius: 26px;
+  padding: 26px 28px 22px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 15px;
+  background: color-mix(in srgb, var(--b-bg) 88%, #ffffff 6%);
+  border: 1px solid color-mix(in srgb, var(--b-glow) 30%, transparent);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55);
+  animation: popIn 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+.b-pop .tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--b-glow);
+}
+.b-pop h2 {
+  font-size: clamp(19px, 2.4vw, 25px);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.32;
+}
+.b-pop .dt {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--b-ink2);
+}
+.b-opts {
+  display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  padding-inline: 16px;
-  margin-top: 28px;
+  margin-top: 2px;
 }
-.b-foot button {
+.b-opts button {
+  flex: 1 1 200px;
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 16px;
-  border-radius: 99px;
-  border: 1px solid var(--b-line);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 13px 18px;
+  border-radius: 16px;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--b-glow) 42%, transparent);
+  background: color-mix(in srgb, var(--b-glow) 10%, transparent);
+  color: var(--b-ink);
+  transition: 0.18s;
+}
+.b-opts button:hover {
+  background: color-mix(in srgb, var(--b-glow) 22%, transparent);
+}
+.b-opts button .lb {
+  font-size: 15px;
+  font-weight: 500;
+}
+.b-opts button .vx {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--b-glow);
+}
+.b-opts button.ghost {
+  border-color: var(--b-line);
   background: var(--b-card);
   color: var(--b-ink2);
-  font-size: 13px;
-  transition: 0.18s;
-  backdrop-filter: blur(10px);
 }
-.b-foot button:hover {
+.b-opts button.ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: var(--b-ink);
-  border-color: color-mix(in srgb, var(--b-glow) 40%, transparent);
 }
-.b-foot svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.b-opts button.ghost .vx {
+  color: var(--b-ink3);
+}
+.b-pop-pied {
+  font-size: 12px;
+  color: var(--b-ink3);
+  border-top: 1px solid var(--b-line);
+  padding-top: 13px;
 }
 
-/* -------------------------------------------------- sélecteur scénario ---- */
-.b-scenes {
-  position: absolute;
-  top: 22px;
-  right: 20px;
+/* ---------------------------------------------------------------- pied ---- */
+.b-pied {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 46px;
+}
+.b-hint {
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--b-ink3);
+  text-align: center;
+}
+.is-listening .b-hint {
+  color: var(--b-glow);
+}
+
+/* ------------------------------------------------- bandeau démonstration -- */
+/* Hors interface : c'est la main de celui qui présente, pas celle du résident.
+   D'où l'effacement au repos — l'écran de la borne reste nu. */
+.b-demo {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
   gap: 3px;
-  padding: 4px;
+  padding: 4px 4px 4px 10px;
   border-radius: 99px;
   border: 1px solid var(--b-line);
   background: var(--b-card);
   backdrop-filter: blur(10px);
-  z-index: 2;
+  opacity: 0.16;
+  transition: opacity 0.3s ease;
 }
-.b-scenes button {
-  padding: 6px 13px;
+.b-demo:hover,
+.b-demo:focus-within {
+  opacity: 1;
+}
+.b-demo .lb {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--b-ink3);
+  margin-right: 5px;
+}
+.b-demo .sep {
+  width: 1px;
+  height: 16px;
+  background: var(--b-line);
+  margin: 0 4px;
+}
+.b-demo button {
+  padding: 5px 12px;
   border-radius: 99px;
   font-size: 12px;
   color: var(--b-ink3);
   transition: 0.16s;
 }
-.b-scenes button:hover {
+.b-demo button:hover {
   color: var(--b-ink2);
 }
-.b-scenes button[aria-pressed="true"] {
+.b-demo button[aria-pressed="true"] {
   background: color-mix(in srgb, var(--b-glow) 20%, transparent);
   color: var(--b-ink);
 }
-@media (max-width: 720px) {
-  .b-scenes {
-    position: static;
-    margin-bottom: 18px;
-    align-self: center;
+
+/* ----------------------------------------------------------- la veille ---- */
+/* Le navigateur n'ouvre ni le micro ni la synthèse vocale sans un geste : ce
+   voile est ce geste, une fois, au réveil de la borne. Ensuite plus rien à
+   toucher. */
+.b-eveil {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: color-mix(in srgb, var(--b-bg) 82%, transparent);
+  backdrop-filter: blur(4px);
+  animation: fondIn 0.4s ease;
+}
+.b-eveil .t {
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 300;
+  color: var(--b-ink);
+}
+.b-eveil .s {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--b-ink3);
+  max-width: 34ch;
+  line-height: 1.7;
+  animation: veilleRespire 3s ease-in-out infinite;
+}
+@keyframes veilleRespire {
+  0%,
+  100% {
+    opacity: 0.55;
   }
-  .b-status {
-    margin-bottom: 14px;
+  50% {
+    opacity: 1;
   }
 }
 
-/* ------------------------------------------------- respiration guidée ----- */
+/* --------------------------------------------------- respiration guidée --- */
 .breath {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 .breath .num {
   font-family: var(--mono);
-  font-size: 30px;
+  font-size: 26px;
   color: var(--b-warm);
 }
 .breath .st {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--b-ink2);
   letter-spacing: 0.04em;
+}
+
+/* ------------------------------------------------------------ étroit ------ */
+@media (max-width: 860px) {
+  /* Plus de place à droite : les cartes reprennent le fil, au-dessus du
+     compagnon, et rendent leur hauteur à la grille. */
+  .b-notes {
+    position: static;
+    order: -1;
+    width: 100%;
+    flex: none;
+    margin-bottom: 10px;
+  }
+  .sola-wrap {
+    width: min(28vh, 220px, 52vw);
+  }
+}
+@media (max-width: 620px) {
+  /* Le bandeau ne tient plus à côté du pied : il passe dessous, et la borne
+     lui réserve sa hauteur pour que la ligne d'état reste lisible. */
+  .borne {
+    padding: 16px 14px 54px;
+  }
+  .b-demo {
+    left: 50%;
+    right: auto;
+    bottom: 8px;
+    transform: translateX(-50%);
+  }
+  .b-demo .lb {
+    display: none;
+  }
+  .b-pop {
+    padding: 20px 18px 16px;
+    border-radius: 20px;
+  }
 }

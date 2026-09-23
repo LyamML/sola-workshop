@@ -5,7 +5,7 @@
 --  format du modele que l'equipe fait evoluer sur dbdiagram.io. La base qui
 --  tourne reellement est en SQLite : db/serveur/01-schema.sql.
 --
---  Les deux decrivent les memes 12 tables. Si vous modifiez l'une, modifiez
+--  Les deux decrivent les memes 17 tables. Si vous modifiez l'une, modifiez
 --  l'autre — ou supprimez celle-ci le jour ou dbdiagram ne sert plus.
 -- =============================================================================
 
@@ -27,10 +27,68 @@ CREATE DATABASE IF NOT EXISTS sola
 USE sola;
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS conversation_tags, conversations, signaux, evenements,
-  etat_mental, nuits, mesures_jour, mesures, suivis, particularites,
-  bracelets, residents;
+DROP TABLE IF EXISTS analyses_sang, bilans_sanguins, conversation_tags,
+  conversations, signaux, evenements, etat_mental, nuits, mesures_jour,
+  mesures, suivis, particularites, bracelets, residents,
+  sessions, medecins, admins;
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ---------------------------------------------------------------- comptes ---
+-- Qui lit les dossiers, et qui a ecrit quoi dedans. Ces tables viennent avant
+-- `residents` parce que `particularites` et `signaux` les referencent : une
+-- note de dossier porte le nom de celui qui l'a ecrite.
+--
+-- `mdp_hash` contient une empreinte argon2id, jamais un mot de passe. Le
+-- format stocke inclut le sel et les parametres, d'ou la longueur.
+CREATE TABLE medecins (
+  id                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  -- Matricule affiche a l'ecran : M-001.
+  code               CHAR(5)      NOT NULL UNIQUE,
+  prenom             VARCHAR(80)  NOT NULL,
+  nom                VARCHAR(80)  NOT NULL,
+  titre              ENUM('Dr.','Inf.') NOT NULL DEFAULT 'Dr.',
+  poste              VARCHAR(80)  NOT NULL DEFAULT 'Medecine de bord',
+  email              VARCHAR(160) NOT NULL UNIQUE,
+  mdp_hash           VARCHAR(255) NOT NULL,
+  -- On desactive, on ne supprime pas : une note signee par un soignant parti
+  -- perdrait son auteur.
+  actif              BOOLEAN      NOT NULL DEFAULT TRUE,
+  cree_le            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  derniere_connexion DATETIME     NULL
+) ENGINE = InnoDB;
+
+-- Administration du bord : le backoffice, les tables, les comptes. Pas de
+-- matricule ni de titre — un administrateur ne signe pas de note clinique.
+CREATE TABLE admins (
+  id                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  prenom             VARCHAR(80)  NOT NULL,
+  nom                VARCHAR(80)  NOT NULL,
+  email              VARCHAR(160) NOT NULL UNIQUE,
+  mdp_hash           VARCHAR(255) NOT NULL,
+  actif              BOOLEAN      NOT NULL DEFAULT TRUE,
+  cree_le            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  derniere_connexion DATETIME     NULL
+) ENGINE = InnoDB;
+
+-- Sessions ouvertes. `id` est le SHA-256 du jeton pose dans le cookie, pas le
+-- jeton : une copie de la base ne donne acces a aucune session ouverte.
+CREATE TABLE sessions (
+  id           CHAR(64)     PRIMARY KEY,
+  medecin_id   INT UNSIGNED NULL,
+  admin_id     INT UNSIGNED NULL,
+  ouverte_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  vue_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expire_at    DATETIME     NOT NULL,
+
+  CONSTRAINT fk_sessions_medecin
+    FOREIGN KEY (medecin_id) REFERENCES medecins (id) ON DELETE CASCADE,
+  CONSTRAINT fk_sessions_admin
+    FOREIGN KEY (admin_id) REFERENCES admins (id) ON DELETE CASCADE,
+  -- Une session appartient a un compte et a un seul.
+  CONSTRAINT chk_sessions_proprietaire
+    CHECK ((medecin_id IS NULL) <> (admin_id IS NULL)),
+  INDEX idx_sessions_expire (expire_at)
+) ENGINE = InnoDB;
 
 -- --------------------------------------------------------------- identite ---
 CREATE TABLE residents (
@@ -50,13 +108,19 @@ CREATE TABLE residents (
   -- Personne de confiance declaree par le resident (un autre resident).
   confiance_id       INT UNSIGNED NULL,
   confiance_lien     VARCHAR(40)  NULL,
+  -- Le medecin qui suit ce resident au long cours : un rattachement, pas un
+  -- acte. Voir le commentaire de db/serveur/01-schema.sql.
+  medecin_traitant_id INT UNSIGNED NULL,
   created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
                                   ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_residents_confiance
     FOREIGN KEY (confiance_id) REFERENCES residents (id) ON DELETE SET NULL,
+  CONSTRAINT fk_residents_traitant
+    FOREIGN KEY (medecin_traitant_id) REFERENCES medecins (id),
   INDEX idx_residents_cabine (cabine),
-  INDEX idx_residents_statut (statut)
+  INDEX idx_residents_statut (statut),
+  INDEX idx_residents_traitant (medecin_traitant_id)
 ) ENGINE = InnoDB;
 
 CREATE TABLE bracelets (
@@ -83,9 +147,14 @@ CREATE TABLE particularites (
   titre        VARCHAR(120) NOT NULL,
   detail       TEXT         NOT NULL,
   constate_le  DATE         NULL,
+  -- Qui a ecrit la note. Sans ON DELETE : on ne supprime pas un compte, on le
+  -- desactive, justement pour que cette colonne reste vraie.
+  auteur_id    INT UNSIGNED NULL,
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_particularites_resident
     FOREIGN KEY (resident_id) REFERENCES residents (id) ON DELETE CASCADE,
+  CONSTRAINT fk_particularites_auteur
+    FOREIGN KEY (auteur_id) REFERENCES medecins (id),
   INDEX idx_particularites_resident (resident_id, niveau)
 ) ENGINE = InnoDB;
 
@@ -275,6 +344,10 @@ CREATE TABLE signaux (
   -- D'ou vient le declenchement : utile pour mesurer les faux positifs.
   origine       ENUM('physio','conversation','chute','usage','manuel') NOT NULL,
   ouvert_at     DATETIME     NOT NULL,
+  -- Assigne a une personne : le compte du soignant.
+  assigne_id    INT UNSIGNED NULL,
+  -- Assigne a ce qui n'est pas une personne : « Equipe d'intervention ». Les
+  -- deux colonnes ne sont jamais remplies ensemble.
   assigne_a     VARCHAR(80)  NULL,          -- NULL = non assigne
   statut        ENUM('ouvert','en_cours','clos') NOT NULL DEFAULT 'ouvert',
   clos_at       DATETIME     NULL,
@@ -283,6 +356,8 @@ CREATE TABLE signaux (
 
   CONSTRAINT fk_signaux_resident
     FOREIGN KEY (resident_id) REFERENCES residents (id) ON DELETE CASCADE,
+  CONSTRAINT fk_signaux_assigne
+    FOREIGN KEY (assigne_id) REFERENCES medecins (id),
   INDEX idx_signaux_file (statut, severite, ouvert_at),
   INDEX idx_signaux_resident (resident_id, ouvert_at DESC)
 ) ENGINE = InnoDB;
@@ -301,4 +376,59 @@ CREATE TABLE evenements (
     FOREIGN KEY (resident_id) REFERENCES residents (id) ON DELETE CASCADE,
   INDEX idx_evenements_resident (resident_id, survenu_at DESC),
   INDEX idx_evenements_type (type, survenu_at DESC)
+) ENGINE = InnoDB;
+
+-- -------------------------------------------------------- bilans sanguins ---
+-- Un rendez-vous toutes les deux semaines : prise de sang et consultation.
+-- L'en-tete est ici, les dosages dans `analyses_sang`.
+CREATE TABLE bilans_sanguins (
+  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  resident_id  INT UNSIGNED NOT NULL,
+  -- Qui a preleve. NULL pour un bilan importe ou simule.
+  medecin_id   INT UNSIGNED NULL,
+  preleve_le   DATE         NOT NULL,
+  jour_vol     INT UNSIGNED NOT NULL,
+  -- Le rendez-vous suivant, affiche au resident comme au medecin.
+  prochain_le  DATE         NULL,
+  statut       ENUM('planifie','preleve','rendu') NOT NULL DEFAULT 'rendu',
+  commentaire  TEXT         NULL,
+  source       ENUM('analyse','simule') NOT NULL DEFAULT 'analyse',
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_bilans_resident
+    FOREIGN KEY (resident_id) REFERENCES residents (id) ON DELETE CASCADE,
+  CONSTRAINT fk_bilans_medecin
+    FOREIGN KEY (medecin_id) REFERENCES medecins (id),
+  UNIQUE KEY uq_bilans_prelevement (resident_id, preleve_le),
+  INDEX idx_bilans_resident (resident_id, preleve_le DESC)
+) ENGINE = InnoDB;
+
+-- Un dosage. DEUX colonnes de valeur, et c'est delibere : l'automate rend un
+-- nombre pour la plupart des marqueurs, mais du texte pour les qualitatifs
+-- (« negatif », « traces »). Une seule colonne VARCHAR ferait perdre le tri,
+-- la moyenne et la comparaison aux bornes sur les 28 marqueurs numeriques
+-- du bilan de bord, qui en compte 29.
+CREATE TABLE analyses_sang (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  bilan_id       INT UNSIGNED NOT NULL,
+  panel          ENUM('cellules_sanguines','fer','foie','reins','sucre',
+                      'thyroide','electrolytes','inflammation','lipides',
+                      'vitamines','hormones') NOT NULL,
+  marqueur       VARCHAR(80)   NOT NULL,
+  valeur_num     DECIMAL(10,3) NULL,
+  valeur_texte   VARCHAR(120)  NULL,
+  unite          VARCHAR(20)   NULL,
+  -- Bornes de reference du laboratoire de bord, gardees avec le dosage : une
+  -- norme qui change plus tard ne doit pas reecrire un resultat d'hier.
+  ref_bas        DECIMAL(10,3) NULL,
+  ref_haut       DECIMAL(10,3) NULL,
+  interpretation ENUM('normal','bas','eleve','critique') NOT NULL DEFAULT 'normal',
+
+  CONSTRAINT fk_analyses_bilan
+    FOREIGN KEY (bilan_id) REFERENCES bilans_sanguins (id) ON DELETE CASCADE,
+  CONSTRAINT chk_analyses_valeur
+    CHECK (valeur_num IS NOT NULL OR valeur_texte IS NOT NULL),
+  UNIQUE KEY uq_analyses_marqueur (bilan_id, marqueur),
+  INDEX idx_analyses_bilan (bilan_id, panel),
+  INDEX idx_analyses_interpretation (interpretation)
 ) ENGINE = InnoDB;

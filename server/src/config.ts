@@ -40,12 +40,11 @@ export const config = {
   jourVol: entier("JOUR_VOL", 4128),
   consoleOrigin: process.env.CONSOLE_ORIGIN ?? "http://localhost:5174",
   backofficeOrigin: process.env.BACKOFFICE_ORIGIN ?? "http://localhost:5176",
+  // Seul jeton restant, et il est porte par des MACHINES : une borne de
+  // cabine n'a pas de mot de passe a saisir. Les personnes — medecins et
+  // administrateurs — ouvrent une session (table `sessions`), et l'ancien
+  // ADMIN_TOKEN a disparu avec elle.
   borneToken: requis("BORNE_TOKEN"),
-  // Jeton du backoffice. Distinct de celui des bornes : le backoffice peut
-  // modifier des dossiers, une borne ne peut qu'ecrire des mesures. Un seul
-  // jeton pour les deux donnerait a chaque cabine le droit de reassigner un
-  // signal.
-  adminToken: requis("ADMIN_TOKEN"),
   // Fichier SQLite du serveur de bord. Il se sauvegarde par copie.
   //
   // Resolu depuis la racine du depot, PAS depuis le repertoire courant : le
@@ -56,10 +55,4 @@ export const config = {
 
 if (config.borneToken.length < 32) {
   throw new Error("BORNE_TOKEN doit faire au moins 32 caracteres.");
-}
-if (config.adminToken.length < 32) {
-  throw new Error("ADMIN_TOKEN doit faire au moins 32 caracteres.");
-}
-if (config.adminToken === config.borneToken) {
-  throw new Error("ADMIN_TOKEN et BORNE_TOKEN doivent etre differents.");
 }

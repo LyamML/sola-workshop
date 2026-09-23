@@ -99,6 +99,16 @@
     max-width: 62ch;
     margin-top: 12px;
   }
+  .fait {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 12px;
+    color: var(--ink);
+    max-width: 62ch;
+  }
+  .fait b { font-weight: 600; }
   .meta {
     font-family: var(--mono);
     font-size: 11.5px;
@@ -331,7 +341,18 @@
       aucune écriture n'est signée. Voici les trois tables à ajouter et les deux
       colonnes à poser dans l'existant.
     </p>
-    <p class="meta">Sola · Horizon 2080 · suite de « Du template au schéma » · proposition, rien n'est écrit en base</p>
+    <p class="fait">
+      <b>C'est fait.</b> Les trois tables et les deux colonnes décrites ici
+      existent en base depuis la version « comptes et bilans sanguins » :
+      <code>medecins</code>, <code>admins</code>, <code>sessions</code>,
+      <code>particularites.auteur_id</code> et <code>signaux.assigne_id</code>.
+      Les mots de passe sont hachés en argon2id (<code>server/src/mdp.ts</code>),
+      la session vit dans un cookie <code>httpOnly</code>
+      (<code>server/src/sessions.ts</code>) et le premier compte se crée au
+      terminal avec <code>npm run compte</code>. Ce document reste comme trace
+      du raisonnement — il explique <i>pourquoi</i> le schéma a cette forme.
+    </p>
+    <p class="meta">Sola · Horizon 2080 · suite de « Du template au schéma » · conception, désormais implémentée</p>
   </header>
 
   <section>

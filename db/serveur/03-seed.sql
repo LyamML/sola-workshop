@@ -13,6 +13,9 @@
 
 PRAGMA foreign_keys = ON;
 
+DELETE FROM analyses_sang;
+DELETE FROM bilans_sanguins;
+DELETE FROM sessions;
 DELETE FROM conversation_tags;
 DELETE FROM conversations;
 DELETE FROM signaux;
@@ -24,6 +27,11 @@ DELETE FROM mesures;
 DELETE FROM suivis;
 DELETE FROM particularites;
 DELETE FROM bracelets;
+-- Les comptes ne sont pas semes ici : un mot de passe ne se pose pas en SQL,
+-- il se hache. C'est `npm run db:demo` (comptes de demonstration) ou
+-- `npm run compte` (creation a la main) qui remplissent ces deux tables.
+DELETE FROM medecins;
+DELETE FROM admins;
 DELETE FROM residents;
 
 -- ---------------------------------------------------------------- equipage --

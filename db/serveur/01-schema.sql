@@ -20,6 +20,11 @@
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
+-- Les enfants d'abord : avec `PRAGMA foreign_keys = ON`, supprimer une table
+-- encore referencee echoue.
+DROP TABLE IF EXISTS analyses_sang;
+DROP TABLE IF EXISTS bilans_sanguins;
+DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS conversation_tags;
 DROP TABLE IF EXISTS conversations;
 DROP TABLE IF EXISTS signaux;
@@ -31,7 +36,65 @@ DROP TABLE IF EXISTS mesures;
 DROP TABLE IF EXISTS suivis;
 DROP TABLE IF EXISTS particularites;
 DROP TABLE IF EXISTS bracelets;
+DROP TABLE IF EXISTS medecins;
+DROP TABLE IF EXISTS admins;
 DROP TABLE IF EXISTS residents;
+
+-- ----------------------------------------------------------------- comptes ---
+--
+--  Ces trois tables viennent en premier parce que `particularites` et
+--  `signaux` les referencent : une note de dossier dit qui l'a ecrite, une
+--  affectation dit a qui elle revient.
+--
+--  Le mot de passe n'est JAMAIS stocke, seulement son empreinte argon2id —
+--  voir server/src/mdp.ts. La colonne s'appelle `mdp_hash` et non `mdp` :
+--  le nom rappelle ce qu'on a le droit d'y mettre.
+--
+CREATE TABLE medecins (
+  id                 INTEGER PRIMARY KEY,
+  -- Matricule affiche au bas d'une note : M-007. Ce n'est pas un secret.
+  code               TEXT NOT NULL UNIQUE,
+  prenom             TEXT NOT NULL,
+  nom                TEXT NOT NULL,
+  -- Etiquette d'affichage, pour que la fiche ecrive « Dr. Nakamura ». Ce
+  -- n'est pas un droit : un infirmier et un medecin ouvrent les memes ecrans.
+  titre              TEXT NOT NULL DEFAULT 'Dr.' CHECK (titre IN ('Dr.','Inf.')),
+  poste              TEXT NOT NULL DEFAULT 'Medecine de bord',
+  email              TEXT NOT NULL UNIQUE,        -- range en minuscules
+  mdp_hash           TEXT NOT NULL,               -- argon2id, jamais le mot de passe
+  actif              INTEGER NOT NULL DEFAULT 1 CHECK (actif IN (0,1)),
+  cree_le            TEXT NOT NULL DEFAULT (datetime('now')),
+  derniere_connexion TEXT
+) STRICT;
+
+-- Ceux qui exploitent : corriger une donnee, reassigner un signal, regarder
+-- les tables brutes. Meme forme, table separee — la separation est dans le
+-- schema et non dans une clause WHERE qu'on peut oublier d'ecrire.
+CREATE TABLE admins (
+  id                 INTEGER PRIMARY KEY,
+  prenom             TEXT NOT NULL,
+  nom                TEXT NOT NULL,
+  email              TEXT NOT NULL UNIQUE,
+  mdp_hash           TEXT NOT NULL,
+  actif              INTEGER NOT NULL DEFAULT 1 CHECK (actif IN (0,1)),
+  cree_le            TEXT NOT NULL DEFAULT (datetime('now')),
+  derniere_connexion TEXT
+) STRICT;
+
+-- L'identifiant stocke est l'EMPREINTE du cookie, pas le cookie : une copie
+-- de la base ne donne aucune session ouverte. Le CHECK garantit qu'une
+-- session appartient a un medecin OU a un admin, jamais aux deux.
+CREATE TABLE sessions (
+  id         TEXT PRIMARY KEY,                    -- sha256 du jeton du cookie
+  medecin_id INTEGER REFERENCES medecins (id) ON DELETE CASCADE,
+  admin_id   INTEGER REFERENCES admins (id) ON DELETE CASCADE,
+  ouverte_at TEXT NOT NULL DEFAULT (datetime('now')),
+  vue_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  expire_at  TEXT NOT NULL,
+  CHECK ((medecin_id IS NULL) <> (admin_id IS NULL))
+) STRICT;
+
+CREATE INDEX idx_sessions_expire ON sessions (expire_at);
 
 -- --------------------------------------------------------------- identite ---
 CREATE TABLE residents (
@@ -53,12 +116,20 @@ CREATE TABLE residents (
   -- Personne de confiance declaree par le resident (un autre resident).
   confiance_id      INTEGER REFERENCES residents (id) ON DELETE SET NULL,
   confiance_lien    TEXT,
+  -- Le medecin qui suit ce resident au long cours. A ne pas confondre avec
+  -- `bilans_sanguins.medecin_id`, qui dit qui a preleve ce jour-la, ni avec
+  -- `particularites.auteur_id`, qui dit qui a signe une note : ces deux-la
+  -- sont des actes, celui-ci est un rattachement. Pas d'ON DELETE, comme
+  -- partout ou on pointe un compte : on desactive un medecin, on ne l'efface
+  -- pas sous ses residents.
+  medecin_traitant_id INTEGER REFERENCES medecins (id),
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
 ) STRICT;
 
 CREATE INDEX idx_residents_cabine ON residents (cabine);
 CREATE INDEX idx_residents_statut ON residents (statut);
+CREATE INDEX idx_residents_traitant ON residents (medecin_traitant_id);
 
 CREATE TABLE bracelets (
   id           INTEGER PRIMARY KEY,
@@ -83,6 +154,11 @@ CREATE TABLE particularites (
   titre       TEXT NOT NULL,
   detail      TEXT NOT NULL,
   constate_le TEXT,
+  -- Qui a ecrit la note. Pas d'ON DELETE : la base doit refuser d'effacer un
+  -- medecin qui a signe des dossiers. Nullable, parce que les notes du jeu de
+  -- demonstration anterieures aux comptes n'ont pas d'auteur et n'en auront
+  -- jamais — on ne reinvente pas une signature.
+  auteur_id   INTEGER REFERENCES medecins (id),
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 ) STRICT;
 
@@ -264,6 +340,10 @@ CREATE TABLE signaux (
   origine     TEXT NOT NULL
               CHECK (origine IN ('physio','conversation','chute','usage','manuel')),
   ouvert_at   TEXT NOT NULL,
+  -- `assigne_id` designe une personne, `assigne_a` reste pour le seul cas qui
+  -- n'en est pas une : « Equipe d'intervention ». Le texte libre ne disparait
+  -- donc pas, il se limite a ce qu'une cle etrangere ne sait pas dire.
+  assigne_id  INTEGER REFERENCES medecins (id),
   assigne_a   TEXT,                       -- NULL = non assigne
   statut      TEXT NOT NULL DEFAULT 'ouvert'
               CHECK (statut IN ('ouvert','en_cours','clos')),
@@ -289,3 +369,76 @@ CREATE TABLE evenements (
 
 CREATE INDEX idx_evenements_resident ON evenements (resident_id, survenu_at DESC);
 CREATE INDEX idx_evenements_type     ON evenements (type, survenu_at DESC);
+
+-- ------------------------------------------------------- bilans sanguins ---
+--
+--  Le seul examen de Sola qui ne vienne pas d'un capteur : toutes les deux
+--  semaines, un medecin recoit le resident, preleve, et commente. Le bracelet
+--  mesure en continu et ne sait rien du fer ni de la thyroide ; la prise de
+--  sang sait, mais une fois tous les quinze jours. Les deux ne se remplacent
+--  pas, d'ou deux tables separees de `mesures`.
+--
+CREATE TABLE bilans_sanguins (
+  id          INTEGER PRIMARY KEY,
+  resident_id INTEGER NOT NULL REFERENCES residents (id) ON DELETE CASCADE,
+  -- Le medecin qui a recu le resident. Pas d'ON DELETE, comme pour une note :
+  -- un compte ferme ne doit pas effacer les consultations qu'il a menees.
+  medecin_id  INTEGER REFERENCES medecins (id),
+  preleve_le  TEXT NOT NULL,
+  jour_vol    INTEGER NOT NULL,
+  -- Le rendez-vous suivant, pose au moment du prelevement. C'est cette date
+  -- que la fiche affiche, et elle vaut `preleve_le` + 14 jours.
+  prochain_le TEXT,
+  statut      TEXT NOT NULL DEFAULT 'rendu'
+              CHECK (statut IN ('planifie','preleve','rendu')),
+  commentaire TEXT,
+  source      TEXT NOT NULL DEFAULT 'analyse'
+              CHECK (source IN ('analyse','simule')),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+
+  -- Un seul bilan par resident et par jour : une reemission du laboratoire ne
+  -- doit pas doubler la ligne, comme pour les minutes du bracelet.
+  UNIQUE (resident_id, preleve_le)
+) STRICT;
+
+CREATE INDEX idx_bilans_resident ON bilans_sanguins (resident_id, preleve_le DESC);
+CREATE INDEX idx_bilans_prochain ON bilans_sanguins (prochain_le);
+
+-- Une ligne par marqueur dose, et non onze colonnes fourre-tout.
+--
+-- DEUX COLONNES DE VALEUR, ET C'EST VOULU. On ne sait pas encore ce que
+-- l'analyseur de bord rendra : un nombre pour l'hemoglobine, sans doute, mais
+-- peut-etre « traces » ou « non detecte » pour un marqueur qualitatif. Plutot
+-- que de tout mettre en texte — ce qui interdirait AVG(), une courbe et un
+-- seuil — on garde le nombre en REAL quand il y en a un, le texte a cote
+-- quand il n'y en a pas, et le CHECK impose qu'au moins l'un des deux soit la.
+--
+-- Les bornes de reference voyagent avec le resultat plutot que de vivre dans
+-- une table de reference : elles dependent de l'appareil et de la date du
+-- dosage, et un resultat de l'an dernier doit rester lisible avec les bornes
+-- de l'an dernier.
+CREATE TABLE analyses_sang (
+  id             INTEGER PRIMARY KEY,
+  bilan_id       INTEGER NOT NULL REFERENCES bilans_sanguins (id) ON DELETE CASCADE,
+  -- Les onze groupes du modele d'origine, en snake_case ASCII.
+  panel          TEXT NOT NULL CHECK (panel IN (
+                   'cellules_sanguines','fer','foie','reins','sucre','thyroide',
+                   'electrolytes','inflammation','lipides','vitamines','hormones')),
+  marqueur       TEXT NOT NULL,            -- "Hémoglobine", "Ferritine"…
+  valeur_num     REAL,
+  valeur_texte   TEXT,
+  unite          TEXT,                     -- "g/dL", "µg/L"…
+  ref_bas        REAL,
+  ref_haut       REAL,
+  -- Calculee a l'ecriture : l'interface n'a pas a redecider si 11,2 g/dL est
+  -- bas, et un marqueur purement textuel n'a pas de bornes a comparer.
+  interpretation TEXT NOT NULL DEFAULT 'normal'
+                 CHECK (interpretation IN ('normal','bas','eleve','critique')),
+
+  CHECK (valeur_num IS NOT NULL OR valeur_texte IS NOT NULL),
+  UNIQUE (bilan_id, marqueur)
+) STRICT;
+
+CREATE INDEX idx_analyses_bilan ON analyses_sang (bilan_id, panel);
+CREATE INDEX idx_analyses_anormales ON analyses_sang (interpretation)
+  WHERE interpretation <> 'normal';

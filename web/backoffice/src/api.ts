@@ -1,42 +1,17 @@
 /**
  * Client du backoffice.
  *
- * Le jeton d'administration est saisi une fois et garde dans `sessionStorage` :
- * il disparait a la fermeture de l'onglet. C'est le compromis assume du
- * prototype, et sa limite la plus visible — un script injecte dans la page
- * pourrait le lire. Un deploiement reel utiliserait une session serveur avec
- * cookie httpOnly, un compte par personne, et une trace de qui modifie quoi.
- * La remarque est reprise dans `server/src/auth.ts`, au-dessus de `authAdmin`.
+ * Le jeton d'administration a disparu. Il vivait dans le `sessionStorage`,
+ * lisible par n'importe quel script injecte dans la page, et il prouvait
+ * qu'on connaissait une cle — jamais qu'on etait quelqu'un. A sa place : un
+ * compte dans la table `admins`, un mot de passe hache en argon2id, et une
+ * session dans un cookie `httpOnly` qu'aucun script de la page ne peut lire.
+ *
+ * Toutes les requetes portent `credentials: "include"` : le serveur est sur un
+ * autre port, et sans cette option le navigateur ne renvoie pas le cookie.
  */
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:5175";
-const CLE = "sola.admin.jeton";
-
-export function jeton(): string {
-  try {
-    return sessionStorage.getItem(CLE) ?? "";
-  } catch {
-    // Navigation privee, stockage bloque : on retombe sur « pas de jeton »,
-    // l'ecran de connexion s'affiche, rien ne casse.
-    return "";
-  }
-}
-
-export function poserJeton(valeur: string): void {
-  try {
-    sessionStorage.setItem(CLE, valeur);
-  } catch {
-    /* ignore */
-  }
-}
-
-export function oublierJeton(): void {
-  try {
-    sessionStorage.removeItem(CLE);
-  } catch {
-    /* ignore */
-  }
-}
 
 export class ErreurApi extends Error {
   constructor(
@@ -50,11 +25,8 @@ export class ErreurApi extends Error {
 async function appel<T>(chemin: string, options: RequestInit = {}): Promise<T> {
   const reponse = await fetch(`${BASE}${chemin}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${jeton()}`,
-      ...options.headers,
-    },
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...options.headers },
   });
 
   if (!reponse.ok) {
@@ -67,6 +39,22 @@ async function appel<T>(chemin: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  /** Qui est connecte. Un 401 est une reponse normale : « personne ». */
+  moi: () => appel<{ compte: Compte }>("/auth/moi"),
+  connexion: (email: string, mdp: string) =>
+    appel<{ compte: Compte }>("/auth/connexion", {
+      method: "POST",
+      body: JSON.stringify({ email, mdp }),
+    }),
+  deconnexion: () => appel<{ ok: true }>("/auth/deconnexion", { method: "POST" }),
+
+  comptes: () => appel<ListeComptes>("/admin/comptes"),
+  activerCompte: (role: "medecin" | "admin", id: number, actif: boolean) =>
+    appel<{ ok: true }>(`/admin/comptes/${role}/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ actif }),
+    }),
+
   apercu: () => appel<Apercu>("/admin/apercu"),
   ecrans: () => appel<Ecrans>("/admin/ecrans"),
 
@@ -106,6 +94,36 @@ export const api = {
 };
 
 // ------------------------------------------------------------------ types --
+export interface Compte {
+  role: "medecin" | "admin";
+  id: number;
+  prenom: string;
+  nom: string;
+  email: string;
+  code: string | null;
+  titre: string | null;
+}
+
+/** Les comptes, sans leur empreinte : le serveur ne la sert jamais. */
+export interface ListeComptes {
+  lignes: {
+    role: "medecin" | "admin";
+    id: number;
+    code: string | null;
+    titre: string | null;
+    prenom: string;
+    nom: string;
+    poste: string;
+    email: string;
+    actif: number;
+    cree_le: string;
+    derniere_connexion: string | null;
+    notes_signees: number;
+    signaux_ouverts: number;
+  }[];
+  sessions_ouvertes: number;
+}
+
 export type Severite = "critique" | "surveillance" | "info";
 export type Statut = "ok" | "surveillance" | "critique";
 
@@ -146,6 +164,9 @@ export interface Signal {
   motif: string;
   origine: string;
   ouvert_at: string;
+  /** Le compte a qui le signal est assigne, s'il l'est a une personne. */
+  assigne_id: number | null;
+  /** Le nom affiche : celui du compte, sinon le texte libre (« Equipe… »). */
   assigne_a: string | null;
   statut: "ouvert" | "en_cours" | "clos";
   clos_at: string | null;
@@ -158,6 +179,9 @@ export interface Signal {
 }
 
 export interface ChampsSignal {
+  /** Une personne : le signal pointe alors sur un compte medecin. */
+  assigne_id?: number | null;
+  /** Ce qui n'est pas une personne : « Equipe d'intervention ». */
   assigne_a?: string | null;
   statut?: "ouvert" | "en_cours" | "clos";
   clos_motif?: string;
