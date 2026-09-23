@@ -52,43 +52,47 @@ Aucune ressource n'est chargée depuis un CDN : les polices sont empaquetées av
 
 ## Démarrer
 
+**Node 24 ou plus** est requis, pour `node:sqlite`.
+
 ```bash
 npm install
 ```
 
 ```bash
-npm run dev:borne
-```
-
-```bash
-npm run dev:console
-```
-
-La borne écoute sur <http://localhost:5173>, la console sur <http://localhost:5174>.
-`npm run build` et `npm run typecheck` traversent tous les espaces de travail.
-
-La console lit le serveur de bord quand il répond, et retombe sur son jeu de
-démonstration sinon — en le disant dans son en-tête. Pour la brancher sur la
-base (**Node 24 ou plus**, pour `node:sqlite`), copiez le modèle de
-configuration et renseignez le jeton des bornes :
-
-```bash
 cp server/.env.example server/.env
 ```
+
+Renseignez le jeton des bornes dans `server/.env` (voir
+[Qui entre, et comment](#qui-entre-et-comment)), puis chargez la base :
 
 ```bash
 npm run db:reset
 ```
 
 ```bash
-npm run dev:server
+npm run dev
 ```
 
-```bash
-npm run dev:backoffice
-```
+lance les quatre services dans un seul terminal. Chaque ligne porte le nom du
+service qui l'a écrite, et Ctrl+C les arrête tous.
 
-Le backoffice écoute sur <http://localhost:5176>, l'API sur <http://localhost:5175>.
+| Service | Adresse |
+|---|---|
+| Borne — écran 01 | <http://localhost:5173> |
+| Console — écrans 02 à 04 | <http://localhost:5174> |
+| Serveur de bord — l'API | <http://localhost:5175> |
+| Backoffice | <http://localhost:5176> |
+
+`npm run dev -- console server` n'en lance que certains, et `npm run dev:borne`,
+`dev:console`, `dev:server` ou `dev:backoffice` en lance un seul. Un port déjà
+pris fait échouer son service au lieu de le déplacer : une console servie
+ailleurs que sur 5174 ne serait plus une origine autorisée par le serveur, et
+la connexion échouerait sans raison visible.
+
+La console lit le serveur de bord quand il répond, et retombe sur son jeu de
+démonstration sinon — en le disant dans son en-tête. Sans `server/.env`,
+`npm run dev` lance les trois interfaces seules et le signale.
+`npm run build` et `npm run typecheck` traversent tous les espaces de travail.
 
 Une commande par bloc : l'équipe est sous Windows PowerShell, qui ne connaît
 pas l'enchaînement `&&`.

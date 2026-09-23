@@ -181,6 +181,7 @@ marche.
 
 | Commande | Ce qu'elle fait | Port |
 |---|---|---|
+| `npm run dev` | les quatre services dans un terminal, journaux préfixés, Ctrl+C arrête tout — `scripts/dev.mjs` ; `npm run dev -- console server` pour un sous-ensemble | 5173–5176 |
 | `npm run dev:borne` | écran 01 — la borne de cabine | 5173 |
 | `npm run dev:console` | écrans 02 à 04 — la console médicale | 5174 |
 | `npm run dev:server` | le serveur de bord (API) | 5175 |
