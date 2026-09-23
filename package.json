@@ -8,7 +8,7 @@
     "server"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=web/console",
+    "dev": "node scripts/dev.mjs",
     "dev:borne": "npm run dev --workspace=web/borne",
     "dev:console": "npm run dev --workspace=web/console",
     "dev:server": "npm run dev --workspace=server",

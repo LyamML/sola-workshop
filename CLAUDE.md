@@ -114,9 +114,14 @@ Le README a une section « limites » et elle est à jour. Si vous en levez une,
 retirez la ligne. Si vous en créez une, ajoutez-la. Une limite assumée et
 documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
-**Les cinq limites ouvertes aujourd'hui :** aucune purge des mesures n'est
-implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base,
-les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
+**Les huit limites ouvertes aujourd'hui :** aucune purge des mesures n'est
+implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
+il n'y écrit que les trames du bracelet —, ces mesures n'atteignent pas la
+fiche (`mesures_jour` ne se calcule qu'avec `npm run db:rollup`, et `adapt.ts`
+afficherait à 0 ce que le bracelet ne mesure pas), la borne ne transmet que
+servie par Vite, dont le relais porte le jeton, une partie de la trame est
+reçue sans être conservée — une chute comptée par le bracelet n'ouvre pas de
+signal —, les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
 et la fiche le dit), la reconnaissance vocale de la borne n'existe que dans
 les navigateurs à moteur Chromium — ailleurs elle bascule au clavier et le dit
 dans sa barre d'état —, et Sola ne reconnaît sa propre voix que par le texte :
@@ -167,6 +172,7 @@ pas d'outils, et l'équipe travaille sous Windows.
 | **Cache de Vite** | après réécriture complète d'un fichier, le serveur de dev peut le servir **vide** (`Content-Length: 0`), d'où une page blanche | `touch` le fichier ; ce n'est pas votre code |
 | **Captures d'écran** | le panneau navigateur échoue parfois (`Screenshot timed out`) | Mesurer en JavaScript (`getBoundingClientRect`) plutôt que regarder |
 | **Micro dans le panneau navigateur** | il est bloqué : la borne affiche « micro refusé » | Piloter l'écran 01 au clavier (espace, `1`/`2`) — mais le clavier contourne l'écoute : pour tester interruption et écho, capturer le moteur en remplaçant `webkitSpeechRecognition.prototype.start`, puis appeler son `onresult` avec des résultats fabriqués. La vraie voix se teste dans Chrome |
+| **Bluetooth dans le panneau navigateur** | aucun bracelet n'y est joignable, et le premier clic est pris par le voile du micro | Remplacer `navigator.bluetooth` par un faux qui notifie des trames, cliquer « Appairer » en JavaScript. Tester l'envoi contre une copie de la base (`VACUUM INTO`) et un serveur sur un autre port : une trame écrite dans `sola.db` ne s'efface plus, faute de purge |
 | **Routes de la console** | `/residents/:id`, pas `/resident/:id` | Voir `web/console/src/App.tsx` |
 
 **Vérifier avant d'annoncer.** `npm run typecheck` pour le code ; pour une
@@ -181,6 +187,7 @@ marche.
 
 | Commande | Ce qu'elle fait | Port |
 |---|---|---|
+| `npm run dev` | les quatre services dans un terminal, journaux préfixés, Ctrl+C arrête tout — `scripts/dev.mjs` ; `npm run dev -- console server` pour un sous-ensemble | 5173–5176 |
 | `npm run dev:borne` | écran 01 — la borne de cabine | 5173 |
 | `npm run dev:console` | écrans 02 à 04 — la console médicale | 5174 |
 | `npm run dev:server` | le serveur de bord (API) | 5175 |
@@ -211,6 +218,9 @@ racine, réglé par `DB_FILE`.
 | L'enchaînement des scènes, le clavier de secours | `src/App.tsx` |
 | Les répliques, les cartes et les questions | `src/scenarios.ts` |
 | Écoute, synthèse, mot d'éveil, filtre d'écho | `src/voix.ts` |
+| Le client Web Bluetooth du bracelet | `src/bracelet.ts` |
+| La file d'envoi des trames et son libellé dans la barre d'état | `src/transmission.ts` |
+| Le relais qui ajoute le jeton de `/ingest`, et à qui il le prête | `vite.config.ts` |
 | **Le visage de Sola** — trois images, une par état | `src/components/SolaAvatar.tsx` |
 | Le chat vectoriel d'origine, gardé en réserve | `src/components/SolaCat.tsx` |
 | Les images en pixels (repos, écoute, parole) | `src/assets/` |
@@ -244,6 +254,7 @@ racine, réglé par `DB_FILE`.
 | Écriture d'une note (partagée avec le backoffice) | `src/routes/console.ts`, `ajouterParticularite` |
 | Backoffice — tables, correction, signaux | `src/routes/admin.ts` |
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
+| **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`) |
 | Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
 | Hachage argon2id des mots de passe | `src/mdp.ts` |
 | Ouverture, lecture et purge des sessions, cookie | `src/sessions.ts` |
