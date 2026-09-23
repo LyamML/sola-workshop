@@ -1,0 +1,7 @@
+python-dotenv
+ollama
+sentence-transformers
+pymupdf
+sqlalchemy
+pandas
+numpy

@@ -12,10 +12,10 @@
  *                  haute ;
  *   · `Question` — une demande qui attend une réponse, à voix haute ou au doigt.
  *
- * Le récit suit la base de démonstration : les nuits et la variabilité
- * cardiaque de R-0448, son médecin, sa sœur et le résident que Sola lui
- * propose de voir y sont tels qu'ils sont dits ici. Un chiffre qu'on change
- * dans une réplique se vérifie d'abord avec `npm run db:sql`.
+ * Le récit suit la base de démonstration : le médecin de R-0448 et son
+ * contact de confiance y sont tels qu'ils sont dits ici. Un chiffre qu'on
+ * change dans une réplique se vérifie d'abord avec `npm run db:sql`. La
+ * conversation libre, elle, n'a pas de réplique écrite : voir `ia.ts`.
  */
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking";
@@ -29,8 +29,8 @@ export interface Personne {
 
 /**
  * Ce qui vient de quitter la cabine. La pastille d'état dit la dernière :
- * elle remplace « Tout reste dans la cabine », que la scène démentait deux
- * répliques plus loin en prévenant la maintenance puis le médecin.
+ * elle remplace « Tout reste dans la cabine », que démentaient l'alerte partie
+ * à l'infirmerie et le résumé qu'un échange envoie au serveur de bord.
  */
 export interface Sortie {
   /** Une même sortie annoncée deux fois ne s'empile pas. */
@@ -78,9 +78,6 @@ export interface Beat {
   dit?: string;
   /** Ligne d'état affichée en pied de borne. */
   hint?: string;
-  /** Sola se remet à attendre son nom : c'est ce qui rend vrai « dis « Sola »
-   *  si tu veux reparler », au lieu d'une borne qui écoute encore tout. */
-  veille?: boolean;
   sortie?: Sortie;
   question?: Question;
 }
@@ -116,6 +113,9 @@ export interface Scene {
   onEnter?: Beat[];
   /** Sola mène seule : la borne n'attend pas que le résident parle. */
   monologue?: boolean;
+  /** Conversation libre : chaque phrase du résident part au modèle local, au
+   *  lieu de dérouler `echanges`. */
+  ia?: boolean;
   breathing?: boolean;
   arrivee?: Arrivee;
 }
@@ -125,183 +125,25 @@ export const HINT_ECOUTE = "Je t’écoute…";
 
 const APPEL = "Dis « Sola » pour commencer";
 
-/** La fin d'un échange ne ramène pas à « pour commencer » : la conversation
- *  vient d'avoir lieu. */
-const REPARLER = "Dis « Sola » si tu veux reparler";
-
-const PARLE = "Parle quand tu veux";
-
-const MAINTENANCE: Sortie = { id: "maintenance", texte: "1 demande envoyée à la maintenance" };
-const SELIM: Sortie = { id: "selim", texte: "1 message envoyé à Selim" };
-const MEDECIN: Sortie = {
-  id: "medecin",
-  texte: "1 résumé transmis au Dr Ferreira",
-  ton: "chaud",
-};
-
 export const SCENES: Scene[] = [
   {
     key: "jour",
     label: "Échange",
     ouverture: {
-      // Sans le prénom : cette ligne reste à l'écran tant que personne ne
-      // parle, et la borne n'affiche pas qui habite la cabine.
-      dit: "Salut. Tu as dormi 5 h 18 cette nuit — je me disais qu’on pouvait en parler.",
+      // Seul texte figé du mode libre : le bonjour. Le reste est le modèle.
+      // Sans le prénom : la ligne reste à l'écran tant que personne ne parle,
+      // et la borne n'affiche pas qui habite la cabine.
+      dit: "Salut. Je suis là.",
       hint: APPEL,
       state: "idle",
     },
-    echanges: [
-      {
-        resident: "Sola, j’ai encore super mal dormi.",
-        reponse: [
-          { at: 0, state: "thinking", hint: "" },
-          {
-            // Les six heures de l'avant-veille coupent la série : c'est la
-            // cinquième nuit courte en deux semaines, pas la troisième
-            // d'affilée.
-            at: 1100,
-            state: "speaking",
-            dit: "Cinq heures dix-huit. C’est ta cinquième nuit sous cinq heures et demie en deux semaines. Tu veux qu’on regarde ce qui se passe, ou je te laisse tranquille ?",
-          },
-          {
-            at: 7000,
-            state: "idle",
-            question: {
-              id: "regarder",
-              titre: "On regarde ensemble ce qui t’empêche de dormir ?",
-              detail:
-                "5 nuits sur 14 sous 5 h 30, et une variabilité cardiaque sous ton seuil depuis 6 jours.",
-              options: [
-                {
-                  label: "Oui, on regarde",
-                  mots: ["oui", "d’accord", "ok", "vas-y", "regarde"],
-                  suite: [
-                    { at: 0, state: "speaking", dit: "D’accord. Raconte-moi ta nuit." },
-                    { at: 2400, state: "idle", hint: PARLE },
-                  ],
-                },
-                {
-                  label: "Pas maintenant",
-                  mots: ["non", "plus tard", "pas maintenant", "laisse"],
-                  ghost: true,
-                  suite: [
-                    {
-                      at: 0,
-                      state: "speaking",
-                      dit: "Comme tu veux. Je reste là si tu changes d’avis.",
-                    },
-                    { at: 3000, state: "idle", hint: REPARLER, veille: true },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-      {
-        resident: "C’est la ventilation du module C, elle claque toute la nuit.",
-        reponse: [
-          { at: 0, state: "thinking", hint: "" },
-          {
-            at: 1100,
-            state: "speaking",
-            dit: "Je préviens la maintenance — c’est fait. Je peux aussi baisser la lumière de ta cabine à 19 h ce soir.",
-          },
-          // Au « c'est fait », pas avant : la pastille suit ce que Sola dit.
-          { at: 3200, sortie: MAINTENANCE },
-          {
-            at: 7000,
-            state: "idle",
-            question: {
-              id: "lumiere",
-              titre: "Je baisse la lumière de la cabine à 19 h ce soir ?",
-              detail: "Ce soir seulement. Tu me le redis si tu veux que ça devienne l’habitude.",
-              options: [
-                {
-                  label: "Oui, baisse-la",
-                  mots: ["oui", "baisse", "d’accord", "ok"],
-                  suite: [
-                    {
-                      at: 0,
-                      state: "speaking",
-                      dit: "C’est réglé. Dix-neuf heures, lumière basse.",
-                    },
-                    { at: 3000, state: "idle", hint: PARLE },
-                  ],
-                },
-                {
-                  label: "Laisse comme ça",
-                  mots: ["non", "laisse", "pas la peine"],
-                  ghost: true,
-                  suite: [
-                    { at: 0, state: "speaking", dit: "Entendu, je ne touche à rien." },
-                    { at: 2600, state: "idle", hint: PARLE },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-      {
-        resident: "Merci. J’aimerais bien que ça s’arrête, c’est tout.",
-        reponse: [
-          { at: 0, state: "thinking", hint: "" },
-          {
-            // Un bruit de conduit, pas un symptôme : Sola ne dit rien de la
-            // santé d'un autre résident.
-            at: 1000,
-            state: "speaking",
-            dit: "Je sais. Une dernière chose : Selim, du C-04, a eu le même bruit de conduit le mois dernier. Ce soir, Selim est au jardin 2 à 18 h. Je lui dis que tu passes ?",
-          },
-          {
-            at: 8000,
-            state: "idle",
-            question: {
-              id: "selim",
-              titre: "Je préviens Selim que tu passes au jardin 2 ?",
-              personne: {
-                initiales: "SB",
-                nom: "Selim Bergstrom · C-04",
-                meta: "Hydroponie · au jardin 2 à 18 h",
-              },
-              options: [
-                {
-                  label: "Dis-lui que je passe",
-                  mots: ["oui", "dis lui", "je passe", "d’accord"],
-                  suite: [
-                    {
-                      at: 0,
-                      state: "speaking",
-                      dit: "C’est envoyé : rendez-vous au jardin 2 à 18 h. Et j’ai prévenu le Dr Ferreira de ta fatigue — rien d’inquiétant, un point de vigilance.",
-                    },
-                    { at: 600, sortie: SELIM },
-                    { at: 3600, sortie: MEDECIN },
-                    { at: 9500, state: "idle", hint: REPARLER, veille: true },
-                  ],
-                },
-                {
-                  label: "Une autre fois",
-                  mots: ["non", "une autre fois", "plus tard"],
-                  ghost: true,
-                  suite: [
-                    {
-                      at: 0,
-                      state: "speaking",
-                      dit: "Pas de souci. J’ai quand même prévenu le Dr Ferreira de ta fatigue — un point de vigilance, rien de plus.",
-                    },
-                    { at: 1800, sortie: MEDECIN },
-                    { at: 7000, state: "idle", hint: REPARLER, veille: true },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-    ],
+    // Pas de tours écrits : c'est le modèle local qui répond (voir `ia.ts`).
+    ia: true,
+    echanges: [],
   },
 
+  // Démos temporaires : à terme, apaisement / alerte seront déclenchés par
+  // de vraies situations (bracelet, chute), plus par ces scénarios écrits.
   {
     key: "calme",
     label: "Apaisement",

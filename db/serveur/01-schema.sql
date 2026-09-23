@@ -208,7 +208,11 @@ CREATE TABLE mesures (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
 
   CHECK (fc_bpm   IS NULL OR fc_bpm   BETWEEN 25 AND 220),
-  CHECK (spo2_pct IS NULL OR spo2_pct BETWEEN 50 AND 100),
+  -- Toute l'echelle, et non une plage « plausible » : une SpO2 sous 50 % se
+  -- voit en detresse respiratoire ou en fin de vie, et c'est justement celle
+  -- qu'il ne faut pas perdre. Seul zero reste dehors : le bracelet l'envoie
+  -- faute de valeur, et il devient NULL avant d'arriver ici.
+  CHECK (spo2_pct IS NULL OR spo2_pct BETWEEN 1 AND 100),
   -- Le bracelet peut reemettre apres une coupure BLE : la meme minute ne doit
   -- pas entrer deux fois.
   UNIQUE (resident_id, mesure_at)

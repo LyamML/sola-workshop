@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { SolaAvatar } from "./components/SolaAvatar";
 import { Wave } from "./components/Wave";
 import {
@@ -15,7 +23,9 @@ import {
 } from "./scenarios";
 import { connectBracelet, type BraceletReading } from "./bracelet";
 import { libelleTransmission, useTransmission } from "./transmission";
-import { correspond, motDEveil, useVoix } from "./voix";
+import { correspond, useVoix } from "./voix";
+import { discuter, EchecIA, prechauffer, resumer, type Tour } from "./ia";
+import { envoyerResume } from "./remontee";
 
 interface Replique {
   id: number;
@@ -57,6 +67,15 @@ const RIEN_PARTI = "Rien n’a quitté la cabine";
  *  « rien » faux : la pastille ne ment pas pour rester courte. */
 const CONSTANTES_PARTIES = "Seules tes constantes ont quitté la cabine";
 
+/** Ce qu'un échange libre laisse partir quand on le quitte : un résumé, jamais
+ *  le verbatim. `remontee_auto` le met sous les yeux du médecin. */
+const RESUME: Sortie = { id: "resume", texte: "Résumé de l’échange transmis" };
+const RESUME_REMONTE: Sortie = {
+  id: "resume",
+  texte: "Résumé remonté à ton médecin",
+  ton: "chaud",
+};
+
 const SCENE_ALERTE = SCENES.find((s) => s.mode === "alerte");
 
 /** La question qu'une scène posera d'elle-même. La carte de l'alerte lui garde
@@ -71,11 +90,11 @@ function questionPrevue(scene: Scene | undefined): Question | null {
  *  et c'est lui que le filtre d'écho compare à ce qu'elle entend. */
 function insecable(texte: string): string {
   return texte
-    .replace(/ ([?!:;»])/g, " $1")
-    .replace(/« /g, "« ")
-    .replace(/\bDr /g, "Dr ")
-    .replace(/(\d) h\b/g, "$1 h")
-    .replace(/\bh (\d)/g, "h $1");
+    .replace(/ ([?!:;»])/g, " $1")
+    .replace(/« /g, "« ")
+    .replace(/\bDr /g, "Dr ")
+    .replace(/(\d) h\b/g, "$1 h")
+    .replace(/\bh (\d)/g, "h $1");
 }
 
 function Icone({ nom, taille = 15 }: { nom: "micro" | "coche"; taille?: number }) {
@@ -146,7 +165,20 @@ export default function App() {
   const [etape, setEtape] = useState(0);
   const [busy, setBusy] = useState(false);
   const [actif, setActif] = useState(false);
-  const [eveille, setEveille] = useState(false);
+
+  const [iaErreur, setIaErreur] = useState<string | null>(null);
+  // Le résumé en route, ou ce qui l'a empêché de partir. Une fois parti, c'est
+  // la pastille qui le dit, comme toute sortie — et d'une scène à l'autre.
+  const [remontee, setRemontee] = useState<{ texte: string; alerte: boolean } | null>(null);
+  const [resumeParti, setResumeParti] = useState<Sortie | null>(null);
+  const [saisie, setSaisie] = useState("");
+  const champ = useRef<HTMLInputElement>(null);
+
+  // L'échange avec le modèle ne vit qu'ici, dans la mémoire de la page.
+  // À la sortie de « Échange », un résumé part ; le verbatim, lui, disparaît.
+  const historique = useRef<Tour[]>([]);
+  const debutEchange = useRef<string | null>(null);
+  const requete = useRef<AbortController | null>(null);
 
   // --- la voix ---------------------------------------------------------------
   // Le gestionnaire de phrase dépend de presque tout l'état de l'écran, et la
@@ -168,6 +200,13 @@ export default function App() {
     // Une phrase du résident ouvre un tour : la réponse précédente part avec
     // l'ancien, sinon elle aurait l'air de répondre à la nouvelle.
     setTrace((t) => (qui === "resident" ? { resident: replique } : { ...t, sola: replique }));
+    return replique.id;
+  }, []);
+
+  // La réponse du modèle arrive mot à mot : elle réécrit sa réplique au lieu
+  // d'en ouvrir une par morceau, et n'entre donc qu'une fois à l'écran.
+  const reecrire = useCallback((id: number, texte: string) => {
+    setTrace((t) => (t.sola?.id === id ? { ...t, sola: { id, texte } } : t));
   }, []);
 
   // --- minuterie du scénario -------------------------------------------------
@@ -184,7 +223,6 @@ export default function App() {
     (beat: Beat) => {
       if (beat.state) setVoice(beat.state);
       if (beat.hint !== undefined) setHint(beat.hint);
-      if (beat.veille) setEveille(false);
       if (beat.dit !== undefined) {
         dire("sola", beat.dit);
         parler(beat.dit);
@@ -225,6 +263,13 @@ export default function App() {
   useEffect(() => {
     clearTimers();
     taire();
+    // Une réponse encore en route appartient à la scène qu'on quitte.
+    requete.current?.abort();
+    requete.current = null;
+    historique.current = [{ role: "assistant", content: scene.ouverture.dit }];
+    debutEchange.current = scene.ia ? new Date().toISOString() : null;
+    setIaErreur(null);
+    if (scene.ia && actif) prechauffer();
     setVoice(scene.ouverture.state);
     setHint(scene.ouverture.hint);
     compteur.current += 1;
@@ -233,12 +278,52 @@ export default function App() {
     setQuestion(null);
     setMalCompris(false);
     setEtape(0);
-    setEveille(false);
     setBusy(false);
     if (actif) parler(scene.ouverture.dit);
     if (scene.onEnter) jouer(scene.onEnter);
     return clearTimers;
   }, [scene, actif, clearTimers, jouer, parler, taire]);
+
+  // Résumé clinique : uniquement quand on quitte la scène « Échange »
+  // (changement de scénario ou démontage), pas quand `actif` bascule.
+  // Déclaré après l'effet d'ouverture pour que ce cleanup lise l'historique
+  // avant que le suivant ne le réinitialise.
+  useEffect(() => {
+    const etaitIa = scene.ia;
+    return () => {
+      if (!etaitIa) return;
+      const tours = historique.current;
+      const debut = debutEchange.current;
+      if (!debut || !tours.some((t) => t.role === "user")) return;
+
+      historique.current = [];
+      debutEchange.current = null;
+
+      void (async () => {
+        setRemontee({ texte: "Résumé en cours…", alerte: false });
+        const clinique = await resumer(tours);
+        if (!clinique) {
+          setRemontee({ texte: "Résumé non produit", alerte: true });
+          return;
+        }
+        const ecoule = Date.now() - Date.parse(debut);
+        const duree_min = Number.isFinite(ecoule)
+          ? Math.max(0, Math.min(600, Math.round(ecoule / 60_000)))
+          : 0;
+        const resultat = await envoyerResume({ debut_at: debut, duree_min, clinique });
+        if (!resultat.ok) {
+          setRemontee({
+            texte:
+              resultat.raison === "serveur" ? "Serveur de bord injoignable" : "Résumé non produit",
+            alerte: true,
+          });
+          return;
+        }
+        setRemontee(null);
+        setResumeParti(resultat.remontee_auto ? RESUME_REMONTE : RESUME);
+      })();
+    };
+  }, [scene.key, scene.ia]);
 
   // --- respiration guidée -----------------------------------------------------
   const [breath, setBreath] = useState({ phase: 0, left: BREATH_PHASES[0].seconds });
@@ -296,8 +381,66 @@ export default function App() {
 
   useEffect(() => () => disconnect.current?.(), []);
 
+  // --- conversation avec le modèle local ------------------------------------
+  const converser = async (texte: string) => {
+    // Écrire par-dessus elle la coupe, comme lui parler par-dessus.
+    taire();
+    dire("resident", texte);
+    historique.current = [...historique.current, { role: "user", content: texte }];
+    const controle = new AbortController();
+    requete.current = controle;
+    setBusy(true);
+    setVoice("thinking");
+    setHint("Sola réfléchit…");
+    setIaErreur(null);
+
+    let replique: number | null = null;
+    const ecrire = (t: string) => {
+      if (replique === null) replique = dire("sola", t);
+      else reecrire(replique, t);
+    };
+
+    let dit: string;
+    try {
+      const reponse = await discuter(historique.current, {
+        signal: controle.signal,
+        onMorceau: (t) => {
+          if (t) ecrire(t);
+        },
+      });
+      dit = reponse || "Je n’ai pas trouvé mes mots. Tu peux répéter ?";
+      historique.current = [...historique.current, { role: "assistant", content: dit }];
+    } catch (erreur) {
+      const raison = erreur instanceof EchecIA ? erreur.raison : "injoignable";
+      if (raison === "annule") return;
+      setIaErreur(
+        raison === "modele" && erreur instanceof EchecIA ? erreur.message : "IA locale injoignable",
+      );
+      // Même en panne, Sola ne laisse pas une question sans réponse — et elle
+      // rappelle où aller si ce qu'on vient de lui dire ne pouvait pas attendre.
+      dit =
+        raison === "delai"
+          ? "Je mets trop de temps à te répondre. Tu peux me le redire ? Si c’est urgent, appelle l’infirmerie."
+          : "Je n’arrive pas à réfléchir pour l’instant. Si c’est urgent, appelle l’infirmerie.";
+    } finally {
+      if (requete.current === controle) {
+        requete.current = null;
+        setBusy(false);
+      }
+    }
+    ecrire(dit);
+    setVoice("idle");
+    setHint("");
+    parler(dit);
+  };
+
   // --- conduite de l'échange --------------------------------------------------
   const avancer = (texte?: string) => {
+    if (scene.ia) {
+      const phrase = texte?.trim();
+      if (phrase && !question && !busy) void converser(phrase);
+      return;
+    }
     if (question || busy || etape >= scene.echanges.length) return;
     const echange = scene.echanges[etape];
     dire("resident", texte?.trim() || echange.resident);
@@ -321,8 +464,8 @@ export default function App() {
 
   // Une réponse à une question se prend dès qu'elle est entendue, sans attendre
   // que le moteur ferme la phrase : entre « oui » et le choix, la borne doit
-  // paraître immédiate. Rien d'autre ne se décide au vol — un mot d'éveil pris
-  // trop tôt emporterait la suite de la phrase avec lui.
+  // paraître immédiate. Rien d'autre ne se décide au vol — une phrase coupée
+  // à son premier mot partirait incomplète.
   auVol.current = (phrase) => {
     if (!question) return false;
     const choix = question.options.find((o) => correspond(phrase, o.mots));
@@ -340,21 +483,6 @@ export default function App() {
       else setMalCompris(true);
       return;
     }
-    if (!eveille) {
-      const suite = motDEveil(phrase);
-      if (suite === null) {
-        // Entendue, mais pas appelée. Le montrer : une borne qui reçoit la
-        // parole sans rien en faire passe pour sourde, et on cherche la panne
-        // là où il n'y en a pas.
-        const bout = phrase.length > 52 ? `${phrase.slice(0, 52)}…` : phrase;
-        setHint(`« ${bout} » — dis mon nom et je réponds`);
-        return;
-      }
-      setEveille(true);
-      if (suite) avancer(phrase);
-      else setHint(HINT_ECOUTE);
-      return;
-    }
     avancer(phrase);
   };
 
@@ -370,6 +498,8 @@ export default function App() {
   const touche = useRef<(e: KeyboardEvent) => void>(() => {});
   touche.current = (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // On écrit à Sola : l'espace est une espace, pas un tour de parole.
+    if (e.target instanceof HTMLInputElement) return;
     if (!actif) {
       e.preventDefault();
       eveiller();
@@ -385,10 +515,21 @@ export default function App() {
     }
     if (e.code === "Space" || e.code === "Enter") {
       e.preventDefault();
-      if (!eveille) setEveille(true);
-      avancer();
+      // Sans micro, le modèle n'a pas de réplique toute prête à recevoir : il
+      // faut la lui écrire.
+      if (scene.ia) champ.current?.focus();
+      else avancer();
     }
   };
+
+  const envoyer = (e: FormEvent) => {
+    e.preventDefault();
+    const texte = saisie.trim();
+    if (!texte || busy || question) return;
+    setSaisie("");
+    avancer(texte);
+  };
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => touche.current(e);
     window.addEventListener("keydown", h);
@@ -467,17 +608,19 @@ export default function App() {
     .filter(Boolean)
     .join(" ");
 
-  const piedTexte = enEcoute ? (eveille ? HINT_ECOUTE : hint || HINT_ECOUTE) : hint;
+  const piedTexte = enEcoute ? HINT_ECOUTE : hint;
 
-  // La pastille dit la dernière sortie : c'est celle que Sola vient d'annoncer
-  // à voix haute. Un compte sans détail inquiéterait sans rien apprendre.
-  const sortie = sorties.length > 0 ? sorties[sorties.length - 1] : null;
+  // La pastille dit la dernière sortie : celle que la scène vient d'annoncer,
+  // sinon le résumé du dernier échange libre, vrai d'une scène à l'autre. Un
+  // compte sans détail inquiéterait sans rien apprendre.
+  const sortie = sorties.length > 0 ? sorties[sorties.length - 1] : resumeParti;
   const pastille = sortie?.texte ?? (constantesParties ? CONSTANTES_PARTIES : RIEN_PARTI);
   const ton = sortie?.ton === "critique" ? " crit" : sortie?.ton === "chaud" ? " warm" : "";
 
   // Ce qui n'a sa place que quand il y a quelque chose à dire.
   const annexes: { cle: string; texte: string; alerte: boolean }[] = [];
   if (envoi) annexes.push({ cle: "envoi", texte: envoi.texte, alerte: envoi.alerte });
+  if (remontee) annexes.push({ cle: "remontee", ...remontee });
   if (reading?.batteryPercent !== undefined && reading.batteryPercent < BATTERIE_BASSE) {
     annexes.push({ cle: "batterie", texte: `Bracelet · ${reading.batteryPercent} %`, alerte: true });
   }
@@ -490,6 +633,7 @@ export default function App() {
       alerte: true,
     });
   }
+  if (iaErreur) annexes.push({ cle: "ia", texte: iaErreur, alerte: true });
 
   const lecture = reading
     ? [
@@ -574,6 +718,18 @@ export default function App() {
               {enEcoute && piedTexte ? <Icone nom="micro" /> : null}
               {insecable(piedTexte)}
             </p>
+            {scene.ia && actif ? (
+              <form className="b-saisie" onSubmit={envoyer}>
+                <input
+                  ref={champ}
+                  value={saisie}
+                  onChange={(e) => setSaisie(e.target.value)}
+                  placeholder="Ou écris à Sola, puis Entrée"
+                  aria-label="Écrire à Sola"
+                  autoComplete="off"
+                />
+              </form>
+            ) : null}
           </div>
         </section>
 

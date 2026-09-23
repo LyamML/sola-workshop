@@ -1025,6 +1025,36 @@ button {
   white-space: nowrap;
 }
 
+/* Le secours de la voix, en conversation libre : sans micro, le modèle n'a
+   rien à entendre. Discret au repos pour ne pas faire de la borne un
+   formulaire, net dès qu'on y écrit. */
+.b-saisie {
+  width: min(420px, 100%);
+  margin-top: 6px;
+}
+.b-saisie input {
+  width: 100%;
+  padding: 8px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--b-line);
+  background: var(--b-card);
+  color: var(--b-ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: center;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+.b-saisie input::placeholder {
+  color: var(--b-ink3);
+}
+.b-saisie input:hover,
+.b-saisie input:focus {
+  opacity: 1;
+  outline: none;
+  border-color: color-mix(in srgb, var(--b-glow) 45%, transparent);
+}
+
 /* ------------------------------------------------- bandeau démonstration -- */
 /* Hors interface : c'est la main de celui qui présente, pas celle du résident.
    D'où l'effacement au repos. Il occupe sa propre rangée : posé par-dessus la
