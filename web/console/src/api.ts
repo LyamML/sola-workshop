@@ -100,6 +100,8 @@ export const api = {
 
   crew: () => lire<CrewApi>("/api/crew"),
   resident: (code: string) => lire<ResidentApi>(`/api/residents/${encodeURIComponent(code)}`),
+  /** Hors du repli : ce qui change à la seconde ne se fige pas dans un fichier commité. */
+  direct: (code: string) => lire<DirectApi>(`/api/residents/${encodeURIComponent(code)}/direct`),
   statsSignaux: () => lire<StatsSignauxApi>("/api/signaux/stats"),
 
   /** L'assigne au compte connecté et le passe « en cours ». */
@@ -320,6 +322,39 @@ export interface AnalyseApi {
   ref_bas: number | null;
   ref_haut: number | null;
   interpretation: "normal" | "bas" | "eleve" | "critique";
+}
+
+/** Une minute de `mesures`, telle que le bracelet l'a fait écrire. */
+export interface MinuteApi {
+  /** ISO en UTC, avec son « Z » : le navigateur la lit dans son fuseau. */
+  at: string;
+  fc_bpm: number | null;
+  spo2_pct: number | null;
+  rmssd_ms: number | null;
+  activite_g: number | null;
+  qualite: "good" | "fair" | "poor" | "warmup";
+}
+
+/** La carte « en direct » de la fiche. */
+export interface DirectApi {
+  /** L'horloge du serveur : l'âge d'une trame se compte sur elle, pas sur celle du poste. */
+  maintenant: string;
+  bracelet: { serie: string; batterie_pct: number | null; synchro_at: string | null } | null;
+  /** La dernière minute des vingt-quatre dernières heures. Null : pas de carte. */
+  derniere: MinuteApi | null;
+  /** L'heure écoulée, de la plus ancienne minute à la plus récente. */
+  minutes: MinuteApi[];
+  /** Le jour UTC en cours, sur les minutes exploitables : celui des tuiles. */
+  jour: {
+    /** Null tant que la ligne du jour n'est pas écrite. */
+    jour_vol: number | null;
+    minutes: number;
+    fc_min: number | null;
+    fc_moy: number | null;
+    fc_max: number | null;
+    spo2_min: number | null;
+    spo2_moy: number | null;
+  };
 }
 
 export interface StatsSignauxApi {

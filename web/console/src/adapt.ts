@@ -469,11 +469,30 @@ function depuis(points: { x: number; y: number }[], fin: number, juge: (v: numbe
   return n;
 }
 
+/** Le point le plus récent d'une série, quel que soit l'ordre où elle arrive. */
+const plusRecent = <T extends { x: number }>(points: T[]) =>
+  points.length ? points.reduce((a, p) => (p.x > a.x ? p : a)) : undefined;
+
+/**
+ * Une tuile, au dernier jour de la fenêtre.
+ *
+ * `bracelet` : le résident a une ligne ce jour-là. S'il en a une sans cette
+ * constante, c'est un capteur qui ne la mesure pas — le bracelet réel
+ * n'envoie que la FC et la SpO₂ —, et la tuile reprend sa dernière valeur en
+ * disant de quel jour elle date. Sans ligne du tout, c'est un bracelet muet,
+ * et la tuile reste vide : c'est l'absence qu'il faut voir.
+ *
+ * Une valeur reprise garde son alerte. Une variabilité sous son seuil hier ne
+ * remonte pas parce que le bracelet du jour ne la mesure pas, et éteindre
+ * l'alerte laisserait un capteur absent dire que tout va bien. « Depuis » se
+ * compte alors à partir de la valeur reprise, et le repère la date.
+ */
 function constante(
   m: Descripteur,
   lignes: ResidentApi["constantes"],
   debut: number,
   fin: number,
+  bracelet: boolean,
 ): Constante {
   const f = (v: number) => (m.fixe ? fr(v, m.decimales) : frMax(v, m.decimales));
   const fb = (v: number) => (m.fixe ? fr(v, m.decimalesBase) : frMax(v, m.decimalesBase));
@@ -487,7 +506,8 @@ function constante(
     ? arrondi(debutBase.reduce((s, p) => s + p.y, 0) / debutBase.length, m.decimalesBase)
     : null;
   const seuils = m.seuils(base);
-  const dernier = points.find((p) => p.x === fin);
+  const dernier = points.find((p) => p.x === fin) ?? (bracelet ? plusRecent(points) : undefined);
+  const date = dernier && dernier.x !== fin ? `dernière mesure le ${jv(dernier.x)}` : null;
 
   const franchi = (s: Seuil, v: number) => (s.sens === "haut" ? v > s.valeur : v < s.valeur);
   const depasse = dernier && seuils?.find((s) => franchi(s, dernier.y));
@@ -497,9 +517,11 @@ function constante(
   if (!dernier) {
     repere = points.length ? `— aucune mesure le ${jv(fin)}` : "— aucune mesure sur la fenêtre";
   } else if (depasse) {
-    const n = depuis(points, fin, (v) => franchi(depasse, v));
+    const n = depuis(points, dernier.x, (v) => franchi(depasse, v));
     ecart = `${depasse.sens === "bas" ? `▼ ${SOUS[depasse.nom]}` : `▲ ${DESSUS[depasse.nom]}`} ${f(depasse.valeur)} depuis ${entier(n)} j`;
-    repere = m.personnel && base !== null ? `base ${fb(base)}` : null;
+    repere = date ?? (m.personnel && base !== null ? `base ${fb(base)}` : null);
+  } else if (date) {
+    repere = `— ${date}`;
   } else if (seuils === null) {
     repere = "— base personnelle indisponible";
   } else if (seuils.length === 0) {
@@ -539,24 +561,33 @@ function constante(
   };
 }
 
-function sommeil(nuits: ResidentApi["nuits"], debut: number, fin: number): Constante {
+/** La règle de `constante` : un bracelet qui écrit sans estimer le sommeil garde la dernière nuit, datée. */
+function sommeil(
+  nuits: ResidentApi["nuits"],
+  debut: number,
+  fin: number,
+  bracelet: boolean,
+): Constante {
   const presentes = nuits.filter(
     (n) => n.sommeil_min !== null && n.jour_vol >= debut && n.jour_vol <= fin,
   ) as { jour_vol: number; sommeil_min: number }[];
-  const derniere = presentes.find((n) => n.jour_vol === fin);
+  const duJour = presentes.find((n) => n.jour_vol === fin);
+  const derniere =
+    duJour ?? (bracelet ? plusRecent(presentes.map((n) => ({ ...n, x: n.jour_vol }))) : undefined);
   const courtes = presentes.filter((n) => n.sommeil_min < NUIT_COURTE).length;
   const alerte = courtes >= NUITS_COURTES_ALERTE;
   const compte = `${pluriel(courtes, "nuit")} sur ${entier(presentes.length)} sous 5 h 30`;
+  const absente = derniere ? `dernière nuit le ${jv(derniere.jour_vol)}` : `aucune nuit le ${jv(fin)}`;
 
   let ecart: string | null = null;
   let repere: string | null = null;
   if (alerte) {
     ecart = compte;
-    if (!derniere) repere = `aucune nuit le ${jv(fin)}`;
+    if (!duJour) repere = absente;
   } else if (!presentes.length) {
     repere = "— aucune nuit enregistrée sur la fenêtre";
-  } else if (!derniere) {
-    repere = `— aucune nuit le ${jv(fin)}`;
+  } else if (!duJour) {
+    repere = `— ${absente}`;
   } else {
     repere = courtes ? `— ${compte}` : "— aucune nuit sous 5 h 30";
   }
@@ -691,6 +722,21 @@ function bilans(liste: BilanApi[]): BilanFiche[] {
   });
 }
 
+/**
+ * « Bracelet BR-0448 · 61 % · synchro 16:04 ». La synchro arrive écrite : la
+ * fiche la donne à l'heure de bord de la base, la carte en direct à celle du
+ * poste, à la seconde.
+ */
+export function ligneBracelet(serie: string, batterie: number | null, synchro: string | null): string {
+  return [
+    `Bracelet ${serie}`,
+    batterie !== null ? `${entier(batterie)} %` : null,
+    synchro ? `synchro ${synchro}` : "jamais synchronisé",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export function adapterResident(d: ResidentApi): VueResident {
   const r = d.resident;
   const { debut_jour_vol: debut, fin_jour_vol: fin } = d.fenetre;
@@ -703,21 +749,16 @@ export function adapterResident(d: ResidentApi): VueResident {
 
   const b = d.bracelet;
   const bracelet = b
-    ? [
-        `Bracelet ${b.serie}`,
-        b.batterie_pct !== null ? `${entier(b.batterie_pct)} %` : null,
-        b.synchro_at ? `synchro ${horodatage(b.synchro_at, d.ancre.jour)}` : "jamais synchronisé",
-      ]
-        .filter(Boolean)
-        .join(" · ")
+    ? ligneBracelet(b.serie, b.batterie_pct, b.synchro_at ? horodatage(b.synchro_at, d.ancre.jour) : null)
     : null;
 
   const parDescripteur = new Map(MESUREES.map((m) => [m.cle, m]));
   const ordre: CleConstante[] = ["hrv", "hr", "spo2", "resp", "sleep", "eda", "temp", "steps"];
+  const duJour = d.constantes.some((l) => l.jour_vol === fin);
   const constantes = ordre.map((cle) =>
     cle === "sleep"
-      ? sommeil(d.nuits, debut, fin)
-      : constante(parDescripteur.get(cle)!, d.constantes, debut, fin),
+      ? sommeil(d.nuits, debut, fin, duJour)
+      : constante(parDescripteur.get(cle)!, d.constantes, debut, fin, duJour),
   );
 
   const compte = d.conversations_compte;

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { adapterResident, statut } from "../adapt";
 import { ErreurApi, api, type SignalApi } from "../api";
@@ -7,11 +7,13 @@ import { useAvis } from "../components/Avis";
 import { BilanSanguin } from "../components/BilanSanguin";
 import { Conversations } from "../components/Conversations";
 import { Courbe } from "../components/Courbe";
+import { EnDirect, LigneBracelet } from "../components/EnDirect";
 import { RETOUR_EQUIPAGE } from "../components/FileTriage";
 import { Icone } from "../components/Icone";
 import { MentionDemo } from "../components/MentionDemo";
 import { SignalFerme, SignalOuvert, type SignalClos } from "../components/SignalOuvert";
 import { TuileConstante } from "../components/TuileConstante";
+import { useDirect } from "../direct";
 import { REPLI_RESIDENT } from "../repli";
 import { useCompte } from "../session";
 import type { CleConstante, SignalFiche, VueResident } from "../types";
@@ -120,6 +122,20 @@ function Fiche({
   const { compte } = useCompte();
   const { montrer, rendu: avis } = useAvis();
 
+  const direct = useDirect(vue.code, source === "api");
+  const minute = direct?.donnees.derniere?.at ?? null;
+  // La minute de la relecture précédente ; undefined avant la première.
+  const minuteVue = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!direct) return;
+    // Une minute neuve a changé la ligne du jour : les tuiles et la courbe la
+    // suivent. La première réponse ne recharge rien, la fiche vient d'arriver.
+    if (minuteVue.current !== undefined && minute !== null && minute !== minuteVue.current) {
+      rafraichir();
+    }
+    minuteVue.current = minute;
+  }, [direct, minute, rafraichir]);
+
   const moi = compte?.role === "medecin" ? compte.id : null;
   const peutAgir = moi !== null && source === "api";
   // Le bouton de note reste affiché même quand il ne peut rien : un bouton qui
@@ -217,7 +233,7 @@ function Fiche({
             </span>
             <span className="f">
               <Icone nom="pulse" />
-              {i.bracelet ?? "Aucun bracelet appairé"}
+              <LigneBracelet direct={direct} repli={i.bracelet} />
             </span>
           </div>
         </div>
@@ -236,6 +252,8 @@ function Fiche({
       {clos.map((c) => (
         <SignalFerme key={c.signal.id} clos={c} />
       ))}
+
+      {direct && <EnDirect direct={direct} />}
 
       <div className="mk-row">
         <section className="mk-card">

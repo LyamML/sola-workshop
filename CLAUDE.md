@@ -117,23 +117,23 @@ documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 **Les limites ouvertes aujourd'hui :** aucune purge des mesures n'est
 implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
 il n'y écrit que les trames du bracelet —, le bracelet ne remplit que trois
-constantes de la fiche — un jour qu'il est seul à écrire, les autres
-s'affichent « — aucune mesure » —, le jour d'une mesure est le jour UTC, le
-port réseau des bracelets parle HTTP en clair avec un seul jeton pour tous, la
-borne ne transmet que servie par Vite, dont le relais porte le jeton, une
+tuiles de la fiche — un jour qu'il est seul à écrire, les autres reprennent leur
+dernière valeur, datée, alerte comprise —, le jour d'une mesure est le jour UTC,
+le port réseau des bracelets parle HTTP en clair avec un seul jeton pour tous,
+la borne ne transmet que servie par Vite, dont le relais porte le jeton, une
 partie de la trame est reçue sans être conservée — une chute comptée par le
-bracelet n'ouvre pas de signal —, la conversation libre de la borne exige
-Ollama sur la machine, le résumé clinique à la sortie d'« Échange » exige
-Ollama et le serveur de bord (sinon la barre d'état le dit), Sola ne déclenche
-aucune action et, hors urgences gérées dans le code (réponses écrites,
-sévérité forcée), ses règles ne sont que des consignes données au modèle, la
-détection d'urgence ne repose que sur des mots-clés, les bilans sanguins du
-jeu de démonstration sont simulés (`source = 'simule'`, et la fiche le dit), la
-reconnaissance vocale de la borne n'existe que dans les navigateurs à moteur
-Chromium — ailleurs elle bascule au clavier et le dit dans sa barre d'état —,
-Sola ne reconnaît sa propre voix que par le texte : un mot qu'elle vient de
-dire ne vaut pas réponse dans les deux secondes qui suivent, et, serveur
-éteint, seule la fiche de R-0448 s'affiche — le repli ne contient qu'elle.
+bracelet n'ouvre pas de signal —, la conversation libre de la borne exige Ollama
+sur la machine, le résumé clinique à la sortie d'« Échange » exige Ollama et le
+serveur de bord (sinon la barre d'état le dit), Sola ne déclenche aucune action
+et, hors urgences gérées dans le code (réponses écrites, sévérité forcée), ses
+règles ne sont que des consignes données au modèle, la détection d'urgence ne
+repose que sur des mots-clés, les bilans sanguins du jeu de démonstration sont
+simulés (`source = 'simule'`, et la fiche le dit), la reconnaissance vocale de
+la borne n'existe que dans les navigateurs à moteur Chromium — ailleurs elle
+bascule au clavier et le dit dans sa barre d'état —, Sola ne reconnaît sa propre
+voix que par le texte : un mot qu'elle vient de dire ne vaut pas réponse dans
+les deux secondes qui suivent, et, serveur éteint, seule la fiche de R-0448
+s'affiche — le repli ne contient qu'elle.
 
 ---
 
@@ -249,6 +249,7 @@ racine, réglé par `DB_FILE`.
 | Le mécanisme de repli et `rafraichir` | `src/useSource.ts` |
 | La file « À traiter maintenant » de l'écran 02 | `src/components/FileTriage.tsx` |
 | Le signal ouvert de la fiche : prendre, clore avec un motif | `src/components/SignalOuvert.tsx` |
+| La carte « en direct » de la fiche et sa ligne bracelet, relues toutes les dix secondes | `src/components/EnDirect.tsx`, `src/direct.ts`, `src/styles/direct.css` |
 | Les tuiles de constantes, la courbe et les barres | `src/components/TuileConstante.tsx`, `src/components/Courbe.tsx`, `src/components/Barres.tsx` |
 | Les conversations remontées et les résumés de contexte | `src/components/Conversations.tsx` |
 | Les colonnes, tris et filtres de l'écran 04 | `src/pages/RegistrePage.tsx` (descripteurs `Colonne<T>`) |
@@ -274,7 +275,7 @@ racine, réglé par `DB_FILE`.
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
 | **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures`, puis la ligne du jour de `mesures_jour` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`, `SQL_JOUR`) |
 | La lecture seule d'un bracelet en Wi-Fi, et ce qu'une réponse dit des valeurs écartées | `src/validation.ts` (`lectureSchema`), `src/routes/ingest.ts` (`recevoirWifi`, `accuse`) |
-| La dernière minute du bracelet et l'heure écoulée, pour la carte « en direct » de l'écran 03 | `src/routes/direct.ts` |
+| La dernière minute du bracelet et l'heure écoulée — la carte « en direct » de l'écran 03 | `src/routes/direct.ts` |
 | Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
 | Hachage argon2id des mots de passe | `src/mdp.ts` |
 | Ouverture, lecture et purge des sessions, cookie | `src/sessions.ts` |
