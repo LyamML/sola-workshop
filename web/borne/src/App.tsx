@@ -13,8 +13,9 @@ import {
   type VoiceState,
 } from "./scenarios";
 import { connectBracelet, type BraceletReading } from "./bracelet";
-import { correspond, motDEveil, useVoix } from "./voix";
-import { discuter, EchecIA, prechauffer, type Tour } from "./ia";
+import { correspond, useVoix } from "./voix";
+import { discuter, EchecIA, prechauffer, resumer, type Tour } from "./ia";
+import { envoyerResume } from "./remontee";
 
 interface Ligne {
   id: number;
@@ -43,13 +44,16 @@ export default function App() {
   const [etape, setEtape] = useState(0);
   const [busy, setBusy] = useState(false);
   const [actif, setActif] = useState(false);
-  const [eveille, setEveille] = useState(false);
+
   const [iaErreur, setIaErreur] = useState<string | null>(null);
+  const [remonteeMsg, setRemonteeMsg] = useState<string | null>(null);
   const [saisie, setSaisie] = useState("");
   const champ = useRef<HTMLInputElement>(null);
 
   // L'échange avec le modèle ne vit qu'ici, dans la mémoire de la page.
+  // À la sortie de « Échange », un résumé part ; le verbatim, lui, disparaît.
   const historique = useRef<Tour[]>([]);
+  const debutEchange = useRef<string | null>(null);
   const requete = useRef<AbortController | null>(null);
 
   // --- la voix ---------------------------------------------------------------
@@ -134,6 +138,7 @@ export default function App() {
     requete.current?.abort();
     requete.current = null;
     historique.current = [{ role: "assistant", content: scene.ouverture.dit }];
+    debutEchange.current = scene.ia ? new Date().toISOString() : null;
     setIaErreur(null);
     if (scene.ia && actif) prechauffer();
     setVoice(scene.ouverture.state);
@@ -144,12 +149,49 @@ export default function App() {
     setQuestion(null);
     setMalCompris(false);
     setEtape(0);
-    setEveille(false);
     setBusy(false);
     if (actif) parler(scene.ouverture.dit);
     if (scene.onEnter) jouer(scene.onEnter);
     return clearTimers;
   }, [scene, actif, clearTimers, jouer, parler, taire]);
+
+  // Résumé clinique : uniquement quand on quitte la scène « Échange »
+  // (changement de scénario ou démontage), pas quand `actif` bascule.
+  // Déclaré après l'effet d'ouverture pour que ce cleanup lise l'historique
+  // avant que le suivant ne le réinitialise.
+  useEffect(() => {
+    const etaitIa = scene.ia;
+    return () => {
+      if (!etaitIa) return;
+      const tours = historique.current;
+      const debut = debutEchange.current;
+      if (!debut || !tours.some((t) => t.role === "user")) return;
+
+      historique.current = [];
+      debutEchange.current = null;
+
+      void (async () => {
+        setRemonteeMsg("Résumé en cours…");
+        const clinique = await resumer(tours);
+        if (!clinique) {
+          setRemonteeMsg("Résumé non produit");
+          return;
+        }
+        const ecoule = Date.now() - Date.parse(debut);
+        const duree_min = Number.isFinite(ecoule)
+          ? Math.max(0, Math.min(600, Math.round(ecoule / 60_000)))
+          : 0;
+        const resultat = await envoyerResume({ debut_at: debut, duree_min, clinique });
+        if (!resultat.ok) {
+          setRemonteeMsg(
+            resultat.raison === "serveur" ? "Serveur de bord injoignable" : "Résumé non produit",
+          );
+          return;
+        }
+        setRemonteeMsg(resultat.remontee_auto ? "Remontée médecin" : "Résumé transmis");
+      })();
+    };
+  }, [scene.key, scene.ia]);
 
   // --- respiration guidée -----------------------------------------------------
   const [breath, setBreath] = useState({ phase: 0, left: BREATH_PHASES[0].seconds });
@@ -293,21 +335,6 @@ export default function App() {
       else setMalCompris(true);
       return;
     }
-    if (!eveille) {
-      const suite = motDEveil(phrase);
-      if (suite === null) {
-        // Entendue, mais pas appelée. Le montrer : une borne qui reçoit la
-        // parole sans rien en faire passe pour sourde, et on cherche la panne
-        // là où il n'y en a pas.
-        const bout = phrase.length > 52 ? `${phrase.slice(0, 52)}…` : phrase;
-        setHint(`« ${bout} » — dis mon nom et je réponds`);
-        return;
-      }
-      setEveille(true);
-      if (suite) avancer(phrase);
-      else setHint(HINT_ECOUTE);
-      return;
-    }
     avancer(phrase);
   };
 
@@ -340,7 +367,6 @@ export default function App() {
     }
     if (e.code === "Space" || e.code === "Enter") {
       e.preventDefault();
-      if (!eveille) setEveille(true);
       // Sans micro, le modèle n'a pas de réplique toute prête à recevoir : il
       // faut la lui écrire.
       if (scene.ia) champ.current?.focus();
@@ -353,7 +379,6 @@ export default function App() {
     const texte = saisie.trim();
     if (!texte || busy || question) return;
     setSaisie("");
-    if (!eveille) setEveille(true);
     avancer(texte);
   };
 
@@ -374,11 +399,7 @@ export default function App() {
   // La dernière ligne est la grande — sauf quand une phrase est en cours d'être
   // entendue : c'est elle qui prend la place, la précédente redescend.
   const vive = voix.partiel ? -1 : lignes.length - 1;
-  const piedTexte = enEcoute
-    ? eveille
-      ? HINT_ECOUTE
-      : hint || HINT_ECOUTE
-    : hint;
+  const piedTexte = enEcoute ? HINT_ECOUTE : hint;
 
   return (
     <div className={classes}>
@@ -418,7 +439,8 @@ export default function App() {
         ) : (
           <span>Bracelet · 61 %</span>
         )}
-        <span>Tout reste dans la cabine</span>
+        <span>Verbatim en cabine</span>
+        {remonteeMsg ? <span>{remonteeMsg}</span> : null}
         {bleError ? <span className="warn">{bleError}</span> : null}
         {voix.erreur ? <span className="warn">{voix.erreur}</span> : null}
         {iaErreur ? <span className="warn">{iaErreur}</span> : null}

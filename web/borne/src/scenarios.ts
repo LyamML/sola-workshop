@@ -104,7 +104,8 @@ export const SCENES: Scene[] = [
     key: "jour",
     label: "Échange",
     ouverture: {
-      dit: "Salut Lyam. Tu as dormi 5 h 12 cette nuit — je me disais qu’on pouvait en parler.",
+      // Seul texte figé du mode libre : le bonjour. Le reste est le modèle.
+      dit: "Salut Lyam. Je suis là.",
       hint: APPEL,
       state: "idle",
     },
@@ -113,6 +114,8 @@ export const SCENES: Scene[] = [
     echanges: [],
   },
 
+  // Démos temporaires : à terme, apaisement / alerte seront déclenchés par
+  // de vraies situations (bracelet, chute), plus par ces scénarios écrits.
   {
     key: "calme",
     label: "Apaisement",

@@ -114,11 +114,13 @@ Le README a une section « limites » et elle est à jour. Si vous en levez une,
 retirez la ligne. Si vous en créez une, ajoutez-la. Une limite assumée et
 documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
-**Les huit limites ouvertes aujourd'hui :** aucune purge des mesures n'est
+**Les neuf limites ouvertes aujourd'hui :** aucune purge des mesures n'est
 implémentée, l'écran 01 ne lit pas la base, sa conversation libre exige Ollama
-sur la machine, elle ne produit encore aucun résumé, Sola ne déclenche aucune
-action et ses règles (pas de diagnostic, pas de chiffre inventé) ne sont que
-des consignes données au modèle,
+sur la machine, le résumé clinique à la sortie d'« Échange » exige Ollama et le
+serveur de bord (sinon la barre d'état le dit), Sola ne déclenche aucune
+action et, hors urgences, actions prétendues et noms de maladie filtrés dans
+le code, ses règles ne sont que des consignes données au modèle, la détection
+d'urgence ne repose que sur des mots-clés,
 les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
 et la fiche le dit), la reconnaissance vocale de la borne n'existe que dans
 les navigateurs à moteur Chromium — ailleurs elle bascule au clavier et le dit
@@ -214,8 +216,9 @@ racine, réglé par `DB_FILE`.
 | L'enchaînement des scènes, le clavier de secours | `src/App.tsx` |
 | Les répliques, les cartes et les questions | `src/scenarios.ts` |
 | Écoute, synthèse, mot d'éveil, filtre d'écho | `src/voix.ts` |
-| La conversation libre : prompt de Sola, appel au modèle local (Ollama) | `src/ia.ts` |
-| Le relais `/ollama` vers `127.0.0.1:11434` | `vite.config.ts` |
+| La conversation libre : prompt de Sola, appel au modèle local (Ollama), réponses d'urgence, filtres de sortie, résumé clinique | `src/ia.ts` |
+| Envoi du résumé au serveur de bord (via proxy `/bord`) | `src/remontee.ts` |
+| Le relais `/ollama` vers `127.0.0.1:11434` et `/bord` vers le serveur | `vite.config.ts` |
 | **Le visage de Sola** — trois images, une par état | `src/components/SolaAvatar.tsx` |
 | Le chat vectoriel d'origine, gardé en réserve | `src/components/SolaCat.tsx` |
 | Les images en pixels (repos, écoute, parole) | `src/assets/` |
