@@ -16,19 +16,36 @@ const codeResident = z
 /** Horodatage ISO 8601. La borne envoie toujours en UTC. */
 const horodatage = z.string().datetime({ offset: true });
 
+/**
+ * Bornes physiologiques d'une minute de mesure. Les deux routes qui ecrivent
+ * `mesures` les partagent : /ingest/mesure les impose a ce qu'on lui envoie,
+ * /ingest/bracelet ecarte ce qui en sort avant de faire ses moyennes.
+ */
+export const BORNES = {
+  bpm: { min: 25, max: 220 },
+  rmssd: { min: 0, max: 300 },
+  spo2: { min: 50, max: 100 },
+  activite: { min: 0, max: 16 },
+} as const;
+
 export const mesureSchema = z
   .object({
     at: horodatage,
     // Le firmware envoie 0 quand il n'a pas de valeur fiable : la borne
     // convertit en null AVANT d'envoyer. On refuse ici les zeros physiologi-
     // quement impossibles plutot que de les stocker comme des mesures.
-    bpm: z.number().min(25).max(220).nullable().default(null),
-    rmssd: z.number().min(0).max(300).nullable().default(null),
-    spo2: z.number().min(50).max(100).nullable().default(null),
+    bpm: z.number().min(BORNES.bpm.min).max(BORNES.bpm.max).nullable().default(null),
+    rmssd: z.number().min(BORNES.rmssd.min).max(BORNES.rmssd.max).nullable().default(null),
+    spo2: z.number().min(BORNES.spo2.min).max(BORNES.spo2.max).nullable().default(null),
     resp: z.number().min(4).max(60).nullable().default(null),
     temp: z.number().min(25).max(43).nullable().default(null),
     eda: z.number().min(0).max(50).nullable().default(null),
-    activite: z.number().min(0).max(16).nullable().default(null),
+    activite: z
+      .number()
+      .min(BORNES.activite.min)
+      .max(BORNES.activite.max)
+      .nullable()
+      .default(null),
     pas: z.number().int().min(0).max(65535).nullable().default(null),
     dort: z.boolean().nullable().default(null),
     source: z.enum(["mesure", "simule"]).default("mesure"),
@@ -44,6 +61,60 @@ export const lotMesuresSchema = z
     // La borne accumule hors ligne et vide sa file a la reconnexion : on
     // accepte donc un lot, pas une mesure isolee.
     mesures: z.array(mesureSchema).min(1).max(1440),
+  })
+  .strict();
+
+/**
+ * Trame du bracelet, telle que le firmware la publie chaque seconde sur son
+ * service BLE (`statusJson()` dans firmware/bracelet*), plus `at` : l'ESP32
+ * n'a pas d'horloge, c'est le relais qui horodate.
+ *
+ * Les deux firmwares ne publient pas les memes cles — le KY-039 ajoute
+ * `beats` et `amp`, le MAX30102 la SpO2, l'activite, le sommeil et les
+ * compteurs de chutes. Toutes sont declarees et `.strict()` refuse les
+ * autres : une cle que le firmware viendrait d'ajouter doit echouer ici, pas
+ * disparaitre en silence.
+ *
+ * Seule la forme est verifiee ici, pas la physiologie : zero y veut dire
+ * « pas de valeur fiable », et c'est en faisant la minute que le serveur
+ * l'ecarte, avec tout ce qui sort de BORNES. Une valeur aberrante coute
+ * donc une seconde de mesure, pas le lot entier.
+ */
+export const trameSchema = z
+  .object({
+    at: horodatage,
+    id: codeResident.optional(),
+    bpm: z.number().min(0),
+    rmssd: z.number().min(0),
+    q: z.enum(["good", "fair", "poor", "warmup"]),
+    // KY-039
+    beats: z.number().int().min(0).optional(),
+    amp: z.number().min(0).optional(),
+    // MAX30102 + MPU6050. tst et waso comptent des epoques du firmware
+    // (EPOCH_MS), qui ne durent une minute que dans son reglage par defaut.
+    spo2: z.number().min(0).max(100).optional(),
+    act: z.number().min(0).optional(),
+    sleep: z.union([z.literal(0), z.literal(1)]).optional(),
+    tst: z.number().int().min(0).optional(),
+    waso: z.number().int().min(0).optional(),
+    hrRest: z.number().min(0).optional(),
+    fall: z.number().int().min(0).optional(),
+    shake: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+export type Mesure = z.infer<typeof mesureSchema>;
+export type Trame = z.infer<typeof trameSchema>;
+
+export const lotTramesSchema = z
+  .object({
+    resident: codeResident,
+    // Obligatoire ici, contrairement a /ingest/mesure : c'est lui qui permet
+    // de verifier que le bracelet appaire est bien celui du resident.
+    bracelet: z.string().regex(/^BR-\d{4}$/, "Numero de bracelet attendu au format BR-0448."),
+    // Une heure a une trame par seconde. La borne envoie par paquets de dix
+    // minutes ; la marge couvre un relais qui accumulerait davantage.
+    trames: z.array(trameSchema).min(1).max(3600),
   })
   .strict();
 

@@ -114,13 +114,19 @@ Le README a une section « limites » et elle est à jour. Si vous en levez une,
 retirez la ligne. Si vous en créez une, ajoutez-la. Une limite assumée et
 documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
-**Les neuf limites ouvertes aujourd'hui :** aucune purge des mesures n'est
-implémentée, l'écran 01 ne lit pas la base, sa conversation libre exige Ollama
-sur la machine, le résumé clinique à la sortie d'« Échange » exige Ollama et le
-serveur de bord (sinon la barre d'état le dit), Sola ne déclenche aucune
-action et, hors urgences, actions prétendues et noms de maladie filtrés dans
-le code, ses règles ne sont que des consignes données au modèle, la détection
-d'urgence ne repose que sur des mots-clés,
+**Les limites ouvertes aujourd'hui :** aucune purge des mesures n'est
+implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
+il n'y écrit que les trames du bracelet —, ces mesures n'atteignent pas la
+fiche (`mesures_jour` ne se calcule qu'avec `npm run db:rollup`, et `adapt.ts`
+afficherait à 0 ce que le bracelet ne mesure pas), la borne ne transmet que
+servie par Vite, dont le relais porte le jeton, une partie de la trame est
+reçue sans être conservée — une chute comptée par le bracelet n'ouvre pas de
+signal —, la conversation libre de la borne exige Ollama sur la machine, le
+résumé clinique à la sortie d'« Échange » exige Ollama et le serveur de bord
+(sinon la barre d'état le dit), Sola ne déclenche aucune action et, hors
+urgences gérées dans le code (réponses écrites, sévérité forcée), ses règles
+ne sont que des consignes données au modèle, la détection d'urgence ne repose
+que sur des mots-clés,
 les bilans sanguins du jeu de démonstration sont simulés (`source = 'simule'`,
 et la fiche le dit), la reconnaissance vocale de la borne n'existe que dans
 les navigateurs à moteur Chromium — ailleurs elle bascule au clavier et le dit
@@ -172,6 +178,7 @@ pas d'outils, et l'équipe travaille sous Windows.
 | **Cache de Vite** | après réécriture complète d'un fichier, le serveur de dev peut le servir **vide** (`Content-Length: 0`), d'où une page blanche | `touch` le fichier ; ce n'est pas votre code |
 | **Captures d'écran** | le panneau navigateur échoue parfois (`Screenshot timed out`) | Mesurer en JavaScript (`getBoundingClientRect`) plutôt que regarder |
 | **Micro dans le panneau navigateur** | il est bloqué : la borne affiche « micro refusé » | Piloter l'écran 01 au clavier (espace, `1`/`2`) — mais le clavier contourne l'écoute : pour tester interruption et écho, capturer le moteur en remplaçant `webkitSpeechRecognition.prototype.start`, puis appeler son `onresult` avec des résultats fabriqués. La vraie voix se teste dans Chrome |
+| **Bluetooth dans le panneau navigateur** | aucun bracelet n'y est joignable, et le premier clic est pris par le voile du micro | Remplacer `navigator.bluetooth` par un faux qui notifie des trames, cliquer « Appairer » en JavaScript. Tester l'envoi contre une copie de la base (`VACUUM INTO`) et un serveur sur un autre port : une trame écrite dans `sola.db` ne s'efface plus, faute de purge |
 | **Routes de la console** | `/residents/:id`, pas `/resident/:id` | Voir `web/console/src/App.tsx` |
 
 **Vérifier avant d'annoncer.** `npm run typecheck` pour le code ; pour une
@@ -186,6 +193,7 @@ marche.
 
 | Commande | Ce qu'elle fait | Port |
 |---|---|---|
+| `npm run dev` | les quatre services dans un terminal, journaux préfixés, Ctrl+C arrête tout — `scripts/dev.mjs` ; `npm run dev -- console server` pour un sous-ensemble | 5173–5176 |
 | `npm run dev:borne` | écran 01 — la borne de cabine | 5173 |
 | `npm run dev:console` | écrans 02 à 04 — la console médicale | 5174 |
 | `npm run dev:server` | le serveur de bord (API) | 5175 |
@@ -218,7 +226,9 @@ racine, réglé par `DB_FILE`.
 | Écoute, synthèse, mot d'éveil, filtre d'écho | `src/voix.ts` |
 | La conversation libre : prompt de Sola, appel au modèle local (Ollama), réponses d'urgence, filtres de sortie, résumé clinique | `src/ia.ts` |
 | Envoi du résumé au serveur de bord (via proxy `/bord`) | `src/remontee.ts` |
-| Le relais `/ollama` vers `127.0.0.1:11434` et `/bord` vers le serveur | `vite.config.ts` |
+| Le client Web Bluetooth du bracelet | `src/bracelet.ts` |
+| La file d'envoi des trames et son libellé dans la barre d'état | `src/transmission.ts` |
+| Le relais `/ollama` vers Ollama, `/bord` pour le résumé, `/ingest/bracelet` pour les trames | `vite.config.ts` |
 | **Le visage de Sola** — trois images, une par état | `src/components/SolaAvatar.tsx` |
 | Le chat vectoriel d'origine, gardé en réserve | `src/components/SolaCat.tsx` |
 | Les images en pixels (repos, écoute, parole) | `src/assets/` |
@@ -252,6 +262,7 @@ racine, réglé par `DB_FILE`.
 | Écriture d'une note (partagée avec le backoffice) | `src/routes/console.ts`, `ajouterParticularite` |
 | Backoffice — tables, correction, signaux | `src/routes/admin.ts` |
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
+| **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`) |
 | Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
 | Hachage argon2id des mots de passe | `src/mdp.ts` |
 | Ouverture, lecture et purge des sessions, cookie | `src/sessions.ts` |

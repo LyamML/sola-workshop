@@ -21,8 +21,8 @@ Un compagnon à qui on confie ses angoisses n'a de valeur que si l'on est certai
    bracelet ESP32                borne de cabine                console médicale
    ──────────────                ───────────────                ────────────────
    FC · RR · RMSSD    ──BLE──▶   LLM embarqué      ──résumés──▶  agrégats équipage
-   SpO₂ · activité               conversation                   fiche résident
-   sommeil · chutes              tout reste ici                 file de triage
+   SpO₂ · activité               conversation      ─constantes▶ fiche résident
+   sommeil · chutes              la parole reste ici            file de triage
 
                                  ▲                              ▲
                                  │  aucune base de données partagée
@@ -35,7 +35,7 @@ Les transcriptions n'arrivent jamais à la console médicale parce qu'elles **n'
 
 | Dossier | Rôle |
 |---|---|
-| `web/borne` | **Écran 01** — la borne de cabine, vocale. Client Web Bluetooth du bracelet |
+| `web/borne` | **Écran 01** — la borne de cabine, vocale. Client Web Bluetooth du bracelet, et relais de ses trames vers le serveur de bord |
 | `web/console` | **Écrans 02 à 04** — santé de l'équipage, fiche résident, registre triable, pour le médecin de bord |
 | `web/backoffice` | Outil d'exploitation : état des tables, correction des dossiers, suivi des signaux, table des correspondances écran ↔ requête |
 | `firmware/bracelet-i2c` | Firmware ESP32 **principal** : MAX30102 (FC, RR, RMSSD, SpO₂) + MPU6050 (activité, chutes, sommeil) |
@@ -51,6 +51,8 @@ SQLite plutôt que MySQL : un vaisseau générationnel n'a pas d'administrateur 
 Aucune ressource n'est chargée depuis un CDN : les polices sont empaquetées avec l'application. Le vaisseau n'a pas Internet ; le prototype non plus.
 
 ## Démarrer
+
+**Node 24 ou plus** est requis, pour `node:sqlite`.
 
 ```bash
 npm install
@@ -94,19 +96,37 @@ configuration et renseignez le jeton des bornes :
 cp server/.env.example server/.env
 ```
 
+Renseignez le jeton des bornes dans `server/.env` (voir
+[Qui entre, et comment](#qui-entre-et-comment)), puis chargez la base :
+
 ```bash
 npm run db:reset
 ```
 
 ```bash
-npm run dev:server
+npm run dev
 ```
 
-```bash
-npm run dev:backoffice
-```
+lance les quatre services dans un seul terminal. Chaque ligne porte le nom du
+service qui l'a écrite, et Ctrl+C les arrête tous.
 
-Le backoffice écoute sur <http://localhost:5176>, l'API sur <http://localhost:5175>.
+| Service | Adresse |
+|---|---|
+| Borne — écran 01 | <http://localhost:5173> |
+| Console — écrans 02 à 04 | <http://localhost:5174> |
+| Serveur de bord — l'API | <http://localhost:5175> |
+| Backoffice | <http://localhost:5176> |
+
+`npm run dev -- console server` n'en lance que certains, et `npm run dev:borne`,
+`dev:console`, `dev:server` ou `dev:backoffice` en lance un seul. Un port déjà
+pris fait échouer son service au lieu de le déplacer : une console servie
+ailleurs que sur 5174 ne serait plus une origine autorisée par le serveur, et
+la connexion échouerait sans raison visible.
+
+La console lit le serveur de bord quand il répond, et retombe sur son jeu de
+démonstration sinon — en le disant dans son en-tête. Sans `server/.env`,
+`npm run dev` lance les trois interfaces seules et le signale.
+`npm run build` et `npm run typecheck` traversent tous les espaces de travail.
 
 Une commande par bloc : l'équipe est sous Windows PowerShell, qui ne connaît
 pas l'enchaînement `&&`.
@@ -269,7 +289,47 @@ Un service propre à Sola transporte ce que le standard ne prévoit pas : RMSSD,
 
 ### Appairer depuis la borne
 
-Le bouton **Appairer**, dans le bandeau de démonstration en bas à droite, ouvre le sélecteur Web Bluetooth. Deux contraintes : **Chrome ou Edge** en contexte sécurisé (`localhost` suffit), et un **clic** de l'utilisateur — c'est pourquoi l'appairage n'est pas automatique, et c'est aussi pourquoi il est resté dans le bandeau plutôt que sur l'écran de la borne, qui n'a plus de bouton. Une fois connectée, la barre d'état affiche la FC, le RMSSD et la batterie réels à la place des valeurs de démonstration.
+Le bouton **Appairer**, dans le bandeau de démonstration en bas à droite, ouvre le sélecteur Web Bluetooth. Deux contraintes : **Chrome ou Edge** en contexte sécurisé (`localhost` suffit), et un **clic** de l'utilisateur — c'est pourquoi l'appairage n'est pas automatique, et c'est aussi pourquoi il est resté dans le bandeau plutôt que sur l'écran de la borne, qui n'a plus de bouton. Une fois connectée, la barre d'état affiche la FC et le RMSSD réels à la place des valeurs de démonstration. La batterie, elle, reste une valeur fixe du firmware : l'ESP32 du prototype n'est pas sur batterie.
+
+### Transmettre au serveur de bord
+
+Appairée, la borne relaie au serveur de bord chaque trame du service Sola, une par seconde. Elle ne calcule rien : elle horodate — l'ESP32 n'a pas d'horloge —, range les trames par minute et n'envoie que des minutes closes, dix au plus par envoi. Le serveur fait de chaque minute **une ligne de `mesures`**. La barre d'état dit où en est l'envoi : première minute en cours, heure du dernier envoi, serveur injoignable avec le nombre de minutes en attente, ou le motif d'un refus.
+
+Le jeton de `/ingest` n'est jamais dans la page. Le serveur de développement de la borne l'ajoute en relayant la requête (`web/borne/vite.config.ts`). Il le lit dans `server/.env` et ne le prête qu'à une page de sa propre origine, ouverte sur le poste même.
+
+Le contrat, `POST /ingest/bracelet` — la trame est celle que publie `statusJson()` dans le firmware, plus `at` :
+
+```json
+{
+  "resident": "R-0448",
+  "bracelet": "BR-0448",
+  "trames": [
+    { "at": "2026-09-23T11:14:05.012Z", "id": "R-0448", "bpm": 72.4, "rmssd": 41.2,
+      "spo2": 97, "act": 0.0123, "sleep": 0, "tst": 0, "waso": 0, "hrRest": 64,
+      "fall": 0, "shake": 0, "q": "good" }
+  ]
+}
+```
+
+| Clé | Firmware | Sens | Ce que le serveur en fait |
+|---|---|---|---|
+| `at` | ajoutée par la borne | horodatage ISO 8601 | range la trame dans sa minute, en UTC |
+| `id` | les deux | code résident écrit dans le firmware | doit valoir `resident`, sinon `409` |
+| `bpm`, `rmssd` | les deux | FC moyenne, RMSSD en ms ; `0` = pas de valeur fiable | `fc_bpm`, `rmssd_ms` : moyenne des secondes `good` ou `fair` |
+| `q` | les deux | `good` · `fair` · `poor` · `warmup` | `qualite` : vote majoritaire, le pire l'emporte à égalité |
+| `spo2` | I²C | %, non calibrée ; `0` = pas de valeur | `spo2_pct` : moyenne des secondes fiables |
+| `act` | I²C | activité de la dernière époque close, en g | `activite_g` : moyenne de toutes les secondes |
+| `sleep` | I²C | `1` si le firmware estime le résident endormi | `dort` : majorité des secondes |
+| `tst`, `waso`, `hrRest`, `fall`, `shake` | I²C | époques de sommeil et d'éveil, base de repos, compteurs de chutes et de secousses | validées, pas encore conservées |
+| `beats`, `amp` | KY-039 | battements dans la fenêtre, amplitude du signal | validées, pas encore conservées |
+
+Un zéro n'est jamais moyenné, et une valeur hors des bornes physiologiques est écartée : elle coûte une seconde, pas le lot. Respiration, température, activité électrodermale et pas restent `NULL`, parce que le bracelet ne les mesure pas. Une clé inconnue fait en revanche échouer le lot entier en `400`, volontairement : une clé que le firmware viendrait d'ajouter se déclare dans `trameSchema` (`server/src/validation.ts`), elle ne se perd pas en silence. Le serveur répond `202` avec le nombre de trames et de minutes reçues. Il refuse en `404` un résident ou un bracelet inconnu, et en `409` un bracelet qui n'est pas attribué à ce résident.
+
+Les mesures arrivées se lisent au backoffice, *Tables* → `mesures`, ou au terminal :
+
+```bash
+npm run db:sql "SELECT mesure_at, fc_bpm, rmssd_ms, spo2_pct, qualite FROM mesures WHERE bracelet_id = (SELECT id FROM bracelets WHERE serie = 'BR-0448') ORDER BY mesure_at DESC LIMIT 10"
+```
 
 ## Mesure du sommeil
 
@@ -312,7 +372,10 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 - **Le résumé clinique dépend d'Ollama et du serveur de bord.** À la sortie de « Échange », un second appel au modèle produit un résumé (mental et physique évoqués à l'oral) ; le proxy `/bord` l'envoie à `POST /ingest/conversation`. Si la sévérité n'est pas `info`, un signal s'ouvre dans la file du médecin. Sans Ollama le résumé n'est pas produit ; sans serveur (ou sans `BORNE_TOKEN` dans `server/.env`) la barre d'état le dit. Le verbatim ne quitte jamais la cabine.
 - **Sola ne déclenche aucune action, et la plupart de ses règles sont des consignes.** Elle ne peut ni prévenir la maintenance, ni régler la lumière, ni contacter quelqu'un. Trois garde-fous sont écrits dans le code (`web/borne/src/ia.ts`) : une urgence (douleur thoracique, gêne respiratoire, malaise, idée suicidaire) reçoit une réponse écrite à l'avance et force la sévérité `critique` du résumé ; une phrase qui prétend une action est remplacée ; une phrase qui nomme une maladie est retirée. Le reste — ne rien inventer, rester dans le sujet — n'est que consigne, et un modèle de 8 milliards de paramètres s'en écarte encore : conseil incongru, faute de français, supposition.
 - **La détection d'urgence repose sur des mots-clés.** Elle reconnaît les formulations courantes (« douleur dans la poitrine », « du mal à respirer », « plus envie de vivre »…) ; une formulation qu'elle ne connaît pas passe au modèle, qui n'a plus alors que sa consigne. Elle préfère le faux positif : une phrase de trop coûte moins qu'une urgence manquée.
-- **La borne n'est pas branchée sur la base ni sur le bracelet pour le résumé.** Les écrans 02 à 04 lisent le serveur de bord ; l'écran 01 ne connaît du résident que ce que son prompt lui dit (la nuit de 5 h 12). Un problème physique n'entre dans le résumé que s'il a été dit à l'oral.
+- **Les mesures du bracelet n'atteignent pas encore la fiche.** `POST /ingest/bracelet` écrit une ligne par minute dans `mesures`, mais la fiche et le registre (écrans 03 et 04) lisent les agrégats de `mesures_jour`, que seul `npm run db:rollup` calcule : il n'y a pas de tâche de nuit. Un agrégat réel laisserait de plus vides la respiration, la température, l'activité électrodermale et les pas, et `adapt.ts` les afficherait à 0 sur la fiche, alertes comprises. Les vraies mesures se lisent donc au backoffice ou au terminal.
+- **La borne ne transmet que servie par Vite.** C'est son serveur de développement qui ajoute le jeton de `/ingest`. Publiée en fichiers statiques, elle n'aurait plus de relais, et ce rôle reviendrait au serveur de bord ou à un service de la cabine. Sa file d'attente vit en mémoire : une heure au plus, perdue si l'on recharge la page.
+- **Une partie de la trame est reçue sans être conservée.** `tst`, `waso`, `hrRest`, `fall`, `shake`, `beats` et `amp` sont validées puis écartées : aucune table ne les attend encore. En particulier, une chute comptée par le bracelet n'ouvre pas de signal. Seul `POST /ingest/evenement` en ouvre un, et la borne ne l'appelle pas.
+- **La borne n'est pas branchée sur la base pour le résumé IA.** L'écran 01 ne connaît du résident que ce que son prompt lui dit. Un problème physique n'entre dans le résumé que s'il a été dit à l'oral.
 - **La reconnaissance vocale de la borne dépend du navigateur.** `SpeechRecognition` n'existe aujourd'hui que dans les navigateurs à moteur Chromium, et elle y passe par un service distant de Google — un vrai vaisseau ne s'en contenterait pas. Ailleurs, ou micro refusé, la borne le dit dans sa barre d'état et se conduit à la barre d'espace. Ce que Sola entend ne va qu'au modèle local : le verbatim n'est ni enregistré ni envoyé ; seul le résumé clinique peut partir au serveur de bord.
 - **Sola ne reconnaît sa propre voix que par le texte.** Le micro reste ouvert pendant qu'elle parle, pour qu'on puisse la couper, et ce qu'il entend est écarté quand ce sont ses mots à elle. Un mot qu'elle vient de dire ne vaut donc pas réponse, ni pendant sa phrase ni dans les deux secondes qui suivent : à une question, mieux vaut répondre « oui » ou « d'accord » que reprendre ses mots, et en conversation libre une phrase qui reprend surtout les siens peut être ignorée. Le filtre dépend aussi de ce que l'annulation d'écho de Chrome laisse passer ; au casque, il n'a rien à faire.
 - **Aucune purge des mesures n'est implémentée.** Le schéma prévoit une rétention de 90 jours sur `mesures` ; rien ne l'applique aujourd'hui. La base cabine, elle, efface bien le verbatim à 30 jours, par un trigger.
@@ -326,6 +389,7 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 | Route | Qui appelle | Rôle |
 |---|---|---|
 | `POST /ingest/mesure` | la borne | lot de constantes, jusqu'à 1 440 minutes d'un coup après une coupure |
+| `POST /ingest/bracelet` | la borne, par son relais | trames brutes du bracelet, une par seconde ; le serveur en fait une ligne par minute — [le contrat](#transmettre-au-serveur-de-bord) |
 | `POST /ingest/nuit` | la borne | durée de sommeil estimée de la nuit |
 | `POST /ingest/conversation` | la borne | **résumé** clinique — voir ci-dessous |
 | `POST /ingest/evenement` | la borne | chute, secousse, bouton d'urgence |

@@ -13,6 +13,7 @@ import {
   type VoiceState,
 } from "./scenarios";
 import { connectBracelet, type BraceletReading } from "./bracelet";
+import { libelleTransmission, useTransmission } from "./transmission";
 import { correspond, useVoix } from "./voix";
 import { discuter, EchecIA, prechauffer, resumer, type Tour } from "./ia";
 import { envoyerResume } from "./remontee";
@@ -30,6 +31,10 @@ const TRACE_MAX = 4;
 
 /** Deux cartes au plus : au-delà elles se marchent dessus dans le coin. */
 const CARTES_MAX = 2;
+
+/** L'occupant de la cabine C-12. Le serveur n'écrit ses trames que si le
+ *  bracelet appairé lui est bien attribué. */
+const RESIDENT = "R-0448";
 
 export default function App() {
   const [sceneKey, setSceneKey] = useState<SceneKey>("jour");
@@ -212,27 +217,34 @@ export default function App() {
   const [reading, setReading] = useState<BraceletReading | null>(null);
   const [bleError, setBleError] = useState<string | null>(null);
   const disconnect = useRef<(() => void) | null>(null);
+  const transmission = useTransmission(RESIDENT);
+  const { recevoir, terminer } = transmission;
+  const envoi = libelleTransmission(transmission.etat);
+  const transmet = envoi !== null && transmission.etat.etat !== "non-reconnu";
 
   const pair = useCallback(async () => {
     if (disconnect.current) {
       disconnect.current();
       disconnect.current = null;
       setReading(null);
+      terminer();
       return;
     }
     setBleError(null);
     try {
       disconnect.current = await connectBracelet({
         onReading: setReading,
+        onTrame: recevoir,
         onDisconnect: () => {
           disconnect.current = null;
           setReading(null);
+          terminer();
         },
       });
     } catch (err) {
       setBleError(err instanceof Error ? err.message : "Appairage interrompu.");
     }
-  }, []);
+  }, [recevoir, terminer]);
 
   useEffect(() => () => disconnect.current?.(), []);
 
@@ -439,7 +451,9 @@ export default function App() {
         ) : (
           <span>Bracelet · 61 %</span>
         )}
-        <span>Verbatim en cabine</span>
+        {envoi ? <span className={envoi.alerte ? "warn" : undefined}>{envoi.texte}</span> : null}
+        {/* Les constantes du bracelet partent au serveur de bord ; la parole, jamais. */}
+        <span>{transmet ? "Les paroles restent dans la cabine" : "Tout reste dans la cabine"}</span>
         {remonteeMsg ? <span>{remonteeMsg}</span> : null}
         {bleError ? <span className="warn">{bleError}</span> : null}
         {voix.erreur ? <span className="warn">{voix.erreur}</span> : null}
