@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { SolaAvatar } from "./components/SolaAvatar";
 import { Wave } from "./components/Wave";
 import {
@@ -14,6 +14,7 @@ import {
 } from "./scenarios";
 import { connectBracelet, type BraceletReading } from "./bracelet";
 import { correspond, motDEveil, useVoix } from "./voix";
+import { discuter, EchecIA, prechauffer, type Tour } from "./ia";
 
 interface Ligne {
   id: number;
@@ -43,6 +44,13 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [actif, setActif] = useState(false);
   const [eveille, setEveille] = useState(false);
+  const [iaErreur, setIaErreur] = useState<string | null>(null);
+  const [saisie, setSaisie] = useState("");
+  const champ = useRef<HTMLInputElement>(null);
+
+  // L'échange avec le modèle ne vit qu'ici, dans la mémoire de la page.
+  const historique = useRef<Tour[]>([]);
+  const requete = useRef<AbortController | null>(null);
 
   // --- la voix ---------------------------------------------------------------
   // Le gestionnaire de phrase dépend de presque tout l'état de l'écran, et la
@@ -62,6 +70,13 @@ export default function App() {
     compteur.current += 1;
     const ligne = { id: compteur.current, qui, texte };
     setLignes((prev) => [...prev, ligne].slice(-TRACE_MAX));
+    return ligne.id;
+  }, []);
+
+  // La réponse du modèle arrive mot à mot : elle réécrit sa ligne au lieu d'en
+  // empiler une par morceau.
+  const majLigne = useCallback((id: number, texte: string) => {
+    setLignes((prev) => prev.map((l) => (l.id === id ? { ...l, texte } : l)));
   }, []);
 
   // --- minuterie du scénario -------------------------------------------------
@@ -115,6 +130,12 @@ export default function App() {
   useEffect(() => {
     clearTimers();
     taire();
+    // Une réponse encore en route appartient à la scène qu'on quitte.
+    requete.current?.abort();
+    requete.current = null;
+    historique.current = [{ role: "assistant", content: scene.ouverture.dit }];
+    setIaErreur(null);
+    if (scene.ia && actif) prechauffer();
     setVoice(scene.ouverture.state);
     setHint(scene.ouverture.hint);
     compteur.current += 1;
@@ -173,8 +194,66 @@ export default function App() {
 
   useEffect(() => () => disconnect.current?.(), []);
 
+  // --- conversation avec le modèle local ------------------------------------
+  const converser = async (texte: string) => {
+    // Écrire par-dessus elle la coupe, comme lui parler par-dessus.
+    taire();
+    ajouterLigne("resident", texte);
+    historique.current = [...historique.current, { role: "user", content: texte }];
+    const controle = new AbortController();
+    requete.current = controle;
+    setBusy(true);
+    setVoice("thinking");
+    setHint("Sola réfléchit…");
+    setIaErreur(null);
+
+    let ligne: number | null = null;
+    const ecrire = (t: string) => {
+      if (ligne === null) ligne = ajouterLigne("sola", t);
+      else majLigne(ligne, t);
+    };
+
+    let dit: string;
+    try {
+      const reponse = await discuter(historique.current, {
+        signal: controle.signal,
+        onMorceau: (t) => {
+          if (t) ecrire(t);
+        },
+      });
+      dit = reponse || "Je n’ai pas trouvé mes mots. Tu peux répéter ?";
+      historique.current = [...historique.current, { role: "assistant", content: dit }];
+    } catch (erreur) {
+      const raison = erreur instanceof EchecIA ? erreur.raison : "injoignable";
+      if (raison === "annule") return;
+      setIaErreur(
+        raison === "modele" && erreur instanceof EchecIA ? erreur.message : "IA locale injoignable",
+      );
+      // Même en panne, Sola ne laisse pas une question sans réponse — et elle
+      // rappelle où aller si ce qu'on vient de lui dire ne pouvait pas attendre.
+      dit =
+        raison === "delai"
+          ? "Je mets trop de temps à te répondre. Tu peux me le redire ? Si c’est urgent, appelle l’infirmerie."
+          : "Je n’arrive pas à réfléchir pour l’instant. Si c’est urgent, appelle l’infirmerie.";
+    } finally {
+      if (requete.current === controle) {
+        requete.current = null;
+        setBusy(false);
+      }
+    }
+    ecrire(dit);
+    setVoice("idle");
+    setHint("");
+    parler(dit);
+  };
+
   // --- conduite de l'échange --------------------------------------------------
   const avancer = (texte?: string) => {
+    if (scene.ia) {
+      const phrase = texte?.trim();
+      if (phrase && !question && !busy) void converser(phrase);
+      return;
+    }
     if (question || busy || etape >= scene.echanges.length) return;
     const echange = scene.echanges[etape];
     ajouterLigne("resident", texte?.trim() || echange.resident);
@@ -244,6 +323,8 @@ export default function App() {
   const touche = useRef<(e: KeyboardEvent) => void>(() => {});
   touche.current = (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // On écrit à Sola : l'espace est une espace, pas un tour de parole.
+    if (e.target instanceof HTMLInputElement) return;
     if (!actif) {
       e.preventDefault();
       eveiller();
@@ -260,9 +341,22 @@ export default function App() {
     if (e.code === "Space" || e.code === "Enter") {
       e.preventDefault();
       if (!eveille) setEveille(true);
-      avancer();
+      // Sans micro, le modèle n'a pas de réplique toute prête à recevoir : il
+      // faut la lui écrire.
+      if (scene.ia) champ.current?.focus();
+      else avancer();
     }
   };
+
+  const envoyer = (e: FormEvent) => {
+    e.preventDefault();
+    const texte = saisie.trim();
+    if (!texte || busy || question) return;
+    setSaisie("");
+    if (!eveille) setEveille(true);
+    avancer(texte);
+  };
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => touche.current(e);
     window.addEventListener("keydown", h);
@@ -327,6 +421,7 @@ export default function App() {
         <span>Tout reste dans la cabine</span>
         {bleError ? <span className="warn">{bleError}</span> : null}
         {voix.erreur ? <span className="warn">{voix.erreur}</span> : null}
+        {iaErreur ? <span className="warn">{iaErreur}</span> : null}
       </div>
 
       <div className="b-scene">
@@ -439,6 +534,18 @@ export default function App() {
           </div>
         ) : null}
         <p className="b-hint">{piedTexte}</p>
+        {scene.ia && actif ? (
+          <form className="b-saisie" onSubmit={envoyer}>
+            <input
+              ref={champ}
+              value={saisie}
+              onChange={(e) => setSaisie(e.target.value)}
+              placeholder="Ou écris à Sola, puis Entrée"
+              aria-label="Écrire à Sola"
+              autoComplete="off"
+            />
+          </form>
+        ) : null}
       </div>
 
       {actif ? null : (
