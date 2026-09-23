@@ -8,7 +8,9 @@
 --
 --  Les dates sont relatives a date('now') : la demonstration est toujours
 --  "aujourd'hui", quel que soit le jour de la soutenance. Le jour de vol
---  courant est 4128.
+--  courant est 4128. Les heures, elles, sont fixes (« start of day » plus
+--  des minutes) : l'horloge de demonstration marque 16:05, comme celle de
+--  scripts/db-demo.mjs, quelle que soit l'heure ou la base est generee.
 -- =============================================================================
 
 PRAGMA foreign_keys = ON;
@@ -35,6 +37,10 @@ DELETE FROM admins;
 DELETE FROM residents;
 
 -- ---------------------------------------------------------------- equipage --
+-- Le statut suit les signaux ouverts, avec la regle que la console applique a
+-- chaque cloture : critique s'il en reste un critique, surveillance s'il en
+-- reste un autre, ok sinon. Un signal « info » compte donc : R-1003 est en
+-- surveillance tant que son signal d'usage n'est pas clos.
 INSERT INTO residents
   (code, prenom, nom, date_naissance, poste, cabine, groupe_sanguin,
    embarque_jour_vol, statut)
@@ -51,7 +57,7 @@ VALUES
   ('R-1147','Tomas','Ferreira',  date('now','-51 years'),'Logistique',           'E-03','O+',0,'critique'),
   ('R-0233','Helene','Park',     date('now','-62 years'),'Archives',             'A-07','AB-',0,'critique'),
   ('R-0781','Samuel','Diaz',     date('now','-41 years'),'Habitat 1',            'B-22','B+',0,'surveillance'),
-  ('R-1003','Iris','Kowalski',   date('now','-24 years'),'Recherche',            'F-05','A+',0,'ok');
+  ('R-1003','Iris','Kowalski',   date('now','-24 years'),'Recherche',            'F-05','A+',0,'surveillance');
 
 -- Personne de confiance : sa soeur, declaree au J+4 001.
 UPDATE residents
@@ -61,7 +67,7 @@ UPDATE residents
 
 INSERT INTO bracelets (serie, resident_id, firmware, batterie_pct, synchro_at)
 SELECT 'BR-' || substr(code, 3), id, 'bracelet-i2c', 61,
-       datetime('now', '-2 minutes')
+       datetime('now', 'start of day', '+963 minutes')
   FROM residents;
 
 -- -------------------------------------------------- fiche de R-0448 : Lyam --
@@ -94,10 +100,7 @@ INSERT INTO suivis (resident_id, type, titre, detail, debut_jour_vol, echeance_j
    'Proposé par Sola au J+4 128, accepté par le résident. À réévaluer au J+4 135.', 4128, 4135),
   ((SELECT id FROM residents WHERE code='R-0448'),'rendez_vous',
    'Entretien psychologique bimensuel',
-   'Prochain créneau : J+4 134 à 15:00, infirmerie B. Dr. A. Ferreira.', NULL, 4134),
-  ((SELECT id FROM residents WHERE code='R-0448'),'contact',
-   'Amara Mafray · sœur · C-15',
-   'Personne de confiance déclarée, joignable en urgence. Autorisation donnée par le résident au J+4 001.', 4001, NULL);
+   'Prochain créneau : J+4 134 à 15:00, infirmerie B. Dr. Ferreira.', NULL, 4134);
 
 -- Quatorze jours de constantes — les memes series que les graphiques actuels.
 -- `mixte` : FC et RMSSD viennent du capteur, le reste est simule et l'interface
@@ -195,9 +198,9 @@ INSERT INTO conversations
    actions_proposees, actions_acceptees, remontee_auto, resident_notifie_at)
 VALUES
   ((SELECT id FROM residents WHERE code='R-0448'),
-   datetime('now','start of day','+1361 minutes'), 4128, 11, 'surveillance',
-   '3e nuit consécutive sous 5 h 30. Attribue les réveils à un bruit de ventilation dans le module C — demande de contrôle acoustique transmise à la maintenance. Ton irritable, phrases courtes, plusieurs ruptures de conversation. Dépistage d''idéation suicidaire négatif (C-SSRS, items 1-2). Contact social proposé et accepté.',
-   2, 2, 1, datetime('now','start of day','+1362 minutes')),
+   datetime('now','start of day','+761 minutes'), 4128, 11, 'surveillance',
+   'Dernière nuit à 5 h 18, la cinquième sous 5 h 30 en quatorze jours. Attribue les réveils à un bruit de ventilation dans le module C — demande de contrôle acoustique transmise à la maintenance. Ton irritable, phrases courtes, plusieurs ruptures de conversation. Dépistage d''idéation suicidaire négatif (C-SSRS, items 1-2). Lumière de cabine avancée et contact social proposés, acceptés.',
+   2, 2, 1, datetime('now','start of day','+762 minutes')),
   ((SELECT id FROM residents WHERE code='R-0448'),
    datetime('now','start of day','-3 days','+1382 minutes'), 4125, 6, 'info',
    'Demande spontanée de conseils d''endormissement. Exercice de respiration 4-7-8 proposé et suivi jusqu''au bout. Aucun marqueur d''humeur basse sur l''échange.',
@@ -208,27 +211,34 @@ VALUES
    3, 0, 1, datetime('now','start of day','-9 days','+1216 minutes')),
   ((SELECT id FROM residents WHERE code='R-0448'),
    datetime('now','start of day','-32 days','+1290 minutes'), 4096, 41, 'info',
-   'Anniversaire du départ de la Terre. Évoque longuement sa sœur restée au sol. Échange apaisé, marqueurs prosodiques en nette amélioration en fin de conversation. Aucune action nécessaire — note pour anticiper la même date l''an prochain.',
-   0, 0, 0, NULL);
+   'Anniversaire du départ de la Terre. Évoque longuement les proches restés au sol ; a passé la soirée avec sa sœur. Échange apaisé, marqueurs prosodiques en nette amélioration en fin de conversation. Aucune action nécessaire — note pour anticiper la même date l''an prochain.',
+   0, 0, 0, NULL),
+  ((SELECT id FROM residents WHERE code='R-0912'),
+   datetime('now','start of day','-1 days','+1428 minutes'), 4127, 17, 'critique',
+   'Verbalisation de désespoir, sentiment d''être un poids pour l''équipe de maintenance. Dépistage C-SSRS positif (items 1 à 3) : alerte immédiate au médecin de garde. Échange maintenu jusqu''au relais humain.',
+   1, 1, 1, datetime('now','start of day','-1 days','+1429 minutes'));
 
+-- Un seul vocabulaire : les six motifs de l'ecran 02, plus deux etiquettes de
+-- contexte hors de la fenetre de 30 jours. Les durees servent de cle, faute
+-- d'identifiant connu a l'avance.
 INSERT INTO conversation_tags (conversation_id, tag)
-SELECT id, 'Sommeil'           FROM conversations WHERE duree_min IN (11, 6)
+SELECT id, 'Troubles du sommeil'       FROM conversations WHERE duree_min IN (11, 6)
 UNION ALL
-SELECT id, 'Irritabilité'      FROM conversations WHERE duree_min = 11
+SELECT id, 'Anxiété, stress chronique' FROM conversations WHERE duree_min = 11
 UNION ALL
-SELECT id, 'Humeur basse'      FROM conversations WHERE duree_min = 19
+SELECT id, 'Humeur basse'              FROM conversations WHERE duree_min IN (19, 17)
 UNION ALL
-SELECT id, 'Isolement'         FROM conversations WHERE duree_min = 19
+SELECT id, 'Isolement social'          FROM conversations WHERE duree_min = 19
 UNION ALL
-SELECT id, 'Deuil'             FROM conversations WHERE duree_min = 41
+SELECT id, 'Deuil'                     FROM conversations WHERE duree_min = 41
 UNION ALL
-SELECT id, 'Date anniversaire' FROM conversations WHERE duree_min = 41;
+SELECT id, 'Date anniversaire'         FROM conversations WHERE duree_min = 41;
 
 -- --------------------------------------------------- file de triage du jour --
 INSERT INTO signaux (resident_id, severite, motif, origine, ouvert_at, assigne_a, statut)
 VALUES
   ((SELECT id FROM residents WHERE code='R-0912'),'critique',
-   'HRV sous 18 ms depuis 4 jours + verbalisation de désespoir détectée en conversation',
+   'Verbalisation de désespoir détectée en conversation · dépistage C-SSRS positif',
    'conversation', datetime('now','start of day','+12 minutes'), NULL, 'ouvert'),
   ((SELECT id FROM residents WHERE code='R-1147'),'critique',
    'SpO₂ à 88 % au repos pendant 6 min · antécédent BPCO',
@@ -237,7 +247,7 @@ VALUES
    'Chute détectée par l''accéléromètre · aucune réponse à la borne après 90 s',
    'chute', datetime('now','start of day','+125 minutes'), 'Équipe d''intervention', 'en_cours'),
   ((SELECT id FROM residents WHERE code='R-0448'),'surveillance',
-   '3 nuits sous 5 h 30 · HRV -35 % vs base personnelle · ton irritable',
+   'RMSSD sous le seuil personnel depuis 6 jours · 5 nuits sur 14 sous 5 h 30',
    'physio', datetime('now','start of day','+380 minutes'), 'Dr. Ferreira', 'en_cours'),
   ((SELECT id FROM residents WHERE code='R-0781'),'surveillance',
    'Retrait social depuis 12 jours · 4 invitations déclinées · activité -48 %',

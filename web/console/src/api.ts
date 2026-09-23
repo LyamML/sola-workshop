@@ -1,11 +1,12 @@
 /**
- * Lecture du serveur de bord.
+ * Lecture et écriture du serveur de bord.
  *
- * La console fonctionne SANS serveur : si l'API ne répond pas, les pages
- * retombent sur le jeu de démonstration de `src/data/`. Ce n'est pas de la
- * prudence gratuite — une console médicale qui affiche une page blanche parce
- * qu'un service est tombé est pire qu'inutile, et une soutenance où le serveur
- * refuse de démarrer ne doit pas devenir une soutenance sans écrans.
+ * La console fonctionne SANS serveur : si l'API ne répond pas, les écrans 02
+ * et 03 retombent sur le repli de `src/data/`, une réponse de ce même serveur
+ * figée par `scripts/db-repli.mjs`. Une console médicale qui
+ * affiche une page blanche parce qu'un service est tombé est pire
+ * qu'inutile, et une soutenance où le serveur refuse de démarrer ne doit pas
+ * devenir une soutenance sans écrans.
  *
  * L'origine se règle par `VITE_API_URL` ; par défaut le serveur local.
  */
@@ -13,6 +14,18 @@ const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:5175";
 
 /** Au-delà, on considère le serveur absent plutôt que lent. */
 const DELAI_MS = 2500;
+
+/** Porte le code HTTP, pour distinguer un refus d'une donnée invalide. */
+export class ErreurApi extends Error {
+  constructor(
+    public statut: number,
+    message: string,
+    /** Le corps de la réponse : un 409 dit qui a pris le signal. */
+    public corps: Record<string, unknown> = {},
+  ) {
+    super(message);
+  }
+}
 
 async function lire<T>(chemin: string): Promise<T> {
   const arret = new AbortController();
@@ -31,40 +44,26 @@ async function lire<T>(chemin: string): Promise<T> {
   }
 }
 
-// ---------------------------------------------------------------- écriture --
 /**
- * Lecture comme écriture passent par la session.
+ * Lecture comme écriture passent par la session : c'est le cookie `httpOnly`
+ * posé à la connexion qui dit QUI écrit, et c'est pour cela qu'une note ou
+ * une clôture porte un nom.
  *
- * Le médecin se connecte une fois, avec son adresse et son mot de passe ; le
- * serveur pose un cookie `httpOnly` qu'aucun script de la page ne peut lire.
- * C'est ce cookie qui dit QUI écrit, et c'est pour cela qu'une note de dossier
- * porte enfin un nom — ce qu'un jeton partagé, recopié à la main dans un
- * champ, ne pouvait pas faire.
+ * Pas de délai d'abandon ici, contrairement à la lecture : une écriture
+ * abandonnée côté client mais aboutie côté serveur laisse croire à un échec,
+ * et on recommence. Mieux vaut attendre.
  */
-
-/** Porte le code HTTP, pour distinguer un refus d'une donnée invalide. */
-export class ErreurApi extends Error {
-  constructor(
-    public statut: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-async function poster<T>(chemin: string, corps: unknown): Promise<T> {
-  // Pas de délai d'abandon ici, contrairement à la lecture : une écriture
-  // abandonnée côté client mais aboutie côté serveur laisse l'utilisateur
-  // croire à un échec, et il recommence. Mieux vaut attendre.
+async function envoyer<T>(methode: "POST" | "PATCH", chemin: string, corps: unknown): Promise<T> {
   const reponse = await fetch(`${BASE}${chemin}`, {
-    method: "POST",
+    method: methode,
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify(corps),
   });
-  const donnees = (await reponse.json().catch(() => ({}))) as { erreur?: string };
+  const donnees = (await reponse.json().catch(() => ({}))) as Record<string, unknown>;
   if (!reponse.ok) {
-    throw new ErreurApi(reponse.status, donnees.erreur ?? `HTTP ${reponse.status}`);
+    const message = typeof donnees.erreur === "string" ? donnees.erreur : `HTTP ${reponse.status}`;
+    throw new ErreurApi(reponse.status, message, donnees);
   }
   return donnees as T;
 }
@@ -96,17 +95,29 @@ export const api = {
    */
   moi: () => lire<{ compte: Compte }>("/auth/moi"),
   connexion: (email: string, mdp: string) =>
-    poster<{ compte: Compte }>("/auth/connexion", { email, mdp }),
-  deconnexion: () => poster<{ ok: true }>("/auth/deconnexion", {}),
+    envoyer<{ compte: Compte }>("POST", "/auth/connexion", { email, mdp }),
+  deconnexion: () => envoyer<{ ok: true }>("POST", "/auth/deconnexion", {}),
 
   crew: () => lire<CrewApi>("/api/crew"),
-  resident: (code: string) => lire<ResidentApi>(`/api/residents/${code}`),
+  resident: (code: string) => lire<ResidentApi>(`/api/residents/${encodeURIComponent(code)}`),
+  /** Hors du repli : ce qui change à la seconde ne se fige pas dans un fichier commité. */
+  direct: (code: string) => lire<DirectApi>(`/api/residents/${encodeURIComponent(code)}/direct`),
+  statsSignaux: () => lire<StatsSignauxApi>("/api/signaux/stats"),
+
+  /** L'assigne au compte connecté et le passe « en cours ». */
+  prendre: (id: number) => envoyer<{ signal: SignalApi }>("PATCH", `/api/signaux/${id}`, { geste: "prendre" }),
+  /** Le motif doit être l'un de ceux que l'origine du signal propose. */
+  clore: (id: number, motif: string) =>
+    envoyer<{ signal: SignalApi; statut_resident: StatutResident }>("PATCH", `/api/signaux/${id}`, {
+      geste: "clore",
+      motif,
+    }),
 
   ajouterNote: (code: string, note: NouvelleNote) =>
     // `type` reste « info » : le formulaire de la console ne demande pas de
-    // ranger la note entre allergie, contre-indication et antecedent. Le
-    // backoffice le fait, pour les saisies d'initialisation.
-    poster<{ id: number }>(`/api/residents/${code}/particularites`, {
+    // ranger la note entre allergie, contre-indication et antécédent. C'est
+    // la priorité qui décide où la note s'affiche dans le bandeau.
+    envoyer<{ id: number }>("POST", `/api/residents/${encodeURIComponent(code)}/particularites`, {
       ...note,
       type: "info",
     }),
@@ -114,9 +125,31 @@ export const api = {
 
 // ----------------------------------------------------------------- types --
 export type SeveriteApi = "critique" | "surveillance" | "info";
+export type StatutResident = "ok" | "surveillance" | "critique";
+export type StatutSignal = "ouvert" | "en_cours" | "clos";
+export type Origine = "physio" | "conversation" | "chute" | "usage" | "manuel";
+
+/** Le jour que la base tient pour « aujourd'hui » (`v_jour_courant`). */
+export interface AncreApi {
+  jour: string;
+  jour_vol: number;
+}
+
+/** Un signal tel que le renvoie un geste. */
+export interface SignalApi {
+  id: number;
+  resident_id: number;
+  origine: Origine;
+  statut: StatutSignal;
+  assigne_id: number | null;
+  assigne_a: string | null;
+  clos_at: string | null;
+  clos_motif: string | null;
+}
 
 export interface CrewApi {
   vaisseau: { nom: string; residents: number; jour_vol: number; synchro_at: string | null };
+  ancre: AncreApi;
   depistage: {
     residents: number;
     indice_bienetre: number;
@@ -138,32 +171,47 @@ export interface CrewApi {
   }[];
   modules: { module: string; signaux: number; pct_residents: number }[];
   motifs: { motif: string; conversations: number }[];
+  conversations_30j: number;
   physio: { libelle: string; pct: number }[];
   triage: {
     id: number;
     severite: SeveriteApi;
+    origine: Origine;
+    motif: string;
+    statut: StatutSignal;
     resident: string;
+    prenom: string;
+    nom: string;
     cabine: string;
     age: number;
-    motif: string;
-    ouvert_a: string;
+    ouvert_at: string;
+    ouvert_jour_vol: number;
     assigne_a: string | null;
-    statut: string;
+    assigne_id: number | null;
   }[];
   compteurs: { ouverts: number; critiques: number; non_assignes: number };
 }
 
 export interface ResidentApi {
+  ancre: AncreApi;
+  /** Les quatorze jours affichés, bornes comprises. */
+  fenetre: { debut: string; fin: string; debut_jour_vol: number; fin_jour_vol: number };
   resident: {
+    id: number;
     code: string;
     prenom: string;
     nom: string;
     poste: string;
     cabine: string;
     groupe_sanguin: string;
-    statut: "ok" | "surveillance" | "critique";
+    statut: StatutResident;
     embarque_jour_vol: number;
     age: number;
+    confiance_code: string | null;
+    confiance_prenom: string | null;
+    confiance_nom: string | null;
+    confiance_cabine: string | null;
+    confiance_lien: string | null;
     /**
      * Le médecin traitant. Null tant qu'aucun soignant n'est rattaché : on
      * n'invente pas un nom pour remplir la ligne.
@@ -191,8 +239,21 @@ export interface ResidentApi {
     pas: number | null;
     source: string;
   }[];
+  /** `nuit_du` est la date du lever : la nuit du 22 au 23 compte pour le 23. */
   nuits: { nuit_du: string; jour_vol: number; sommeil_min: number | null }[];
   evenements: { jour: string; type: string; n: number }[];
+  signaux: {
+    id: number;
+    severite: SeveriteApi;
+    origine: Origine;
+    motif: string;
+    ouvert_at: string;
+    ouvert_jour_vol: number;
+    statut: StatutSignal;
+    assigne_a: string | null;
+    assigne_id: number | null;
+    motifs_cloture: string[];
+  }[];
   conversations: {
     id: number;
     debut_at: string;
@@ -202,11 +263,22 @@ export interface ResidentApi {
     resume: string;
     actions_proposees: number;
     actions_acceptees: number;
-    remontee_auto: number;
+    resident_notifie_at: string | null;
     tags: string[];
   }[];
-  conversations_total: number;
+  /** Les résumés sous le seuil : l'en-tête seulement, jamais le texte. */
+  contexte: {
+    id: number;
+    debut_at: string;
+    jour_vol: number;
+    duree_min: number;
+    severite: SeveriteApi;
+    resident_notifie_at: string | null;
+    tags: string[];
+  }[];
+  conversations_compte: { total: number; remontees: number; contexte: number };
   particularites: {
+    id: number;
     type: string;
     niveau: SeveriteApi;
     titre: string;
@@ -215,8 +287,13 @@ export interface ResidentApi {
     /** Null pour les notes antérieures aux comptes : elles n'ont pas d'auteur. */
     auteur: string | null;
   }[];
-  suivis: { type: string; titre: string; detail: string }[];
-  etat_mental: { evalue_le: string; score_moral: number | null }[];
+  suivis: {
+    type: string;
+    titre: string;
+    detail: string;
+    debut_jour_vol: number | null;
+    echeance_jour_vol: number | null;
+  }[];
   bilans: BilanApi[];
 }
 
@@ -226,6 +303,8 @@ export interface BilanApi {
   preleve_le: string;
   jour_vol: number;
   prochain_le: string | null;
+  /** Compté depuis le jour courant de la base, pas depuis l'horloge du poste. */
+  prochain_dans_j: number | null;
   statut: "planifie" | "preleve" | "rendu";
   commentaire: string | null;
   source: "analyse" | "simule";
@@ -243,4 +322,51 @@ export interface AnalyseApi {
   ref_bas: number | null;
   ref_haut: number | null;
   interpretation: "normal" | "bas" | "eleve" | "critique";
+}
+
+/** Une minute de `mesures`, telle que le bracelet l'a fait écrire. */
+export interface MinuteApi {
+  /** ISO en UTC, avec son « Z » : le navigateur la lit dans son fuseau. */
+  at: string;
+  fc_bpm: number | null;
+  spo2_pct: number | null;
+  rmssd_ms: number | null;
+  activite_g: number | null;
+  qualite: "good" | "fair" | "poor" | "warmup";
+}
+
+/** La carte « en direct » de la fiche. */
+export interface DirectApi {
+  /** L'horloge du serveur : l'âge d'une trame se compte sur elle, pas sur celle du poste. */
+  maintenant: string;
+  bracelet: { serie: string; batterie_pct: number | null; synchro_at: string | null } | null;
+  /** La dernière minute des vingt-quatre dernières heures. Null : pas de carte. */
+  derniere: MinuteApi | null;
+  /** L'heure écoulée, de la plus ancienne minute à la plus récente. */
+  minutes: MinuteApi[];
+  /** Le jour UTC en cours, sur les minutes exploitables : celui des tuiles. */
+  jour: {
+    /** Null tant que la ligne du jour n'est pas écrite. */
+    jour_vol: number | null;
+    minutes: number;
+    fc_min: number | null;
+    fc_moy: number | null;
+    fc_max: number | null;
+    spo2_min: number | null;
+    spo2_moy: number | null;
+  };
+}
+
+export interface StatsSignauxApi {
+  /** Pour l'en-tête du registre, qui n'a pas d'autre réponse où les lire. */
+  ancre: AncreApi;
+  residents: number;
+  a_traiter: { ouverts: number; critiques: number; non_assignes: number };
+  clos: {
+    total: number;
+    faux_positifs: number;
+    /** Clos avec un motif que leur origine ne propose pas. */
+    a_revoir: number;
+    par_origine: { origine: Origine; clos: number; faux_positifs: number }[];
+  };
 }

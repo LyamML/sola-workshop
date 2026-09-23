@@ -12,8 +12,8 @@
  *
  * La base s'ouvre en LECTURE SEULE. Ce script sert a regarder, et une faute
  * de frappe dans un `UPDATE` tape a la main ne doit pas pouvoir abimer le jeu
- * de demonstration la veille d'une soutenance. Pour ecrire, il y a le
- * backoffice, qui valide ce qu'il ecrit.
+ * de demonstration la veille d'une soutenance. Pour ecrire, il y a la
+ * console, qui valide ce qu'elle ecrit et le signe.
  */
 import { DatabaseSync } from "node:sqlite";
 import { dirname, isAbsolute, resolve } from "node:path";

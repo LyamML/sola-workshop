@@ -1,14 +1,21 @@
 /**
  * Scénarios de la borne.
  *
- * La borne n'a plus de commande à l'écran : on lui parle, elle répond à voix
+ * La borne n'a pas de commande à l'écran : on lui parle, elle répond à voix
  * haute, et l'écran ne sert qu'à laisser une trace lisible de l'échange. Un
  * scénario est donc une suite d'instants — ce que Sola dit, quand elle écoute,
- * quand elle pose une question, quand elle affiche ce qu'elle vient de faire.
+ * quand elle pose une question, et ce qui quitte la cabine.
  *
  * Deux objets seulement portent du contenu :
- *   · `Carte`    — ce que Sola a fait, pour information, sans réponse attendue ;
+ *   · `Sortie`   — ce qui vient de quitter la cabine : la pastille d'état le
+ *                  dit au moment où ça part, pendant que Sola le dit à voix
+ *                  haute ;
  *   · `Question` — une demande qui attend une réponse, à voix haute ou au doigt.
+ *
+ * Le récit suit la base de démonstration : le médecin de R-0448 et son
+ * contact de confiance y sont tels qu'ils sont dits ici. Un chiffre qu'on
+ * change dans une réplique se vérifie d'abord avec `npm run db:sql`. La
+ * conversation libre, elle, n'a pas de réplique écrite : voir `ia.ts`.
  */
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking";
@@ -20,21 +27,21 @@ export interface Personne {
   meta: string;
 }
 
-/** Une trace de ce que Sola vient de faire. Aucune action : depuis qu'il n'y a
- *  plus de bouton sur la borne, tout ce qui appelle une réponse est une
- *  `Question`. */
-export interface Carte {
+/**
+ * Ce qui vient de quitter la cabine. La pastille d'état dit la dernière :
+ * elle remplace « Tout reste dans la cabine », que démentaient l'alerte partie
+ * à l'infirmerie et le résumé qu'un échange envoie au serveur de bord.
+ */
+export interface Sortie {
+  /** Une même sortie annoncée deux fois ne s'empile pas. */
   id: string;
-  tag: string;
-  /** Teinte chaude : ce qui sort de la cabine (transmission à un soignant). */
-  warm?: boolean;
-  /** Peut contenir un balisage léger (<b>, <br>). */
-  texte?: string;
-  personne?: Personne;
+  texte: string;
+  /** `chaud` : un soignant est prévenu. `critique` : une alerte est partie. */
+  ton?: "chaud" | "critique";
 }
 
 /** Une réponse possible. Le doigt lit `label`, la voix reconnaît `mots` — la
- *  première forme de `mots` est celle qu'on affiche sous le bouton, elle doit
+ *  première forme de `mots` est celle qu'on affiche sur le bouton, elle doit
  *  donc rester courte et facile à prononcer. */
 export interface Option {
   label: string;
@@ -45,12 +52,20 @@ export interface Option {
   suite?: Beat[];
 }
 
-/** La fenêtre qui s'ouvre quand Sola pose une question. */
+/** Ce que Sola demande : la feuille qui monte du bas, ou la carte de l'alerte. */
 export interface Question {
   id: string;
+  /** Au-dessus du titre ; « Sola te demande » quand rien n'est précisé. */
+  surtitre?: string;
   /** Reprise écrite de ce que Sola vient de demander à voix haute. */
   titre: string;
   detail?: string;
+  /**
+   * Ce que Sola prononce en posant la question, quand la réplique qui l'amène
+   * ne la pose pas déjà. Dit, pas écrit : la question est à l'écran, la
+   * recopier dans la trace la ferait lire deux fois.
+   */
+  dit?: string;
   personne?: Personne;
   options: Option[];
 }
@@ -63,7 +78,7 @@ export interface Beat {
   dit?: string;
   /** Ligne d'état affichée en pied de borne. */
   hint?: string;
-  carte?: Carte;
+  sortie?: Sortie;
   question?: Question;
 }
 
@@ -75,13 +90,23 @@ export interface Echange {
   reponse: Beat[];
 }
 
+/** La carte d'arrivée de l'alerte : qui vient, dans combien de temps, et ce
+ *  qui est déjà fait. */
+export interface Arrivee {
+  qui: string;
+  minutes: number;
+  trajet: string;
+  faits: string[];
+}
+
 export interface Scene {
   key: SceneKey;
   label: string;
   /** Classe de modulation de l'ambiance lumineuse de l'écran. */
   mode?: "calme" | "alerte";
-  /** État de départ, avant toute interaction. */
-  ouverture: { dit: string; hint: string; state: VoiceState };
+  /** État de départ, avant toute interaction. `sortie` : ce qui est parti
+   *  avant même que Sola ne parle. */
+  ouverture: { dit: string; hint: string; state: VoiceState; sortie?: Sortie };
   /** Tours de parole, joués l'un après l'autre. */
   echanges: Echange[];
   /** Instants joués dès l'entrée dans le scénario. */
@@ -92,12 +117,15 @@ export interface Scene {
    *  lieu de dérouler `echanges`. */
   ia?: boolean;
   breathing?: boolean;
+  arrivee?: Arrivee;
 }
 
 /** Ce que la borne affiche en pied quand elle a le micro ouvert sur quelqu'un. */
 export const HINT_ECOUTE = "Je t’écoute…";
 
-const APPEL = "Dis « Sola » pour commencer";
+// Plus de mot d'éveil depuis la conversation libre : passé le voile, toute
+// phrase entendue part à Sola. L'invite ne demande donc plus son nom.
+const APPEL = "Parle quand tu veux";
 
 export const SCENES: Scene[] = [
   {
@@ -105,7 +133,9 @@ export const SCENES: Scene[] = [
     label: "Échange",
     ouverture: {
       // Seul texte figé du mode libre : le bonjour. Le reste est le modèle.
-      dit: "Salut Lyam. Je suis là.",
+      // Sans le prénom : la ligne reste à l'écran tant que personne ne parle,
+      // et la borne n'affiche pas qui habite la cabine.
+      dit: "Salut. Je suis là.",
       hint: APPEL,
       state: "idle",
     },
@@ -134,11 +164,11 @@ export const SCENES: Scene[] = [
       {
         at: 19000,
         state: "idle",
-        hint: "Réponds à voix haute, ou touche l’écran",
         question: {
           id: "apaisement",
           titre: "Ça descend un peu ?",
           detail: "Ton rythme cardiaque est passé de 94 à 81 depuis le début du cycle.",
+          dit: "Ça descend un peu ?",
           options: [
             {
               label: "Oui, ça va mieux",
@@ -173,31 +203,31 @@ export const SCENES: Scene[] = [
     mode: "alerte",
     monologue: true,
     ouverture: {
-      dit: "J’ai prévenu le Dr Ferreira. Il arrive dans 4 minutes. Reste assis, je reste avec toi.",
+      dit: "J’ai prévenu le Dr Ferreira. Ne te lève pas, je reste avec toi.",
       hint: "",
       state: "speaking",
+      sortie: { id: "alerte", texte: "Alerte transmise · infirmerie B", ton: "critique" },
     },
     echanges: [],
+    arrivee: {
+      qui: "Dr Ferreira arrive",
+      minutes: 4,
+      trajet: "parti de l’infirmerie B à 14:31 · arrivée 14:35",
+      faits: ["Porte déverrouillée pour l’équipe", "Contact de confiance prévenu : Amara, C-15"],
+    },
     onEnter: [
-      {
-        at: 1200,
-        carte: {
-          id: "secours",
-          tag: "Services médicaux en route",
-          texte:
-            "<b>Dr A. Ferreira</b> — parti de l’infirmerie B à 14:31, arrivée estimée 14:35.<br>Ta porte a été déverrouillée pour l’équipe. Ton contact de confiance, Amara (C-15), a été prévenue.",
-        },
-      },
       // Répondre à la voix compte double ici : quelqu'un au sol n'atteint pas
-      // l'écran. Le bouton reste, pour celui qui est debout devant la borne.
+      // l'écran, et ne le voit peut-être pas — d'où la question prononcée. Les
+      // boutons restent, pour qui est debout devant la borne.
       {
-        at: 5000,
+        at: 5600,
         state: "idle",
-        hint: "Réponds à voix haute, ou touche l’écran",
         question: {
           id: "presence",
+          surtitre: "Si tu peux",
           titre: "Tu m’entends ?",
           detail: "Dis-le-moi seulement si tu peux. Sinon je garde l’appel tel quel.",
+          dit: "Tu m’entends ? Dis-le-moi seulement si tu peux.",
           options: [
             {
               label: "Oui, je t’entends",
@@ -206,9 +236,9 @@ export const SCENES: Scene[] = [
                 {
                   at: 0,
                   state: "speaking",
-                  dit: "Bien. Je préviens l’équipe que tu es conscient. Respire doucement, il arrive.",
+                  dit: "Je préviens l’équipe que tu m’entends. Respire doucement, le Dr Ferreira arrive.",
                 },
-                { at: 5000, state: "idle", hint: "Dr Ferreira · arrivée 14:35" },
+                { at: 5000, state: "idle" },
               ],
             },
             {
@@ -221,7 +251,7 @@ export const SCENES: Scene[] = [
                   state: "speaking",
                   dit: "Je transmets, mais le Dr Ferreira passera quand même te voir. C’est la règle après une chute.",
                 },
-                { at: 5500, state: "idle", hint: "Passage de contrôle maintenu" },
+                { at: 5500, state: "idle" },
               ],
             },
           ],

@@ -20,6 +20,11 @@
   --accent: #0f9e8c;
   --accent-2: #0b7a6c;
   --accent-soft: #e0f4f0;
+  /* Le bouton principal : du blanc sur l'accent ne tient ni en clair (3,3:1)
+     ni en sombre (2,1:1). Un fond et une encre par thème, choisis ensemble. */
+  --pri: #0b7a6c;
+  --pri-2: #09685c;
+  --on-pri: #ffffff;
   --watch: #a8820a;
   --watch-soft: #f9f0d9;
   --crit: #c0362f;
@@ -54,6 +59,9 @@
     --accent: #35c7b2;
     --accent-2: #5fdbc8;
     --accent-soft: #0f2e2c;
+    --pri: #35c7b2;
+    --pri-2: #5fdbc8;
+    --on-pri: #0b1214;
     --watch: #c79b2a;
     --watch-soft: #2e2718;
     --crit: #dc5f55;
@@ -80,6 +88,9 @@
   --accent: #35c7b2;
   --accent-2: #5fdbc8;
   --accent-soft: #0f2e2c;
+  --pri: #35c7b2;
+  --pri-2: #5fdbc8;
+  --on-pri: #0b1214;
   --watch: #c79b2a;
   --watch-soft: #2e2718;
   --crit: #dc5f55;

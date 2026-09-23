@@ -69,9 +69,10 @@ npm run db:sql "SELECT * FROM v_depistage_jour"
 La base s'ouvre en **lecture seule** : une faute de frappe dans un `UPDATE` tapé
 à la main ne peut pas abîmer le jeu de démonstration la veille d'une soutenance.
 
-**Depuis le backoffice** — <http://localhost:5176>, onglet *Tables* pour les
-lignes brutes, onglet *Écrans et sources* pour voir quelle requête alimente
-quel bloc. C'est le seul chemin qui écrit, et il valide ce qu'il écrit.
+**Depuis le backoffice** — <http://localhost:5176>, onglet *Base* pour la
+fraîcheur des flux et les lignes brutes, onglet *Écrans et sources* pour voir
+quelle requête alimente quel bloc. Il n'écrit que l'état d'un compte : une note
+ou un signal s'écrivent dans la console, qui valide ce qu'elle écrit et le signe.
 
 **Depuis l'API**, ce que la console lit vraiment :
 

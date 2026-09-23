@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import type { Severite, Statut } from "../api";
 
 /** Cadre standard : un titre, une aide facultative, un corps. */
 export function Cadre({
@@ -10,7 +9,7 @@ export function Cadre({
   sansPadding,
 }: {
   titre: string;
-  aide?: string;
+  aide?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   sansPadding?: boolean;
@@ -20,51 +19,11 @@ export function Cadre({
       <header>
         <h2>{titre}</h2>
         {aide && <span className="aide">{aide}</span>}
-        {actions && <div style={{ marginLeft: "auto" }}>{actions}</div>}
+        {actions && <div className="actions">{actions}</div>}
       </header>
       {sansPadding ? children : <div className="corps">{children}</div>}
     </section>
   );
-}
-
-export function Tuile({
-  etiquette,
-  valeur,
-  unite,
-  note,
-}: {
-  etiquette: string;
-  valeur: ReactNode;
-  unite?: string;
-  note?: string;
-}) {
-  return (
-    <div className="tuile">
-      <div className="etiquette">{etiquette}</div>
-      <div className="valeur">
-        {valeur}
-        {unite && <small>{unite}</small>}
-      </div>
-      {note && <div className="note">{note}</div>}
-    </div>
-  );
-}
-
-const LIBELLES: Record<string, string> = {
-  ok: "Aucun signal",
-  surveillance: "Surveillance",
-  critique: "Critique",
-  info: "Contexte",
-  ouvert: "Ouvert",
-  en_cours: "En cours",
-  clos: "Clos",
-};
-
-export function Puce({ niveau, texte }: { niveau: Severite | Statut | string; texte?: string }) {
-  const classe = ["ok", "surveillance", "critique", "info"].includes(niveau)
-    ? niveau
-    : "neutre";
-  return <span className={`puce ${classe}`}>{texte ?? LIBELLES[niveau] ?? niveau}</span>;
 }
 
 /** Les trois etats d'un chargement, au meme endroit dans chaque page. */
@@ -86,16 +45,19 @@ export function Etat({
 }
 
 // ------------------------------------------------------------- formatage --
-/** 1240 -> « 1 240 ». Espace insécable fine, comme sur la console. */
+/**
+ * 1240 -> « 1 240 ». `toLocaleString` separe les milliers par une espace fine
+ * (U+202F) que les polices de bord ne dessinent pas : on la remplace par une
+ * insecable ordinaire, comme la console et le serveur.
+ */
 export function nombre(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
-  return n.toLocaleString("fr-FR");
+  return n.toLocaleString("fr-FR").replace(/\u202f/g, "\u00a0");
 }
 
-/** 412 minutes -> « 6 h 52 ». */
-export function duree(minutes: number | null | undefined): string {
-  if (minutes === null || minutes === undefined) return "—";
-  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`;
+/** « 1 table », « 17 tables ». Zero prend le singulier, comme en francais. */
+export function pluriel(n: number, singulier: string, forme = `${singulier}s`): string {
+  return `${nombre(n)} ${n >= 2 ? forme : singulier}`;
 }
 
 /** « 2026-09-22 14:31:00 » -> « 22/09 14:31 ». */

@@ -88,9 +88,11 @@ export function session(req: Request, res: Response, next: NextFunction): void {
 /**
  * Console medicale : un medecin, ou un administrateur.
  *
- * L'administrateur y entre parce qu'il doit pouvoir constater a l'ecran ce
- * qu'il corrige en base — mais il n'y signe rien : `auteur_id` n'accepte
- * qu'un medecin, et c'est le schema qui le dit, pas une condition.
+ * L'administrateur y entre pour constater a l'ecran ce que la base contient,
+ * mais il n'y ecrit rien : les gestes de soin — prendre ou clore un signal,
+ * signer une note — refusent tout compte qui n'est pas medecin (`soignant()`
+ * dans routes/console.ts), et le schema le redit, `auteur_id` ne pointant que
+ * sur `medecins`.
  */
 export function exigeSoignant(req: Request, res: Response, next: NextFunction): void {
   if (!compte(res)) {

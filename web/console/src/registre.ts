@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Origine, SeveriteApi, StatutResident, StatutSignal } from "./api";
 
 /**
  * Listes paginées, triées et filtrées côté serveur.
@@ -30,10 +31,12 @@ export interface LigneEquipage {
   poste: string;
   cabine: string;
   module: string;
-  statut: "ok" | "surveillance" | "critique";
+  statut: StatutResident;
   age: number;
+  ordre_statut: number;
   signaux: number;
   pire_severite: number | null;
+  /** Le jour de la dernière ligne de constantes : pas forcément aujourd'hui. */
   constantes_du: string | null;
   fc_repos_bpm: number | null;
   fc_moy_bpm: number | null;
@@ -49,26 +52,31 @@ export interface LigneEquipage {
   phq9: number | null;
   gad7: number | null;
   isi: number | null;
-  synchro_at: string | null;
-  batterie_pct: number | null;
 }
 
 export interface LigneSignal {
   id: number;
-  severite: "critique" | "surveillance" | "info";
+  severite: SeveriteApi;
   motif: string;
-  origine: string;
+  origine: Origine;
   ouvert_at: string;
+  ouvert_jour_vol: number;
   assigne_a: string | null;
-  statut: "ouvert" | "en_cours" | "clos";
+  assigne_id: number | null;
+  statut: StatutSignal;
   clos_at: string | null;
   clos_motif: string | null;
+  clos_jour_vol: number | null;
   resident: string;
   prenom: string;
   nom: string;
   cabine: string;
   module: string;
   age: number;
+  ordre_severite: number;
+  ordre_statut: number;
+  /** Clos avec un motif que son origine ne propose pas. */
+  motif_a_revoir: boolean;
 }
 
 /**
@@ -78,15 +86,18 @@ export interface LigneSignal {
  * interaction : on garde les lignes affichées, on les grise, et on les
  * remplace quand la réponse arrive. Le tri d'un tableau doit donner
  * l'impression de retourner les lignes, pas de recharger l'écran.
+ *
+ * `rafraichir` relance la même requête, après un geste qui change la liste.
  */
 export function useListe<T>(
   chemin: string,
   params: Record<string, string | number>,
-): { lignes: T[]; total: number; chargement: boolean; erreur: string | null } {
+): { lignes: T[]; total: number; chargement: boolean; erreur: string | null; rafraichir: () => void } {
   const [lignes, setLignes] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [tour, setTour] = useState(0);
 
   // La requête part à chaque changement de paramètre : on la décrit par sa
   // chaîne plutôt que par l'objet, sinon un objet recréé à l'identique à
@@ -136,9 +147,11 @@ export function useListe<T>(
       vivant = false;
       arret.abort();
     };
-  }, [chemin, cle]);
+  }, [chemin, cle, tour]);
 
-  return { lignes, total, chargement, erreur };
+  const rafraichir = useCallback(() => setTour((t) => t + 1), []);
+
+  return { lignes, total, chargement, erreur, rafraichir };
 }
 
 /** Retarde la propagation d'une saisie : une requête par mot, pas par touche. */
@@ -149,45 +162,4 @@ export function useRetard<T>(valeur: T, ms = 250): T {
     return () => clearTimeout(t);
   }, [valeur, ms]);
   return retardee;
-}
-
-// ------------------------------------------------------------- formatage --
-const espaces = (t: string) => t.replace(/ /g, " ");
-
-export const nombre = (v: number | null, decimales = 0) =>
-  v === null || v === undefined
-    ? "—"
-    : espaces(
-        v.toLocaleString("fr-FR", {
-          minimumFractionDigits: decimales,
-          maximumFractionDigits: decimales,
-        }),
-      );
-
-/** Minutes vers « 6 h 12 » : personne ne lit un sommeil en 372 minutes. */
-export function duree(min: number | null): string {
-  if (min === null || min === undefined) return "—";
-  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`;
-}
-
-/** « 09:56 » si c'est aujourd'hui, « 20/09 09:56 » sinon. */
-export function horodatage(iso: string | null): string {
-  if (!iso) return "—";
-  const [jour, heure = ""] = iso.split(" ");
-  const aujourdhui = new Date().toISOString().slice(0, 10);
-  const hm = heure.slice(0, 5);
-  if (jour === aujourdhui) return hm;
-  const [, m, j] = (jour ?? "").split("-");
-  return `${j}/${m} ${hm}`;
-}
-
-/** Écart au présent, arrondi à l'unité qui se lit. */
-export function depuis(iso: string | null): string {
-  if (!iso) return "jamais";
-  const minutes = Math.round((Date.now() - new Date(iso.replace(" ", "T")).getTime()) / 60000);
-  if (minutes < 1) return "à l’instant";
-  if (minutes < 60) return `il y a ${minutes} min`;
-  const heures = Math.round(minutes / 60);
-  if (heures < 24) return `il y a ${heures} h`;
-  return `il y a ${Math.round(heures / 24)} j`;
 }

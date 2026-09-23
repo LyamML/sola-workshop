@@ -1,0 +1,1515 @@
+{
+  "ancre": {
+    "jour": "2026-09-23",
+    "jour_vol": 4128
+  },
+  "fenetre": {
+    "debut": "2026-09-10",
+    "fin": "2026-09-23",
+    "debut_jour_vol": 4115,
+    "fin_jour_vol": 4128
+  },
+  "resident": {
+    "id": 1,
+    "code": "R-0448",
+    "prenom": "Lyam",
+    "nom": "Mafray",
+    "poste": "Technicien hydroponie",
+    "cabine": "C-12",
+    "groupe_sanguin": "O-",
+    "statut": "surveillance",
+    "embarque_jour_vol": 0,
+    "age": 28,
+    "confiance_code": "R-0449",
+    "confiance_prenom": "Amara",
+    "confiance_nom": "Mafray",
+    "confiance_cabine": "C-15",
+    "confiance_lien": "sœur",
+    "traitant_code": "M-001",
+    "traitant_titre": "Dr.",
+    "traitant_prenom": "Candice",
+    "traitant_nom": "Oyelaran"
+  },
+  "bracelet": {
+    "serie": "BR-0448",
+    "firmware": "bracelet-i2c",
+    "batterie_pct": 61,
+    "synchro_at": "2026-09-23 16:03:00"
+  },
+  "constantes": [
+    {
+      "jour": "2026-09-10",
+      "jour_vol": 4115,
+      "fc_repos_bpm": 61,
+      "rmssd_ms": 49,
+      "spo2_pct": 98,
+      "resp_min": 13,
+      "temp_c": 34.5,
+      "eda_us": 2,
+      "pas": 8600,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-11",
+      "jour_vol": 4116,
+      "fc_repos_bpm": 62,
+      "rmssd_ms": 47,
+      "spo2_pct": 97,
+      "resp_min": 14,
+      "temp_c": 34.4,
+      "eda_us": 2.1,
+      "pas": 8200,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-12",
+      "jour_vol": 4117,
+      "fc_repos_bpm": 60,
+      "rmssd_ms": 51,
+      "spo2_pct": 98,
+      "resp_min": 13,
+      "temp_c": 34.4,
+      "eda_us": 1.9,
+      "pas": 8800,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-13",
+      "jour_vol": 4118,
+      "fc_repos_bpm": 63,
+      "rmssd_ms": 46,
+      "spo2_pct": 98,
+      "resp_min": 13,
+      "temp_c": 34.3,
+      "eda_us": 2.2,
+      "pas": 8100,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-14",
+      "jour_vol": 4119,
+      "fc_repos_bpm": 62,
+      "rmssd_ms": 48,
+      "spo2_pct": 97,
+      "resp_min": 14,
+      "temp_c": 34.3,
+      "eda_us": 2.1,
+      "pas": 7900,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-15",
+      "jour_vol": 4120,
+      "fc_repos_bpm": 64,
+      "rmssd_ms": 44,
+      "spo2_pct": 97,
+      "resp_min": 14,
+      "temp_c": 34.2,
+      "eda_us": 2.4,
+      "pas": 8100,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-16",
+      "jour_vol": 4121,
+      "fc_repos_bpm": 61,
+      "rmssd_ms": 41,
+      "spo2_pct": 98,
+      "resp_min": 15,
+      "temp_c": 34.2,
+      "eda_us": 2.3,
+      "pas": 7600,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-17",
+      "jour_vol": 4122,
+      "fc_repos_bpm": 63,
+      "rmssd_ms": 43,
+      "spo2_pct": 96,
+      "resp_min": 14,
+      "temp_c": 34.3,
+      "eda_us": 2.6,
+      "pas": 7900,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-18",
+      "jour_vol": 4123,
+      "fc_repos_bpm": 65,
+      "rmssd_ms": 37,
+      "spo2_pct": 97,
+      "resp_min": 15,
+      "temp_c": 34.1,
+      "eda_us": 3,
+      "pas": 7200,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-19",
+      "jour_vol": 4124,
+      "fc_repos_bpm": 64,
+      "rmssd_ms": 34,
+      "spo2_pct": 97,
+      "resp_min": 16,
+      "temp_c": 34,
+      "eda_us": 3.1,
+      "pas": 7000,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-20",
+      "jour_vol": 4125,
+      "fc_repos_bpm": 63,
+      "rmssd_ms": 33,
+      "spo2_pct": 96,
+      "resp_min": 15,
+      "temp_c": 34.1,
+      "eda_us": 3.3,
+      "pas": 6800,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-21",
+      "jour_vol": 4126,
+      "fc_repos_bpm": 62,
+      "rmssd_ms": 31,
+      "spo2_pct": 97,
+      "resp_min": 14,
+      "temp_c": 34,
+      "eda_us": 3.5,
+      "pas": 6500,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-22",
+      "jour_vol": 4127,
+      "fc_repos_bpm": 64,
+      "rmssd_ms": 33,
+      "spo2_pct": 97,
+      "resp_min": 15,
+      "temp_c": 34.2,
+      "eda_us": 3.6,
+      "pas": 6600,
+      "source": "mixte"
+    },
+    {
+      "jour": "2026-09-23",
+      "jour_vol": 4128,
+      "fc_repos_bpm": 62,
+      "rmssd_ms": 31,
+      "spo2_pct": 97,
+      "resp_min": 14,
+      "temp_c": 34.1,
+      "eda_us": 3.8,
+      "pas": 6240,
+      "source": "mixte"
+    }
+  ],
+  "nuits": [
+    {
+      "nuit_du": "2026-09-10",
+      "jour_vol": 4115,
+      "sommeil_min": 426,
+      "latence_min": 14,
+      "eveils_min": 9,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-11",
+      "jour_vol": 4116,
+      "sommeil_min": 408,
+      "latence_min": 17,
+      "eveils_min": 12,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-12",
+      "jour_vol": 4117,
+      "sommeil_min": 444,
+      "latence_min": 11,
+      "eveils_min": 6,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-13",
+      "jour_vol": 4118,
+      "sommeil_min": 372,
+      "latence_min": 22,
+      "eveils_min": 18,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-14",
+      "jour_vol": 4119,
+      "sommeil_min": 420,
+      "latence_min": 15,
+      "eveils_min": 10,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-15",
+      "jour_vol": 4120,
+      "sommeil_min": 396,
+      "latence_min": 19,
+      "eveils_min": 14,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-16",
+      "jour_vol": 4121,
+      "sommeil_min": 354,
+      "latence_min": 28,
+      "eveils_min": 23,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-17",
+      "jour_vol": 4122,
+      "sommeil_min": 384,
+      "latence_min": 21,
+      "eveils_min": 16,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-18",
+      "jour_vol": 4123,
+      "sommeil_min": 312,
+      "latence_min": 41,
+      "eveils_min": 34,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-19",
+      "jour_vol": 4124,
+      "sommeil_min": 294,
+      "latence_min": 47,
+      "eveils_min": 38,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-20",
+      "jour_vol": 4125,
+      "sommeil_min": 324,
+      "latence_min": 38,
+      "eveils_min": 29,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-21",
+      "jour_vol": 4126,
+      "sommeil_min": 306,
+      "latence_min": 44,
+      "eveils_min": 33,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-22",
+      "jour_vol": 4127,
+      "sommeil_min": 360,
+      "latence_min": 26,
+      "eveils_min": 21,
+      "source": "estime"
+    },
+    {
+      "nuit_du": "2026-09-23",
+      "jour_vol": 4128,
+      "sommeil_min": 318,
+      "latence_min": 39,
+      "eveils_min": 31,
+      "source": "estime"
+    }
+  ],
+  "evenements": [],
+  "signaux": [
+    {
+      "id": 4,
+      "severite": "surveillance",
+      "origine": "physio",
+      "motif": "RMSSD sous le seuil personnel depuis 6 jours · 5 nuits sur 14 sous 5 h 30",
+      "ouvert_at": "2026-09-23 06:20:00",
+      "statut": "en_cours",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": "Dr. Ferreira",
+      "assigne_id": 2,
+      "motifs_cloture": [
+        "Faux positif : artefact de mesure confirmé",
+        "Orienté vers la psychologie de bord",
+        "Traitement ajusté, suivi programmé",
+        "Entretien réalisé, retour à la normale"
+      ]
+    }
+  ],
+  "conversations": [
+    {
+      "id": 1,
+      "debut_at": "2026-09-23 12:41:00",
+      "jour_vol": 4128,
+      "duree_min": 11,
+      "severite": "surveillance",
+      "resume": "Dernière nuit à 5 h 18, la cinquième sous 5 h 30 en quatorze jours. Attribue les réveils à un bruit de ventilation dans le module C — demande de contrôle acoustique transmise à la maintenance. Ton irritable, phrases courtes, plusieurs ruptures de conversation. Dépistage d'idéation suicidaire négatif (C-SSRS, items 1-2). Lumière de cabine avancée et contact social proposés, acceptés.",
+      "actions_proposees": 2,
+      "actions_acceptees": 2,
+      "resident_notifie_at": "2026-09-23 12:42:00",
+      "tags": [
+        "Anxiété, stress chronique",
+        "Troubles du sommeil"
+      ]
+    },
+    {
+      "id": 3,
+      "debut_at": "2026-09-14 20:15:00",
+      "jour_vol": 4119,
+      "duree_min": 19,
+      "severite": "surveillance",
+      "resume": "Évoque un sentiment d'inutilité après l'incident du bac 7 (J+4 117). Décline le repas collectif pour la 3e fois de la semaine. Sola a proposé un appel à l'équipe hydroponie — refusé à deux reprises. Repli verbal marqué en fin d'échange.",
+      "actions_proposees": 3,
+      "actions_acceptees": 0,
+      "resident_notifie_at": "2026-09-14 20:16:00",
+      "tags": [
+        "Humeur basse",
+        "Isolement social"
+      ]
+    }
+  ],
+  "contexte": [
+    {
+      "id": 2,
+      "debut_at": "2026-09-20 23:02:00",
+      "jour_vol": 4125,
+      "duree_min": 6,
+      "severite": "info",
+      "resident_notifie_at": null,
+      "tags": [
+        "Troubles du sommeil"
+      ]
+    },
+    {
+      "id": 4,
+      "debut_at": "2026-08-22 21:30:00",
+      "jour_vol": 4096,
+      "duree_min": 41,
+      "severite": "info",
+      "resident_notifie_at": null,
+      "tags": [
+        "Date anniversaire",
+        "Deuil"
+      ]
+    },
+    {
+      "id": 738,
+      "debut_at": "2026-08-12 23:50:00",
+      "jour_vol": 4086,
+      "duree_min": 24,
+      "severite": "info",
+      "resident_notifie_at": "2026-08-12 23:59:00",
+      "tags": [
+        "Désynchronisation circadienne"
+      ]
+    },
+    {
+      "id": 740,
+      "debut_at": "2026-08-09 21:49:00",
+      "jour_vol": 4083,
+      "duree_min": 21,
+      "severite": "surveillance",
+      "resident_notifie_at": "2026-08-09 23:59:00",
+      "tags": [
+        "Isolement social"
+      ]
+    },
+    {
+      "id": 813,
+      "debut_at": "2026-07-17 23:05:00",
+      "jour_vol": 4060,
+      "duree_min": 27,
+      "severite": "info",
+      "resident_notifie_at": "2026-07-17 23:59:00",
+      "tags": [
+        "Dépendance au compagnon"
+      ]
+    }
+  ],
+  "conversations_compte": {
+    "total": 138,
+    "remontees": 2,
+    "contexte": 136
+  },
+  "particularites": [
+    {
+      "id": 1,
+      "type": "allergie",
+      "niveau": "critique",
+      "titre": "Arachide — allergie sévère",
+      "detail": "Choc anaphylactique en 2076. Auto-injecteur d'adrénaline en cabine C-12 et à l'infirmerie B. Régime tracé à la cuisine centrale.",
+      "constate_le": null,
+      "auteur": "Dr. Oyelaran"
+    },
+    {
+      "id": 2,
+      "type": "contre_indication",
+      "niveau": "critique",
+      "titre": "AINS — proscrits",
+      "detail": "Antécédent d'ulcère gastrique (2078). Paracétamol en première intention.",
+      "constate_le": null,
+      "auteur": "Dr. Ferreira"
+    },
+    {
+      "id": 3,
+      "type": "allergie",
+      "niveau": "surveillance",
+      "titre": "Pénicilline — allergie",
+      "detail": "Éruption cutanée généralisée. Alternative : macrolides.",
+      "constate_le": null,
+      "auteur": "Dr. Nakamura"
+    },
+    {
+      "id": 4,
+      "type": "antecedent",
+      "niveau": "surveillance",
+      "titre": "Asthme d'effort",
+      "detail": "Salbutamol à la demande. Dernière crise : J+3 840, sans hospitalisation.",
+      "constate_le": null,
+      "auteur": null
+    },
+    {
+      "id": 5,
+      "type": "antecedent",
+      "niveau": "info",
+      "titre": "Épisode dépressif caractérisé (2077)",
+      "detail": "Rémission complète sous suivi. Facteur de vulnérabilité à considérer dans l'interprétation des signaux actuels — pas un diagnostic en cours.",
+      "constate_le": null,
+      "auteur": null
+    },
+    {
+      "id": 6,
+      "type": "info",
+      "niveau": "info",
+      "titre": "Intolérance au lactose · lentilles -3,5 / -3,75",
+      "detail": "Groupe sanguin O-. Vaccination de bord à jour, rappel au J+4 300.",
+      "constate_le": null,
+      "auteur": null
+    }
+  ],
+  "suivis": [
+    {
+      "type": "traitement",
+      "titre": "Mélatonine 2 mg · 21:00",
+      "detail": "Recalage circadien depuis le J+4 120. Observance 9 prises sur 9, confirmée par le bracelet.",
+      "debut_jour_vol": 4120,
+      "echeance_jour_vol": null
+    },
+    {
+      "type": "action",
+      "titre": "Lumière de cabine avancée à 19:00",
+      "detail": "Proposé par Sola au J+4 128, accepté par le résident. À réévaluer au J+4 135.",
+      "debut_jour_vol": 4128,
+      "echeance_jour_vol": 4135
+    },
+    {
+      "type": "rendez_vous",
+      "titre": "Entretien psychologique bimensuel",
+      "detail": "Prochain créneau : J+4 134 à 15:00, infirmerie B. Dr. Ferreira.",
+      "debut_jour_vol": null,
+      "echeance_jour_vol": 4134
+    }
+  ],
+  "bilans": [
+    {
+      "id": 1,
+      "preleve_le": "2026-09-23",
+      "jour_vol": 4128,
+      "prochain_le": "2026-10-07",
+      "statut": "rendu",
+      "commentaire": null,
+      "source": "simule",
+      "prochain_dans_j": 14,
+      "medecin": "Dr. Oyelaran",
+      "analyses": [
+        {
+          "bilan_id": 1,
+          "panel": "cellules_sanguines",
+          "marqueur": "Hémoglobine",
+          "valeur_num": 15.8,
+          "valeur_texte": null,
+          "unite": "g/dL",
+          "ref_bas": 13,
+          "ref_haut": 17,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "cellules_sanguines",
+          "marqueur": "Leucocytes",
+          "valeur_num": 4.7,
+          "valeur_texte": null,
+          "unite": "10⁹/L",
+          "ref_bas": 4,
+          "ref_haut": 10,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "cellules_sanguines",
+          "marqueur": "Plaquettes",
+          "valeur_num": 150,
+          "valeur_texte": null,
+          "unite": "10⁹/L",
+          "ref_bas": 150,
+          "ref_haut": 400,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "cellules_sanguines",
+          "marqueur": "Hématocrite",
+          "valeur_num": 47.6,
+          "valeur_texte": null,
+          "unite": "%",
+          "ref_bas": 40,
+          "ref_haut": 52,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "electrolytes",
+          "marqueur": "Sodium",
+          "valeur_num": 135.8,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 135,
+          "ref_haut": 145,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "electrolytes",
+          "marqueur": "Potassium",
+          "valeur_num": 4.83,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 3.5,
+          "ref_haut": 5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "electrolytes",
+          "marqueur": "Calcium",
+          "valeur_num": 2.36,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 2.2,
+          "ref_haut": 2.6,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "fer",
+          "marqueur": "Ferritine",
+          "valeur_num": 152,
+          "valeur_texte": null,
+          "unite": "µg/L",
+          "ref_bas": 30,
+          "ref_haut": 300,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "fer",
+          "marqueur": "Fer sérique",
+          "valeur_num": 22.3,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 11,
+          "ref_haut": 28,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "foie",
+          "marqueur": "ALAT",
+          "valeur_num": 19.5,
+          "valeur_texte": null,
+          "unite": "U/L",
+          "ref_bas": 10,
+          "ref_haut": 45,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "foie",
+          "marqueur": "ASAT",
+          "valeur_num": 16.7,
+          "valeur_texte": null,
+          "unite": "U/L",
+          "ref_bas": 10,
+          "ref_haut": 40,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "hormones",
+          "marqueur": "Cortisol matinal",
+          "valeur_num": 431,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 170,
+          "ref_haut": 500,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "hormones",
+          "marqueur": "DHEA-S",
+          "valeur_num": 3.8,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 2,
+          "ref_haut": 9,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "inflammation",
+          "marqueur": "CRP",
+          "valeur_num": 3.5,
+          "valeur_texte": null,
+          "unite": "mg/L",
+          "ref_bas": 0,
+          "ref_haut": 5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "inflammation",
+          "marqueur": "Vitesse de sédimentation",
+          "valeur_num": 7.1,
+          "valeur_texte": null,
+          "unite": "mm/h",
+          "ref_bas": 0,
+          "ref_haut": 15,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "inflammation",
+          "marqueur": "Recherche d'agent infectieux",
+          "valeur_num": null,
+          "valeur_texte": "Négatif",
+          "unite": null,
+          "ref_bas": null,
+          "ref_haut": null,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "lipides",
+          "marqueur": "Cholestérol total",
+          "valeur_num": 1.95,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 1.4,
+          "ref_haut": 2,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "lipides",
+          "marqueur": "LDL",
+          "valeur_num": 1.11,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.7,
+          "ref_haut": 1.3,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "lipides",
+          "marqueur": "HDL",
+          "valeur_num": 0.68,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.4,
+          "ref_haut": null,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "lipides",
+          "marqueur": "Triglycérides",
+          "valeur_num": 1.11,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.5,
+          "ref_haut": 1.5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "reins",
+          "marqueur": "Créatinine",
+          "valeur_num": 80,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 60,
+          "ref_haut": 110,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "reins",
+          "marqueur": "Débit de filtration glomérulaire",
+          "valeur_num": 108,
+          "valeur_texte": null,
+          "unite": "mL/min",
+          "ref_bas": 90,
+          "ref_haut": 140,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "sucre",
+          "marqueur": "Glycémie à jeun",
+          "valeur_num": 0.97,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.7,
+          "ref_haut": 1.05,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "sucre",
+          "marqueur": "HbA1c",
+          "valeur_num": 4.21,
+          "valeur_texte": null,
+          "unite": "%",
+          "ref_bas": 4,
+          "ref_haut": 5.6,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "thyroide",
+          "marqueur": "TSH",
+          "valeur_num": 2.8,
+          "valeur_texte": null,
+          "unite": "mUI/L",
+          "ref_bas": 0.4,
+          "ref_haut": 4,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "thyroide",
+          "marqueur": "T4 libre",
+          "valeur_num": 19,
+          "valeur_texte": null,
+          "unite": "pmol/L",
+          "ref_bas": 12,
+          "ref_haut": 22,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "vitamines",
+          "marqueur": "Vitamine D",
+          "valeur_num": 100,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 50,
+          "ref_haut": 125,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "vitamines",
+          "marqueur": "Vitamine B12",
+          "valeur_num": 711,
+          "valeur_texte": null,
+          "unite": "pmol/L",
+          "ref_bas": 150,
+          "ref_haut": 650,
+          "interpretation": "eleve"
+        },
+        {
+          "bilan_id": 1,
+          "panel": "vitamines",
+          "marqueur": "Folates",
+          "valeur_num": 12.1,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 7,
+          "ref_haut": 45,
+          "interpretation": "normal"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "preleve_le": "2026-09-09",
+      "jour_vol": 4114,
+      "prochain_le": "2026-09-23",
+      "statut": "rendu",
+      "commentaire": "Contrôle de suivi, pas de plainte nouvelle.",
+      "source": "simule",
+      "prochain_dans_j": 0,
+      "medecin": "Dr. Nakamura",
+      "analyses": [
+        {
+          "bilan_id": 2,
+          "panel": "cellules_sanguines",
+          "marqueur": "Hémoglobine",
+          "valeur_num": 15.1,
+          "valeur_texte": null,
+          "unite": "g/dL",
+          "ref_bas": 13,
+          "ref_haut": 17,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "cellules_sanguines",
+          "marqueur": "Leucocytes",
+          "valeur_num": 5.9,
+          "valeur_texte": null,
+          "unite": "10⁹/L",
+          "ref_bas": 4,
+          "ref_haut": 10,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "cellules_sanguines",
+          "marqueur": "Plaquettes",
+          "valeur_num": 281,
+          "valeur_texte": null,
+          "unite": "10⁹/L",
+          "ref_bas": 150,
+          "ref_haut": 400,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "cellules_sanguines",
+          "marqueur": "Hématocrite",
+          "valeur_num": 45.4,
+          "valeur_texte": null,
+          "unite": "%",
+          "ref_bas": 40,
+          "ref_haut": 52,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "electrolytes",
+          "marqueur": "Sodium",
+          "valeur_num": 134.2,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 135,
+          "ref_haut": 145,
+          "interpretation": "bas"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "electrolytes",
+          "marqueur": "Potassium",
+          "valeur_num": 3.8,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 3.5,
+          "ref_haut": 5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "electrolytes",
+          "marqueur": "Calcium",
+          "valeur_num": 2.24,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 2.2,
+          "ref_haut": 2.6,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "fer",
+          "marqueur": "Ferritine",
+          "valeur_num": 260,
+          "valeur_texte": null,
+          "unite": "µg/L",
+          "ref_bas": 30,
+          "ref_haut": 300,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "fer",
+          "marqueur": "Fer sérique",
+          "valeur_num": 28.2,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 11,
+          "ref_haut": 28,
+          "interpretation": "eleve"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "foie",
+          "marqueur": "ALAT",
+          "valeur_num": 22.6,
+          "valeur_texte": null,
+          "unite": "U/L",
+          "ref_bas": 10,
+          "ref_haut": 45,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "foie",
+          "marqueur": "ASAT",
+          "valeur_num": 25.1,
+          "valeur_texte": null,
+          "unite": "U/L",
+          "ref_bas": 10,
+          "ref_haut": 40,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "hormones",
+          "marqueur": "Cortisol matinal",
+          "valeur_num": 217,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 170,
+          "ref_haut": 500,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "hormones",
+          "marqueur": "DHEA-S",
+          "valeur_num": 5.8,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 2,
+          "ref_haut": 9,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "inflammation",
+          "marqueur": "CRP",
+          "valeur_num": 1.6,
+          "valeur_texte": null,
+          "unite": "mg/L",
+          "ref_bas": 0,
+          "ref_haut": 5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "inflammation",
+          "marqueur": "Vitesse de sédimentation",
+          "valeur_num": 0.6,
+          "valeur_texte": null,
+          "unite": "mm/h",
+          "ref_bas": 0,
+          "ref_haut": 15,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "inflammation",
+          "marqueur": "Recherche d'agent infectieux",
+          "valeur_num": null,
+          "valeur_texte": "Négatif",
+          "unite": null,
+          "ref_bas": null,
+          "ref_haut": null,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "lipides",
+          "marqueur": "Cholestérol total",
+          "valeur_num": 1.73,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 1.4,
+          "ref_haut": 2,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "lipides",
+          "marqueur": "LDL",
+          "valeur_num": 0.74,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.7,
+          "ref_haut": 1.3,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "lipides",
+          "marqueur": "HDL",
+          "valeur_num": 0.69,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.4,
+          "ref_haut": null,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "lipides",
+          "marqueur": "Triglycérides",
+          "valeur_num": 1,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.5,
+          "ref_haut": 1.5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "reins",
+          "marqueur": "Créatinine",
+          "valeur_num": 78,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 60,
+          "ref_haut": 110,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "reins",
+          "marqueur": "Débit de filtration glomérulaire",
+          "valeur_num": 110,
+          "valeur_texte": null,
+          "unite": "mL/min",
+          "ref_bas": 90,
+          "ref_haut": 140,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "sucre",
+          "marqueur": "Glycémie à jeun",
+          "valeur_num": 0.88,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.7,
+          "ref_haut": 1.05,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "sucre",
+          "marqueur": "HbA1c",
+          "valeur_num": 4.45,
+          "valeur_texte": null,
+          "unite": "%",
+          "ref_bas": 4,
+          "ref_haut": 5.6,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "thyroide",
+          "marqueur": "TSH",
+          "valeur_num": 2.7,
+          "valeur_texte": null,
+          "unite": "mUI/L",
+          "ref_bas": 0.4,
+          "ref_haut": 4,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "thyroide",
+          "marqueur": "T4 libre",
+          "valeur_num": 21.3,
+          "valeur_texte": null,
+          "unite": "pmol/L",
+          "ref_bas": 12,
+          "ref_haut": 22,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "vitamines",
+          "marqueur": "Vitamine D",
+          "valeur_num": 85,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 50,
+          "ref_haut": 125,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "vitamines",
+          "marqueur": "Vitamine B12",
+          "valeur_num": 626,
+          "valeur_texte": null,
+          "unite": "pmol/L",
+          "ref_bas": 150,
+          "ref_haut": 650,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 2,
+          "panel": "vitamines",
+          "marqueur": "Folates",
+          "valeur_num": 38.6,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 7,
+          "ref_haut": 45,
+          "interpretation": "normal"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "preleve_le": "2026-08-26",
+      "jour_vol": 4100,
+      "prochain_le": "2026-09-09",
+      "statut": "rendu",
+      "commentaire": null,
+      "source": "simule",
+      "prochain_dans_j": -14,
+      "medecin": "Dr. Oyelaran",
+      "analyses": [
+        {
+          "bilan_id": 3,
+          "panel": "cellules_sanguines",
+          "marqueur": "Hémoglobine",
+          "valeur_num": 15,
+          "valeur_texte": null,
+          "unite": "g/dL",
+          "ref_bas": 13,
+          "ref_haut": 17,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "cellules_sanguines",
+          "marqueur": "Leucocytes",
+          "valeur_num": 6.6,
+          "valeur_texte": null,
+          "unite": "10⁹/L",
+          "ref_bas": 4,
+          "ref_haut": 10,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "cellules_sanguines",
+          "marqueur": "Plaquettes",
+          "valeur_num": 331,
+          "valeur_texte": null,
+          "unite": "10⁹/L",
+          "ref_bas": 150,
+          "ref_haut": 400,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "cellules_sanguines",
+          "marqueur": "Hématocrite",
+          "valeur_num": 49.2,
+          "valeur_texte": null,
+          "unite": "%",
+          "ref_bas": 40,
+          "ref_haut": 52,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "electrolytes",
+          "marqueur": "Sodium",
+          "valeur_num": 136.5,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 135,
+          "ref_haut": 145,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "electrolytes",
+          "marqueur": "Potassium",
+          "valeur_num": 4,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 3.5,
+          "ref_haut": 5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "electrolytes",
+          "marqueur": "Calcium",
+          "valeur_num": 2.47,
+          "valeur_texte": null,
+          "unite": "mmol/L",
+          "ref_bas": 2.2,
+          "ref_haut": 2.6,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "fer",
+          "marqueur": "Ferritine",
+          "valeur_num": 114,
+          "valeur_texte": null,
+          "unite": "µg/L",
+          "ref_bas": 30,
+          "ref_haut": 300,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "fer",
+          "marqueur": "Fer sérique",
+          "valeur_num": 14.1,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 11,
+          "ref_haut": 28,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "foie",
+          "marqueur": "ALAT",
+          "valeur_num": 27.7,
+          "valeur_texte": null,
+          "unite": "U/L",
+          "ref_bas": 10,
+          "ref_haut": 45,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "foie",
+          "marqueur": "ASAT",
+          "valeur_num": 27.1,
+          "valeur_texte": null,
+          "unite": "U/L",
+          "ref_bas": 10,
+          "ref_haut": 40,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "hormones",
+          "marqueur": "Cortisol matinal",
+          "valeur_num": 198,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 170,
+          "ref_haut": 500,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "hormones",
+          "marqueur": "DHEA-S",
+          "valeur_num": 3.2,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 2,
+          "ref_haut": 9,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "inflammation",
+          "marqueur": "CRP",
+          "valeur_num": 0.9,
+          "valeur_texte": null,
+          "unite": "mg/L",
+          "ref_bas": 0,
+          "ref_haut": 5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "inflammation",
+          "marqueur": "Vitesse de sédimentation",
+          "valeur_num": 4.1,
+          "valeur_texte": null,
+          "unite": "mm/h",
+          "ref_bas": 0,
+          "ref_haut": 15,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "inflammation",
+          "marqueur": "Recherche d'agent infectieux",
+          "valeur_num": null,
+          "valeur_texte": "Négatif",
+          "unite": null,
+          "ref_bas": null,
+          "ref_haut": null,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "lipides",
+          "marqueur": "Cholestérol total",
+          "valeur_num": 1.35,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 1.4,
+          "ref_haut": 2,
+          "interpretation": "bas"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "lipides",
+          "marqueur": "LDL",
+          "valeur_num": 1,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.7,
+          "ref_haut": 1.3,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "lipides",
+          "marqueur": "HDL",
+          "valeur_num": 0.64,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.4,
+          "ref_haut": null,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "lipides",
+          "marqueur": "Triglycérides",
+          "valeur_num": 1.36,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.5,
+          "ref_haut": 1.5,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "reins",
+          "marqueur": "Créatinine",
+          "valeur_num": 84,
+          "valeur_texte": null,
+          "unite": "µmol/L",
+          "ref_bas": 60,
+          "ref_haut": 110,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "reins",
+          "marqueur": "Débit de filtration glomérulaire",
+          "valeur_num": 128,
+          "valeur_texte": null,
+          "unite": "mL/min",
+          "ref_bas": 90,
+          "ref_haut": 140,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "sucre",
+          "marqueur": "Glycémie à jeun",
+          "valeur_num": 0.98,
+          "valeur_texte": null,
+          "unite": "g/L",
+          "ref_bas": 0.7,
+          "ref_haut": 1.05,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "sucre",
+          "marqueur": "HbA1c",
+          "valeur_num": 3.95,
+          "valeur_texte": null,
+          "unite": "%",
+          "ref_bas": 4,
+          "ref_haut": 5.6,
+          "interpretation": "bas"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "thyroide",
+          "marqueur": "TSH",
+          "valeur_num": 2.7,
+          "valeur_texte": null,
+          "unite": "mUI/L",
+          "ref_bas": 0.4,
+          "ref_haut": 4,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "thyroide",
+          "marqueur": "T4 libre",
+          "valeur_num": 15.7,
+          "valeur_texte": null,
+          "unite": "pmol/L",
+          "ref_bas": 12,
+          "ref_haut": 22,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "vitamines",
+          "marqueur": "Vitamine D",
+          "valeur_num": 72,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 50,
+          "ref_haut": 125,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "vitamines",
+          "marqueur": "Vitamine B12",
+          "valeur_num": 399,
+          "valeur_texte": null,
+          "unite": "pmol/L",
+          "ref_bas": 150,
+          "ref_haut": 650,
+          "interpretation": "normal"
+        },
+        {
+          "bilan_id": 3,
+          "panel": "vitamines",
+          "marqueur": "Folates",
+          "valeur_num": 49.6,
+          "valeur_texte": null,
+          "unite": "nmol/L",
+          "ref_bas": 7,
+          "ref_haut": 45,
+          "interpretation": "eleve"
+        }
+      ]
+    }
+  ]
+}

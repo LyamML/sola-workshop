@@ -37,10 +37,10 @@ Les transcriptions n'arrivent jamais à la console médicale parce qu'elles **n'
 |---|---|
 | `web/borne` | **Écran 01** — la borne de cabine, vocale. Client Web Bluetooth du bracelet, et relais de ses trames vers le serveur de bord |
 | `web/console` | **Écrans 02 à 04** — santé de l'équipage, fiche résident, registre triable, pour le médecin de bord |
-| `web/backoffice` | Outil d'exploitation : état des tables, correction des dossiers, suivi des signaux, table des correspondances écran ↔ requête |
+| `web/backoffice` | Outil d'exploitation, en lecture : correspondance écran ↔ requête, fraîcheur des flux et tables brutes, comptes |
 | `firmware/bracelet-i2c` | Firmware ESP32 **principal** : MAX30102 (FC, RR, RMSSD, SpO₂) + MPU6050 (activité, chutes, sommeil) |
 | `firmware/bracelet` | Firmware ESP32 de **repli** : PPG analogique KY-039, FC + RR + RMSSD seuls |
-| `server` | Service d'ingestion + API de lecture du serveur de bord |
+| `server` | Service d'ingestion + API de la console et du backoffice |
 | `db` | Les deux schémas, tous deux SQLite : `db/serveur` et `db/borne` — [pourquoi deux bases](db/README.md) |
 | `scripts` | Chargement du schéma, génération du jeu de test, agrégation quotidienne |
 
@@ -167,8 +167,10 @@ peut lire. La base ne garde que l'empreinte SHA-256 du jeton de session — une
 copie du fichier `sola.db` n'ouvre aucune session.
 
 Un médecin ouvre la console, un administrateur ouvre la console **et** le
-backoffice. La borne de cabine, elle, reste accessible à tous : c'est une porte
-de couloir, pas un dossier.
+backoffice. Dans la console, l'administrateur voit ce que voit un médecin mais
+n'y fait aucun geste de soin : prendre ou clore un signal, signer une note, le
+serveur le réserve aux comptes soignants. La borne de cabine, elle, reste
+accessible à tous : c'est une porte de couloir, pas un dossier.
 
 Le premier compte se crée au terminal, donc physiquement à bord — c'est la
 réponse la plus simple au problème du premier compte, celui qu'aucun compte
@@ -209,18 +211,32 @@ production, et le dire vaut mieux que le cacher à moitié.
 
 Parmi eux, un passe-partout pour le développement : **`root@root.com`**, mot de
 passe **`admin`**. Il est administrateur, donc il ouvre la console *et* le
-backoffice. Il ne signe pas de note de dossier — `auteur_id` pointe sur
-`medecins`, et une note clinique porte le nom d'un soignant ; pour voir une
-note signée, se connecter avec un des cinq comptes médecin. **Ce compte n'a
+backoffice. Il ne signe pas de note de dossier et ne prend aucun signal —
+`auteur_id` pointe sur `medecins`, et un geste clinique porte le nom d'un
+soignant. Le bouton « Ajouter une note » lui reste affiché, grisé, et dit
+pourquoi ; pour écrire ou prendre un signal, se connecter avec un des cinq
+comptes médecin. **Ce compte n'a
 rien à faire sur une instance accessible à d'autres** : supprimer sa ligne dans
 `scripts/db-demo.mjs` avant tout déploiement.
 
 Le générateur est **déterministe** (graine 4 128) : deux exécutions donnent la
-même base, donc la même soutenance. Et il est **calibré** — il tire une
-population plausible, puis corrige le nombre de résidents au-dessus de chaque
-seuil pour retomber exactement sur les chiffres des maquettes. Les 8,4 % de
-PHQ-9 ≥ 10 affichés par l'écran 02 sont donc calculés sur 1 240 lignes, pas
-écrits en dur quelque part.
+même base, donc la même soutenance — datée du jour où elle est générée, pour
+que la démonstration se passe toujours « aujourd'hui ». Et il est **calibré** —
+il tire une population plausible, puis corrige le nombre de résidents au-dessus
+de chaque seuil pour retomber exactement sur les chiffres des maquettes. Les
+8,4 % de PHQ-9 ≥ 10 affichés par l'écran 02 sont donc calculés sur 1 240 lignes,
+pas écrits en dur quelque part.
+
+```bash
+npm run db:repli
+```
+
+fige deux réponses du serveur de bord — l'écran 02 et la fiche de R-0448 —
+dans `web/console/src/data/`. C'est ce que la console affiche serveur éteint :
+la réponse de la base, passée par le même adaptateur que la réponse vivante,
+et non un second jeu de chaînes tenu à la main. À relancer après chaque
+`db:reset`, puisque le repli garde les dates du jour où il a été figé ;
+`npm run db:repli -- --verifier` dit s'il a dérivé, sans rien écrire.
 
 Pour regarder dedans sans rien installer :
 
@@ -243,13 +259,14 @@ reçue : ce script ne sert qu'à refaire un jour.
 ### La borne se parle, elle ne se touche pas
 
 L'écran 01 n'a aucune commande. On lui parle, elle répond à voix haute, et
-l'écran ne sert qu'à laisser une trace lisible : les derniers tours de parole
-empilés en bas, le plus récent en grand, les précédents qui s'estompent vers le
-haut. Rien ne défile — la borne est un mur, elle occupe exactement l'écran.
+l'écran ne garde de l'échange que la dernière phrase du résident et la réponse
+de Sola, sous le chat qui en occupe l'essentiel. Rien ne défile — la borne est
+un mur, elle occupe exactement l'écran.
 
 Au premier chargement, un voile demande un geste : ni le micro ni la synthèse
 vocale ne s'ouvrent sans lui, c'est une règle du navigateur. Ensuite la borne
-écoute en continu et se réveille sur son nom — **« Sola »**.
+écoute en continu, sans mot d'éveil : en conversation libre, chaque phrase
+entendue part à Sola.
 
 **On peut lui couper la parole.** Le micro reste ouvert pendant qu'elle parle :
 la question affichée se répond sans attendre la fin de la phrase, et Sola se
@@ -259,11 +276,26 @@ que l'autre voix. Ce filtre travaille sur du texte, pas sur du son : au casque
 il n'a rien à faire, et c'est la configuration à préférer pour une
 démonstration.
 
-**Les questions passent par une fenêtre.** Quand Sola demande quelque chose, un
-cadre s'ouvre sous elle avec les réponses possibles. Chacune porte son bouton
-*et* le mot qui suffit à la dire — « oui », « plus tard », « annule ». Le doigt
-sert à qui est debout devant la borne ; la voix sert à qui ne l'est pas, ce qui
-est précisément le cas dans le scénario d'alerte.
+**Les questions passent par une fenêtre.** Quand Sola demande quelque chose, le
+chat se range à gauche et une feuille monte du bas avec les réponses possibles.
+Chacune porte son bouton *et* le mot qui suffit à la dire — « oui », « non »,
+« annule ». Le doigt sert à qui est debout devant la borne ; la voix sert à qui
+ne l'est pas, ce qui est précisément le cas dans le scénario d'alerte.
+
+**En alerte, le chat cède la place.** Il se range dans un coin, et l'écran dit
+en grand qui arrive et dans combien de minutes, ce qui est déjà fait — porte
+déverrouillée, contact de confiance prévenu — et la question que Sola pose à
+voix haute. D'une disposition à l'autre, le chat glisse et change de taille
+pendant que le reste s'efface ; si le système demande moins d'animations, la
+bascule est immédiate.
+
+**La pastille du haut dit ce qui a quitté la cabine** : « Rien n'a quitté la
+cabine », puis ce qui en est sorti — l'alerte partie à l'infirmerie, le résumé
+d'un échange quand on le quitte, « remonté à ton médecin » quand il l'est. Elle
+ne revient pas à « rien » d'une scène à l'autre : ce qui est parti l'est pour de
+bon, une minute de constantes comprise. La barre d'état n'affiche le reste —
+micro, envoi des trames, batterie du bracelet — que quand il y a quelque chose
+à en dire.
 
 **La barre d'espace double la voix de bout en bout**, et les touches `1` et `2`
 répondent à une question ouverte : c'est ce qui sauve la démonstration quand le
@@ -273,7 +305,7 @@ curseur dans le champ « Ou écris à Sola », en pied de borne.
 
 Le bandeau effacé en bas à droite rejoue les trois états de l'écran :
 
-- **Échange** — conversation libre : Sola ouvre sur la nuit courte, puis chaque phrase du résident part au modèle local (`web/borne/src/ia.ts`), qui répond en une à trois phrases, à voix haute. L'historique ne vit que dans la page et s'efface au changement de scène ;
+- **Échange** — conversation libre : Sola dit bonjour, puis chaque phrase du résident part au modèle local (`web/borne/src/ia.ts`), qui répond en une à trois phrases, à voix haute. L'historique ne vit que dans la page et s'efface au changement de scène ;
 - **Apaisement** — respiration guidée 4-7-8, déclenchée dans la vraie vie par une hausse de stress ; Sola demande au bout d'un cycle si ça descend ;
 - **Alerte** — les secours sont en route, Sola reste présente et vérifie qu'on l'entend.
 
@@ -304,7 +336,7 @@ Un service propre à Sola transporte ce que le standard ne prévoit pas : RMSSD,
 
 ### Appairer depuis la borne
 
-Le bouton **Appairer**, dans le bandeau de démonstration en bas à droite, ouvre le sélecteur Web Bluetooth. Deux contraintes : **Chrome ou Edge** en contexte sécurisé (`localhost` suffit), et un **clic** de l'utilisateur — c'est pourquoi l'appairage n'est pas automatique, et c'est aussi pourquoi il est resté dans le bandeau plutôt que sur l'écran de la borne, qui n'a plus de bouton. Une fois connectée, la barre d'état affiche la FC et le RMSSD réels à la place des valeurs de démonstration. La batterie, elle, reste une valeur fixe du firmware : l'ESP32 du prototype n'est pas sur batterie.
+Le bouton **Appairer**, dans le bandeau de démonstration en bas à droite, ouvre le sélecteur Web Bluetooth. Deux contraintes : **Chrome ou Edge** en contexte sécurisé (`localhost` suffit), et un **clic** de l'utilisateur — c'est pourquoi l'appairage n'est pas automatique, et c'est aussi pourquoi il est resté dans le bandeau plutôt que sur l'écran de la borne, qui n'a plus de bouton. Une fois connectée, le bandeau affiche la FC et le RMSSD réels à la place des valeurs de démonstration. La batterie, elle, reste une valeur fixe du firmware : l'ESP32 du prototype n'est pas sur batterie.
 
 ### Transmettre au serveur de bord
 
@@ -340,7 +372,7 @@ Le contrat, `POST /ingest/bracelet` — la trame est celle que publie `statusJso
 
 Un zéro n'est jamais moyenné, et une valeur hors des bornes physiologiques est écartée : elle coûte une seconde, pas le lot. La SpO₂, elle, se garde sur toute l'échelle, de 1 à 100 % : une saturation très basse est justement celle qu'il ne faut pas perdre. Respiration, température, activité électrodermale et pas restent `NULL`, parce que le bracelet ne les mesure pas. Une clé inconnue fait en revanche échouer le lot entier en `400`, volontairement : une clé que le firmware viendrait d'ajouter se déclare dans `trameSchema` (`server/src/validation.ts`), elle ne se perd pas en silence. Le serveur répond `202` avec le nombre de trames et de minutes reçues et, s'il en a écarté, les valeurs hors bornes, champ par champ, dans `ecartees` : elles ne comptent pas, mais l'émetteur sait qu'elles existent. Il refuse en `404` un résident ou un bracelet inconnu, et en `409` un bracelet qui n'est pas attribué à ce résident.
 
-Les mesures arrivées se lisent au backoffice, *Tables* → `mesures`, ou au terminal :
+Les mesures arrivées se lisent au backoffice, onglet *Base* → `mesures`, ou au terminal :
 
 ```bash
 npm run db:sql "SELECT mesure_at, fc_bpm, rmssd_ms, spo2_pct, qualite FROM mesures WHERE bracelet_id = (SELECT id FROM bracelets WHERE serie = 'BR-0448') ORDER BY mesure_at DESC LIMIT 10"
@@ -378,7 +410,7 @@ Le port série sort une ligne par époque — c'est ce journal qu'on compare à 
 
 ## Mesuré ou simulé
 
-La fiche résident étiquette chaque constante. Rien n'est présenté comme mesuré s'il ne l'est pas.
+Ce que le prototype mesure vraiment, selon le firmware :
 
 | Constante | KY-039 (repli) | MAX30102 + MPU6050 |
 |---|---|---|
@@ -388,7 +420,7 @@ La fiche résident étiquette chaque constante. Rien n'est présenté comme mesu
 | Durée de sommeil | simulé | **estimé** (voir ci-dessus) |
 | Respiration, température, activité électrodermale, pas | simulé | simulé — le matériel ne les mesure pas |
 
-Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elles seront mises à jour quand le bracelet I²C aura été validé en conditions réelles.
+La fiche, elle, ne fait pas la différence, et c'est voulu : dans le jeu de démonstration tout est synthétique, et les huit constantes y ont le même rang et la même règle d'alerte. Les séparer ferait croire qu'une moitié du dossier est vide. Le seul bloc marqué est le bilan sanguin : un bilan simulé porte « valeurs simulées » à son pied.
 
 ## Limites connues
 
@@ -399,7 +431,7 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 - **Le résumé clinique dépend d'Ollama et du serveur de bord.** À la sortie de « Échange », un second appel au modèle produit un résumé (mental et physique évoqués à l'oral) ; le proxy `/bord` l'envoie à `POST /ingest/conversation`. Si la sévérité n'est pas `info`, un signal s'ouvre dans la file du médecin. Sans Ollama le résumé n'est pas produit ; sans serveur (ou sans `BORNE_TOKEN` dans `server/.env`) la barre d'état le dit. Le verbatim ne quitte jamais la cabine.
 - **Sola ne déclenche aucune action, et la plupart de ses règles sont des consignes.** Elle ne peut ni prévenir la maintenance, ni régler la lumière, ni contacter quelqu'un. Trois garde-fous sont écrits dans le code (`web/borne/src/ia.ts`) : une urgence (douleur thoracique, gêne respiratoire, malaise, idée suicidaire) reçoit une réponse écrite à l'avance et force la sévérité `critique` du résumé ; une phrase qui prétend une action est remplacée ; une phrase qui nomme une maladie est retirée. Le reste — ne rien inventer, rester dans le sujet — n'est que consigne, et un modèle de 8 milliards de paramètres s'en écarte encore : conseil incongru, faute de français, supposition.
 - **La détection d'urgence repose sur des mots-clés.** Elle reconnaît les formulations courantes (« douleur dans la poitrine », « du mal à respirer », « plus envie de vivre »…) ; une formulation qu'elle ne connaît pas passe au modèle, qui n'a plus alors que sa consigne. Elle préfère le faux positif : une phrase de trop coûte moins qu'une urgence manquée.
-- **Le bracelet ne remplit que trois constantes de la fiche.** Chaque trame reçue recalcule la ligne de son jour dans `mesures_jour`, que lisent la fiche et le registre, mais la trame ne porte ni la respiration, ni la température cutanée, ni l'activité électrodermale, ni les pas : restent la FC de repos, la SpO₂ et la variabilité, qu'un croquis Arduino n'envoie souvent pas. Un jour que le jeu de démonstration couvre déjà, les autres constantes gardent sa valeur ; un jour que le bracelet est seul à écrire, elles restent vides, et `adapt.ts` les affiche à 0, alertes comprises.
+- **Le bracelet ne remplit que trois tuiles de la fiche.** Chaque trame reçue recalcule la ligne de son jour dans `mesures_jour`, que lisent la fiche et le registre, mais la trame ne porte ni la respiration, ni la température cutanée, ni l'activité électrodermale, ni les pas : restent la FC de repos, la SpO₂ et la variabilité, qu'un croquis Arduino n'envoie souvent pas. Les autres constantes gardent la valeur du jeu de démonstration ; un jour que le bracelet est seul à écrire, leur tuile reprend la dernière valeur connue, datée, alerte comprise.
 - **Le jour d'une mesure est le jour UTC.** `mesures` est horodatée en UTC : une minute reçue peu après minuit, heure locale, compte encore pour la veille.
 - **Le port réseau parle HTTP en clair, avec un seul jeton pour tous les bracelets.** Qui écoute le Wi-Fi lit le jeton, et ce jeton dit qu'un envoi vient d'un bracelet de Sola, pas duquel : le serveur vérifie seulement que le bracelet nommé est bien celui du résident nommé. À bord, ce port passerait en TLS, avec un secret par bracelet.
 - **La borne ne transmet que servie par Vite.** C'est son serveur de développement qui ajoute le jeton de `/ingest`. Publiée en fichiers statiques, elle n'aurait plus de relais, et ce rôle reviendrait au serveur de bord ou à un service de la cabine. Sa file d'attente vit en mémoire : une heure au plus, perdue si l'on recharge la page.
@@ -409,6 +441,8 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 - **Sola ne reconnaît sa propre voix que par le texte.** Le micro reste ouvert pendant qu'elle parle, pour qu'on puisse la couper, et ce qu'il entend est écarté quand ce sont ses mots à elle. Un mot qu'elle vient de dire ne vaut donc pas réponse, ni pendant sa phrase ni dans les deux secondes qui suivent : à une question, mieux vaut répondre « oui » ou « d'accord » que reprendre ses mots, et en conversation libre une phrase qui reprend surtout les siens peut être ignorée. Le filtre dépend aussi de ce que l'annulation d'écho de Chrome laisse passer ; au casque, il n'a rien à faire.
 - **Aucune purge des mesures n'est implémentée.** Le schéma prévoit une rétention de 90 jours sur `mesures` ; rien ne l'applique aujourd'hui. La base cabine, elle, efface bien le verbatim à 30 jours, par un trigger.
 - **Les bilans sanguins du jeu de démonstration sont simulés.** Les 29 marqueurs, leurs bornes de référence et leurs unités sont ceux d'un bilan réel, mais les valeurs sont tirées par le générateur : chaque bilan porte `source = 'simule'` et la fiche l'affiche.
+- **Un geste clinique ne se défait pas, et un dossier ne se corrige plus à l'écran.** Le backoffice n'écrit que l'état d'un compte. Un signal pris ne passe pas à un autre soignant, un signal clos ne se rouvre pas, une note de particularité erronée ne se retire pas, et le poste ou la cabine d'un résident ne se modifient plus depuis une interface.
+- **Serveur éteint, seule la fiche de R-0448 s'affiche.** Le repli de la console ne contient que les deux réponses figées par `npm run db:repli`, l'écran 02 et cette fiche. Celle d'un autre résident dit qu'elle est indisponible, plutôt que de montrer R-0448 sous un autre nom.
 - **Les données sont synthétiques.** Elles sont calibrées pour être vraisemblables et cohérentes entre elles, pas pour être vraies. Aucun chiffre de ce dépôt ne dit quoi que ce soit d'une population réelle.
 
 ## Le serveur de bord
@@ -424,16 +458,19 @@ Les étiquettes de la console reflètent aujourd'hui le firmware de repli ; elle
 | `POST /ingest/evenement` | la borne | chute, secousse, bouton d'urgence |
 | `GET /api/crew` | la console | écran 02 : indicateurs, courbes, file de triage |
 | `GET /api/residents/:code` | la console | écran 03 : la fiche complète |
-| `GET /api/residents/:code/direct` | la console, pour la carte « en direct » qui arrive avec la refonte de l'écran 03 | la dernière minute du bracelet, l'heure écoulée et le jour en cours |
+| `GET /api/residents/:code/direct` | la console | écran 03 : la dernière minute du bracelet, l'heure écoulée et le jour en cours, relus toutes les dix secondes |
 | `GET /api/equipage` | la console | écran 04 : les 1 240 résidents, triés et filtrés par le serveur |
 | `GET /api/signaux` | la console | écran 04 : les signaux, de l'ouverture à la clôture |
+| `GET /api/signaux/stats` | la console | écran 04 : signaux à traiter, faux positifs à la clôture, motifs de clôture à revoir |
+| `PATCH /api/signaux/:id` | la console | écrans 02 à 04 : un médecin prend un signal, ou le clôt avec un des motifs de son origine |
 | `POST /api/residents/:code/particularites` | la console | écran 03 : une note de particularité écrite par le médecin |
 | `POST /auth/connexion` | la console, le backoffice | ouvre une session : adresse + mot de passe contre l'empreinte argon2id |
 | `GET /auth/moi` | la console, le backoffice | qui est connecté ; un `401` est une réponse normale — « personne » |
 | `POST /auth/deconnexion` | la console, le backoffice | ferme la session et efface le cookie |
-| `GET /admin/…` | le backoffice | lecture des tables, correction des dossiers, suivi des signaux, comptes |
+| `GET /admin/…` | le backoffice | correspondance écran ↔ requête, fraîcheur des flux, lignes brutes des tables, comptes |
+| `PATCH /admin/comptes/:role/:id` | le backoffice | activer ou désactiver un compte — sa seule écriture |
 
-L'ingestion demande un jeton porteur, comparé à temps constant : une borne est une machine. Tout `/api` exige une session ouverte, tout `/admin` exige en plus le rôle administrateur. Une note de particularité écrite depuis la console porte désormais l'identifiant du médecin connecté, et la fiche affiche sa signature — c'est ce qui manquait, et c'est ce qui rend le dossier défendable. La connexion est freinée après trois échecs, avec un délai qui double, et une adresse inconnue coûte le même temps de calcul qu'une adresse connue : sans cela, la durée de la réponse dirait lesquelles existent. Toutes les requêtes sont préparées avec des paramètres nommés — **aucune concaténation SQL nulle part**, y compris pour le tri : le nom de colonne envoyé par l'écran 04 passe par une table de correspondance, et une clé inconnue retombe sur le tri par défaut au lieu d'atteindre le SQL.
+L'ingestion demande un jeton porteur, comparé à temps constant : une borne est une machine. Tout `/api` exige une session ouverte, tout `/admin` exige en plus le rôle administrateur. Une note de particularité écrite depuis la console porte désormais l'identifiant du médecin connecté, et la fiche affiche sa signature ; un signal pris ou clos porte de même le nom de qui l'a fait — c'est ce qui manquait, et c'est ce qui rend le dossier défendable. La connexion est freinée après trois échecs, avec un délai qui double, et une adresse inconnue coûte le même temps de calcul qu'une adresse connue : sans cela, la durée de la réponse dirait lesquelles existent. Toutes les requêtes sont préparées avec des paramètres nommés — **aucune concaténation SQL nulle part**, y compris pour le tri : le nom de colonne envoyé par l'écran 04 passe par une table de correspondance, et une clé inconnue retombe sur le tri par défaut au lieu d'atteindre le SQL.
 
 Les filtres sont neutralisés *dans* la requête plutôt qu'en la recomposant :
 
@@ -463,18 +500,18 @@ est bien ce que la base contient ? ».
 
 | Onglet | Ce qu'il montre |
 |---|---|
-| **Aperçu** | nombre de lignes par table, fraîcheur des données, indicateurs du jour |
-| **Équipage** | recherche, filtres, accès au dossier de n'importe quel résident |
-| **Signaux** | assignation et clôture — une clôture exige un motif |
-| **Écrans et sources** | chaque bloc de chaque écran, la requête qui l'alimente, et sa valeur actuelle |
-| **Tables** | les lignes brutes, pour vérifier sans passer par `sqlite3` |
+| **Écrans et sources** | chaque bloc de la console, la vue qui le remplit, et ce qu'elle renvoie maintenant |
+| **Base** | la fraîcheur des flux d'abord, les volumes ensuite ; chaque table se parcourt en lignes brutes, sans passer par `sqlite3` |
+| **Comptes** | qui a accès, qui ne s'est jamais connecté ; un compte se désactive sans être supprimé |
 
 L'onglet **Écrans et sources** est le plus utile en soutenance : il met côte à
 côte le bloc affiché, la vue SQL qui le remplit et la valeur qu'elle renvoie à
 l'instant. La correspondance entre l'interface et la base devient vérifiable
 d'un coup d'œil, au lieu d'être promise dans un document.
 
-Une clôture de signal **exige un motif** parce que ce motif est la seule chose
+Le backoffice ne soigne pas : il n'écrit que l'état d'un compte. Prendre un
+signal, le clore, signer une note se font dans la console, sous le nom d'un
+soignant. Une clôture **exige un motif** parce que ce motif est la seule chose
 qui permettra plus tard de mesurer les faux positifs du moteur de règles. Sans
 lui, on sait qu'un signal a été fermé, jamais s'il aurait dû être ouvert.
 

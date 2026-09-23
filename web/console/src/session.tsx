@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ErreurApi, type Compte, api } from "./api";
+import { Logo } from "./components/Icone";
 
 /**
  * Qui est devant la console.
@@ -112,16 +113,8 @@ function Connexion({
 
   return (
     <div className="connexion">
-      <div className="logo" style={{ fontSize: 15 }}>
-        <svg width="17" height="17" viewBox="0 0 26 26" aria-hidden="true">
-          <circle cx="13" cy="13" r="4.4" fill="var(--accent)" />
-          <path
-            d="M13 1.4v3.2M13 21.4v3.2M1.4 13h3.2M21.4 13h3.2"
-            stroke="var(--accent)"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-          />
-        </svg>
+      <div className="logo">
+        <Logo />
         SOLA
       </div>
 
@@ -157,7 +150,7 @@ function Connexion({
 
         {erreur && <div className="message erreur">{erreur}</div>}
 
-        <button type="submit" className="btn primary" disabled={envoi}>
+        <button type="submit" className="btn pri" disabled={envoi}>
           {envoi ? "Vérification…" : "Ouvrir la console"}
         </button>
       </form>

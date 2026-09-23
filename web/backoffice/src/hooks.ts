@@ -50,16 +50,3 @@ export function useChargement<T>(
 
   return { donnees, erreur, charge, relancer };
 }
-
-/**
- * Retarde une valeur qui change vite (la frappe dans un champ de recherche)
- * pour ne pas lancer une requete par caractere.
- */
-export function useRetard<T>(valeur: T, ms = 250): T {
-  const [retardee, setRetardee] = useState(valeur);
-  useEffect(() => {
-    const t = setTimeout(() => setRetardee(valeur), ms);
-    return () => clearTimeout(t);
-  }, [valeur, ms]);
-  return retardee;
-}
