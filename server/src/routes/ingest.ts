@@ -1,6 +1,6 @@
 import { type NextFunction, type Request, type Response, Router } from "express";
 import { config } from "../config.js";
-import { ecrire, residentId, requete, transaction } from "../db.js";
+import { ecrire, heureDeBord, recalculerStatut, residentId, requete, transaction } from "../db.js";
 import {
   BORNES,
   conversationSchema,
@@ -11,6 +11,7 @@ import {
   mesureSchema,
   nuitSchema,
   refuseVerbatim,
+  signalSchema,
   type Mesure,
   type Trame,
 } from "../validation.js";
@@ -25,10 +26,18 @@ import {
  */
 export const ingest = Router();
 
-/** Convertit un horodatage ISO en 'YYYY-MM-DD HH:MM:SS' UTC, format du schema. */
+/**
+ * Convertit un horodatage ISO en 'YYYY-MM-DD HH:MM:SS' UTC : les minutes du
+ * bracelet et les nuits. Ce qui s'affiche a l'heure — signaux, conversations,
+ * evenements — passe par `heureDeBord`.
+ */
 function versDatetime(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
 }
+
+/** Rang d'une gravite, 1 pour la plus haute. Appele avec des noms ecrits ici. */
+const RANG = (expr: string) =>
+  `CASE ${expr} WHEN 'critique' THEN 1 WHEN 'surveillance' THEN 2 ELSE 3 END`;
 
 const SQL_MESURE = `
   INSERT INTO mesures
@@ -520,7 +529,7 @@ ingest.post("/conversation", (req, res, next) => {
                  :proposees, :acceptees, :auto, :notifie)`,
         {
           id,
-          debut: versDatetime(conv.data.debut_at),
+          debut: heureDeBord(conv.data.debut_at),
           jour_vol: conv.data.jour_vol,
           duree: conv.data.duree_min,
           severite: conv.data.severite,
@@ -529,7 +538,7 @@ ingest.post("/conversation", (req, res, next) => {
           acceptees: conv.data.actions_acceptees,
           auto: conv.data.remontee_auto,
           notifie: conv.data.resident_notifie_at
-            ? versDatetime(conv.data.resident_notifie_at)
+            ? heureDeBord(conv.data.resident_notifie_at)
             : null,
         },
       );
@@ -545,18 +554,37 @@ ingest.post("/conversation", (req, res, next) => {
 
       // Une conversation remontee automatiquement ouvre un signal dans la file
       // du medecin. C'est ici que le fil "cabine -> triage" se referme.
+      //
+      // Sauf si la borne en a deja ouvert un pendant l'echange (/ingest/signal) :
+      // le medecin verrait deux alertes pour une seule conversation. On garde
+      // celui-la, a l'heure ou le resident a parle, et on ne fait que relever
+      // sa gravite si le resume la juge plus haute.
       if (conv.data.remontee_auto && conv.data.severite !== "info") {
-        ecrire(
-          `INSERT INTO signaux
-             (resident_id, severite, motif, origine, ouvert_at, statut)
-           VALUES (:id, :severite, :motif, 'conversation', :ouvert, 'ouvert')`,
-          {
-            id,
-            severite: conv.data.severite,
-            motif: conv.data.resume.slice(0, 255),
-            ouvert: versDatetime(conv.data.debut_at),
-          },
+        const debut = heureDeBord(conv.data.debut_at);
+        const { changes } = ecrire(
+          `UPDATE signaux
+              SET severite = CASE
+                    WHEN ${RANG(":severite")} < ${RANG("severite")} THEN :severite
+                    ELSE severite
+                  END
+            WHERE resident_id = :id AND origine = 'conversation'
+              AND statut <> 'clos' AND ouvert_at >= :debut`,
+          { id, severite: conv.data.severite, debut },
         );
+        if (!changes) {
+          ecrire(
+            `INSERT INTO signaux
+               (resident_id, severite, motif, origine, ouvert_at, statut)
+             VALUES (:id, :severite, :motif, 'conversation', :ouvert, 'ouvert')`,
+            {
+              id,
+              severite: conv.data.severite,
+              motif: conv.data.resume.slice(0, 255),
+              ouvert: debut,
+            },
+          );
+        }
+        recalculerStatut(id);
       }
 
       return lastInsertRowid;
@@ -590,7 +618,7 @@ ingest.post("/evenement", (req, res, next) => {
         {
           id,
           type: evt.data.type,
-          survenu: versDatetime(evt.data.survenu_at),
+          survenu: heureDeBord(evt.data.survenu_at),
           intensite: evt.data.intensite_g,
         },
       );
@@ -598,18 +626,71 @@ ingest.post("/evenement", (req, res, next) => {
       // Une chute sans acquittement est une urgence : elle entre dans la file
       // sans attendre le prochain agregat.
       if (evt.data.type === "chute") {
-        ecrire(
-          `INSERT INTO signaux
+    ecrire(
+        `INSERT INTO signaux
              (resident_id, severite, motif, origine, ouvert_at, statut)
            VALUES (:id, 'critique',
                    'Chute detectee par l''accelerometre · en attente de reponse',
                    'chute', :ouvert, 'ouvert')`,
-          { id, ouvert: versDatetime(evt.data.survenu_at) },
+          { id, ouvert: heureDeBord(evt.data.survenu_at) },
         );
+        recalculerStatut(id);
       }
     });
 
     res.status(202).json({ enregistre: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ------------------------------------------------------------------- signal -
+//
+// Alerte de gravite emise par la borne EN COURS de conversation, avant
+// la fin de l'echange. L'origine est 'conversation' comme pour le resume
+// de fin, mais le signal est cree immediatement — pas en fin de seance.
+//
+// Le motif ne contient jamais de verbatim : la borne ne l'envoie pas, et
+// refuseVerbatim verifie l'absence des cles interdites.
+ingest.post("/signal", (req, res, next) => {
+  try {
+    const interdit = refuseVerbatim(req.body);
+    if (interdit) {
+      res.status(422).json({
+        erreur: "Champ interdit dans le signal.",
+        champ: interdit,
+      });
+      return;
+    }
+
+    const signal = signalSchema.safeParse(req.body);
+    if (!signal.success) {
+      res.status(400).json({ erreur: "Charge utile invalide.", detail: signal.error.issues });
+      return;
+    }
+
+    const id = residentId(signal.data.resident);
+    if (id === null) {
+      res.status(404).json({ erreur: `Résident inconnu : ${signal.data.resident}` });
+      return;
+    }
+
+    transaction(() => {
+      ecrire(
+        `INSERT INTO signaux
+           (resident_id, severite, motif, origine, ouvert_at, statut)
+         VALUES (:id, :severite, :motif, 'conversation', :ouvert, 'ouvert')`,
+        {
+          id,
+          severite: signal.data.severite,
+          motif: signal.data.motif,
+          ouvert: heureDeBord(signal.data.survenu_at),
+        },
+      );
+      recalculerStatut(id);
+    });
+
+    res.status(201).json({ enregistre: true });
   } catch (e) {
     next(e);
   }

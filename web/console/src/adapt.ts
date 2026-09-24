@@ -165,6 +165,17 @@ function barres<T>(
   }));
 }
 
+/**
+ * Du plus récent au plus ancien, comme le serveur les sert. Refait ici pour
+ * le repli : une réponse figée avant ce tri s'afficherait sinon dans l'ancien
+ * ordre. Les horodatages « AAAA-MM-JJ HH:MM:SS » se comparent comme du texte.
+ */
+function plusRecentsDabord<T extends { id: number; ouvert_at: string }>(signaux: T[]): T[] {
+  return [...signaux].sort((a, b) =>
+    a.ouvert_at === b.ouvert_at ? b.id - a.id : a.ouvert_at < b.ouvert_at ? 1 : -1,
+  );
+}
+
 export function adapterCrew(d: CrewApi): VueCrew {
   const a = d.ancre.jour_vol;
   const dep = d.depistage;
@@ -232,7 +243,7 @@ export function adapterCrew(d: CrewApi): VueCrew {
   const jours = new Set(d.triage.map((t) => t.ouvert_jour_vol));
   const memeJour = jours.size === 1 ? d.triage[0]!.ouvert_jour_vol : null;
 
-  const file: LigneFile[] = d.triage.map((t) => ({
+  const file: LigneFile[] = plusRecentsDabord(d.triage).map((t) => ({
     id: t.id,
     gravite: gravite(t.severite),
     resident: t.resident,
@@ -251,8 +262,8 @@ export function adapterCrew(d: CrewApi): VueCrew {
   const n = file.length;
   const piedFile = n
     ? [
-        n < total ? `${entier(n)} premiers sur ${entier(total)}` : `${pluriel(n, "signal", "signaux")} à traiter`,
-        "gravité d'abord, puis ancienneté",
+        n < total ? `${entier(n)} plus récents sur ${entier(total)}` : `${pluriel(n, "signal", "signaux")} à traiter`,
+        "les plus récents d'abord",
         memeJour !== null ? `ouverts le ${jv(memeJour)}` : null,
       ]
         .filter(Boolean)
@@ -787,7 +798,7 @@ export function adapterResident(d: ResidentApi): VueResident {
         : null,
       bracelet,
     },
-    signaux: d.signaux.map((s) => ({
+    signaux: plusRecentsDabord(d.signaux).map((s) => ({
       id: s.id,
       gravite: gravite(s.severite),
       entete: `${gravite(s.severite).libelle} · ${s.origine} · ${jv(s.ouvert_jour_vol)} · ${heure(s.ouvert_at)}`,

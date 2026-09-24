@@ -80,6 +80,8 @@ export interface Beat {
   hint?: string;
   sortie?: Sortie;
   question?: Question;
+  /** Basculement automatique de scène déclenché à cet instant. */
+  gotoScene?: SceneKey;
 }
 
 /** Un tour de parole : le résident dit quelque chose, Sola répond. */
@@ -179,7 +181,7 @@ export const SCENES: Scene[] = [
                   state: "speaking",
                   dit: "Tant mieux. Je te laisse, je reste à portée de voix.",
                 },
-                { at: 3400, state: "idle", hint: "Mode apaisement · terminé" },
+                { at: 3400, state: "idle", hint: "Mode apaisement · terminé", gotoScene: "jour" },
               ],
             },
             {
@@ -251,7 +253,7 @@ export const SCENES: Scene[] = [
                   state: "speaking",
                   dit: "Je transmets, mais le Dr Ferreira passera quand même te voir. C’est la règle après une chute.",
                 },
-                { at: 5500, state: "idle" },
+                { at: 5500, state: "idle", hint: "Passage de contrôle maintenu", gotoScene: "jour" },
               ],
             },
           ],

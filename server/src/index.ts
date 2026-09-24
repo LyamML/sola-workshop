@@ -12,6 +12,7 @@ import { config } from "./config.js";
 import { ping } from "./db.js";
 import { adminApi } from "./routes/admin.js";
 import { authApi } from "./routes/auth.js";
+import { borneApi } from "./routes/borne.js";
 import { consoleApi } from "./routes/console.js";
 import { directApi } from "./routes/direct.js";
 import { ingest, recevoirWifi } from "./routes/ingest.js";
@@ -83,6 +84,7 @@ app.get("/", (_req, res) => {
       "POST /ingest/nuit": "duree de sommeil estimee (jeton requis)",
       "POST /ingest/conversation": "resume clinique, jamais de verbatim (jeton requis)",
       "POST /ingest/evenement": "chute, secousse, bouton d'urgence (jeton requis)",
+      "POST /ingest/signal": "signal de gravite emis en cours de conversation (jeton requis)",
       "POST /api/residents/:code/particularites":
         "note de particularite, signee par la session medecin",
       "PATCH /api/signaux/:id":
@@ -92,6 +94,10 @@ app.get("/", (_req, res) => {
       "POST /auth/connexion": "e-mail et mot de passe, pose le cookie de session",
       "POST /auth/deconnexion": "ferme la session en cours",
       "GET /auth/moi": "compte connecte, ou 401",
+    },
+    borne: {
+      "GET /borne/ia-contexte/:code":
+        "contexte de sante du resident, pour le prompt de Sola (jeton requis)",
     },
     lecture: {
       "GET /api/crew": "ecran 02 — sante de l'equipage",
@@ -134,6 +140,7 @@ app.get("/health", sante);
 app.use(session);
 
 app.use("/ingest", authBorne, ingest);
+app.use("/borne", authBorne, borneApi);
 app.use("/auth", authApi);
 app.use("/api", exigeSoignant, consoleApi, directApi);
 app.use("/admin", exigeAdmin, adminApi);

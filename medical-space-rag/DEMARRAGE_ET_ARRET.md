@@ -169,11 +169,41 @@ Par ordre de simplicité :
 
 ---
 
-## 5. Aide-mémoire
+## 5. Lancer le serveur RAG pour la borne
+
+La borne Sola peut maintenant interroger le RAG pendant la scène « Échange ».
+Il faut pour cela lancer le serveur HTTP FastAPI dans un terminal séparé :
+
+```powershell
+cd C:\Users\pivet\Documents\SOLA\medical-space-rag
+.\.venv\Scripts\Activate.ps1
+pip install fastapi "uvicorn[standard]"   # une seule fois, si pas encore installé
+uvicorn api_server:app --port 8000
+```
+
+Le serveur démarre sur `http://localhost:8000`. Il charge les embeddings une
+seule fois au démarrage, puis répond rapidement à chaque requête de la borne.
+
+Pour tester manuellement :
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:8000/health -Method Get
+```
+
+Pour l'arrêter : `Ctrl + C` dans son terminal.
+
+> Le serveur RAG est optionnel. Si Ollama est lancé mais que le serveur RAG ne
+> l'est pas, Sola fonctionne normalement avec les données de sola.db seules.
+> Si ni le serveur ni sola.db ne répondent, Sola fonctionne sans contexte enrichi.
+
+---
+
+## 6. Aide-mémoire
 
 | Action | Commande |
 |---|---|
 | Activer le venv | `.\.venv\Scripts\Activate.ps1` |
+| Lancer le serveur RAG (borne) | `uvicorn api_server:app --port 8000` |
 | Test rapide sans IA | `python test_rag.py --retrieval-only` |
 | Test complet avec IA | `python test_rag.py` |
 | Voir CPU/GPU du modèle | `ollama ps` |

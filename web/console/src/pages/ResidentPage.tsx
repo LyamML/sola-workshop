@@ -17,7 +17,7 @@ import { useDirect } from "../direct";
 import { REPLI_RESIDENT } from "../repli";
 import { useCompte } from "../session";
 import type { CleConstante, SignalFiche, VueResident } from "../types";
-import { useSource, type Source } from "../useSource";
+import { RELECTURE_MS, useSource, type Source } from "../useSource";
 
 interface Retour {
   chemin: string;
@@ -47,6 +47,7 @@ export function ResidentPage() {
     adapterResident,
     REPLI_RESIDENT,
     [id],
+    RELECTURE_MS,
   );
 
   // Le repli ne contient qu'une fiche. Pour tout autre résident, on attend la

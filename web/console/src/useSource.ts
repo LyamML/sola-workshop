@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type Source = "demo" | "api";
 
+/** Relecture de la file et de la fiche : un signal critique n'attend pas plus. */
+export const RELECTURE_MS = 15_000;
+
 /**
  * Charge une vue depuis le serveur de bord, avec repli sur le jeu de
  * démonstration.
@@ -17,12 +20,17 @@ export type Source = "demo" | "api";
  * `rafraichir` recharge **sans** repasser par le repli : après une écriture,
  * la fiche doit se mettre à jour, pas clignoter en revenant une seconde au jeu
  * de démonstration.
+ *
+ * `relireMs` relit la vue à intervalle, onglet visible seulement : une alerte
+ * que la borne remonte doit arriver dans la file sans que le médecin recharge
+ * la page. Un échec garde ce qui est affiché, comme au premier chargement.
  */
 export function useSource<TApi, TVue>(
   charger: () => Promise<TApi>,
   adapter: (donnees: TApi) => TVue,
   repli: TVue,
   deps: unknown[] = [],
+  relireMs?: number,
 ): { vue: TVue; source: Source; erreur: string | null; rafraichir: () => void } {
   const [vue, setVue] = useState<TVue>(repli);
   const [source, setSource] = useState<Source>("demo");
@@ -64,6 +72,15 @@ export function useSource<TApi, TVue>(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+
+  useEffect(() => {
+    if (!relireMs) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") aller();
+    }, relireMs);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relireMs, aller, ...deps]);
 
   return { vue, source, erreur, rafraichir: aller };
 }

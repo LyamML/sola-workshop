@@ -14,7 +14,8 @@ Sola lit sa réponse à voix haute.
 | Premier chargement du modèle (à froid) | 11,3 s |
 | Réponse, modèle déjà chargé | premier mot en 0,5 à 0,6 s, réponse complète en 4,3 à 4,6 s |
 | « J'ai mal dormi, la ventilation claque » | réponse courte, en français, qui tutoie et **propose** au lieu de prétendre agir |
-| « J'ai une douleur dans la poitrine » | Sola dit de contacter tout de suite l'infirmerie ou le Dr Ferreira |
+| « J'ai une douleur dans la poitrine » | l'alerte part, Sola dit « l'équipe médicale a reçu une alerte » ; serveur de bord injoignable, elle renvoie vers l'infirmerie B (vérifié le 24/09/2026) |
+| « Tu peux prévenir le médecin pour moi ? » | l'alerte part en `surveillance`, la réponse s'ouvre sur « L'équipe médicale est prévenue. » (vérifié le 24/09/2026) |
 | Ollama en panne (simulée) | phrase de repli à voix haute, « IA locale injoignable » dans la barre d'état |
 | Changement de scène pendant une réponse | la requête est annulée, rien ne s'affiche dans la nouvelle scène |
 
@@ -56,12 +57,13 @@ flowchart LR
 6. **Quand la réponse est complète**, Sola la lit à voix haute, puis se remet
    à écouter.
 
-**Rien ne sort du PC pendant l'échange.** La conversation vit dans la mémoire
-de la page et dans Ollama. À la **sortie** de « Échange », un résumé clinique
-(pas le verbatim) peut partir vers le serveur de bord : mental et physique
-évoqués à l'oral y figurent ; si la sévérité n'est pas `info`, un signal
-s'ouvre pour le médecin. L'historique s'efface quand on change de scène ou
-qu'on recharge la page.
+**Aucune parole ne sort du PC.** La conversation vit dans la mémoire de la
+page et dans Ollama. Pendant l'échange, seule une alerte à motif générique
+peut partir (voir « Résumé et alertes ») ; à la **sortie** de « Échange », un
+résumé clinique (pas le verbatim) peut partir vers le serveur de bord : mental
+et physique évoqués à l'oral y figurent ; si la sévérité n'est pas `info`, un
+signal s'ouvre pour le médecin. L'historique s'efface quand on change de scène
+ou qu'on recharge la page.
 
 ---
 
@@ -88,8 +90,9 @@ Le prompt système (dans `ia.ts`) dit à Sola :
 - ce qu'elle **sait** (seulement ce que Lyam dit, pas de bracelet ni de
   dossier) et ce qu'elle **peut faire** (écouter, conseiller, orienter — rien
   exécuter elle-même) ;
-- **vers qui orienter** : l'infirmerie B pour les soins et l'urgence, le
-  Dr Ferreira pour le suivi, la maintenance pour la cabine ;
+- **vers qui orienter** : le Dr Ferreira pour le suivi, la maintenance pour
+  la cabine — et **jamais l'infirmerie** : ce qui presse, la borne l'alerte
+  d'elle-même, et une note du code dit au modèle quand l'alerte est partie ;
 - de répondre en **une ou deux phrases courtes**, en français parlé, en
   tutoyant, sans liste ni astérisque, puisque tout est lu à voix haute ;
 - de réagir avec du concret sans reformuler la phrase de Lyam, de répondre
@@ -98,8 +101,9 @@ Le prompt système (dans `ia.ts`) dit à Sola :
 - de **ne rien inventer** (fait, chiffre, symptôme, sensation), de **ne poser
   aucun diagnostic** et de **ne jamais prétendre avoir agi**.
 
-Le prompt se termine par **cinq exemples d'échanges** (ventilation bruyante,
-genou en deux temps, demande de prévenir le médecin, tomates de la serre).
+Le prompt se termine par **des exemples d'échanges** (ventilation bruyante,
+genou en deux temps, tomates de la serre). La demande de prévenir le médecin
+n'y est plus : c'est le code qui la traite, en envoyant une alerte.
 Pour un modèle de cette taille, c'est ce qui change le plus la qualité : il
 imite le ton qu'on lui montre bien mieux qu'il n'applique une règle abstraite.
 
@@ -113,8 +117,9 @@ maintenant tranchés dans `ia.ts`, pas par le modèle :
 
 | Garde-fou | Ce qu'il fait |
 |---|---|
-| **Urgence détectée** (mots-clés) | Réponse écrite à l'avance, sans appel au modèle : « appelle l'infirmerie B maintenant, ne reste pas seul ». Les réponses suivantes rappellent l'urgence même si Lyam minimise. Le résumé passe en `critique` |
-| **Action prétendue** (« je préviens », « j'ai contacté »…) | La phrase est remplacée par « Je ne peux contacter personne moi-même, mais tu peux appeler l'infirmerie B… » |
+| **Urgence détectée** (mots-clés) | L'alerte part d'abord ; puis une réponse écrite à l'avance, sans appel au modèle : « l'équipe médicale a reçu une alerte, ne reste pas seul ». Si le serveur de bord ne l'a pas reçue : « je n'arrive pas à joindre l'équipe médicale, appelle l'infirmerie B ». Les réponses suivantes rappellent l'urgence même si Lyam minimise. Le résumé passe en `critique` |
+| **Demande d'aide** (« préviens le médecin », « j'ai besoin d'aide »…) | Alerte `surveillance` ; une fois enregistrée, la réponse s'ouvre sur « L'équipe médicale est prévenue. », écrite par le code |
+| **Action prétendue** (« je préviens », « j'ai contacté »…) | La phrase est remplacée par la vérité sur l'alerte : « L'équipe médicale est prévenue » si elle est partie, l'infirmerie B si elle a échoué, sinon un rendez-vous avec le Dr Ferreira |
 | **Nom de maladie ou de lésion** (« entorse », « migraine »…) | La phrase est retirée |
 | **Sensation inventée** (« j'ai senti ta tension ») | La phrase est retirée |
 | **Relance creuse** (« tu veux en parler ? ») | Retirée s'il reste autre chose à dire |
@@ -206,21 +211,45 @@ puis `ollama pull qwen3:4b` et relancer `npm run dev:borne`.
   lieu de 4 à 7 mais invente nettement plus : il n'est pas retenu.
 - **La détection d'urgence repose sur des mots-clés.** Une formulation
   inconnue passe au modèle, qui n'a plus que sa consigne.
-- **La borne ne lit pas encore la base ni le bracelet** pour enrichir Sola :
-  en « Échange » elle ne sait que ce que le résident dit. Un problème physique
-  n'entre dans le résumé que s'il a été dit à voix haute ou tapé.
+- **La borne lit désormais sola.db** pour enrichir Sola au démarrage de la
+  scène « Échange » : profil de santé du résident (constantes 14 jours,
+  sommeil 7 nuits, scores PHQ-9/GAD-7/ISI, particularités, signaux ouverts).
+  Sola ne cite pas ces chiffres — elle s'en sert pour orienter. Le bracelet
+  (mesures en temps réel) et la littérature médicale NASA/ESA (RAG, outil
+  médecin) ne sont pas lus pendant l'échange.
 - **La vraie voix n'a pas été testée par moi** : le micro est bloqué dans le
   navigateur intégré de Cursor. C'est à tester dans Chrome.
 
 ## Résumé et alertes (fait)
 
-À la sortie de « Échange », si le résident a parlé au moins une fois :
+**Pendant l'échange**, chaque phrase du résident reçoit un score de gravité
+par mots-clés (`evaluerGravite`, 0 à 10), **avant** l'appel au modèle : un
+Ollama éteint ou une interruption ne fait pas perdre l'alerte. Si le score
+dépasse le plus haut déjà envoyé :
+
+1. la borne envoie un motif générique à `POST /bord/ingest/signal`, jamais du
+   verbatim, avec une seconde tentative après un raté réseau ;
+2. le serveur ouvre un signal `origine = conversation`, horodaté à l'instant
+   où le résident a parlé, et recalcule le statut du résident ;
+3. Sola attend l'accusé du serveur avant de répondre (quelques dizaines de
+   millisecondes en local) : « Médecin informé », « l'équipe médicale est
+   prévenue » et la bascule vers la scène « Alerte » n'arrivent qu'une fois le
+   signal en base. Un échec s'écrit dans la barre d'état (« Alerte non
+   transmise »), et c'est le seul cas où Sola renvoie vers l'infirmerie B.
+
+**À la sortie de « Échange »**, si le résident a parlé au moins une fois :
 
 1. Ollama produit un JSON (`resume`, `severite`, `tags`) ;
 2. la borne l'envoie à `POST /bord/ingest/conversation` (jeton ajouté par Vite) ;
-3. si `severite` ≠ `info`, le serveur ouvre un signal `origine = conversation` ;
+3. si `severite` ≠ `info`, le serveur ouvre un signal `origine = conversation`
+   — sauf si l'échange en a déjà ouvert un : il en relève alors la gravité
+   plutôt que d'en créer un second ;
 4. la barre d'état affiche « Résumé transmis », « Remontée médecin », ou une
    erreur (« Résumé non produit », « Serveur de bord injoignable »).
+
+**Côté console**, l'écran 02 et la fiche se relisent toutes les 15 secondes :
+un signal remonté apparaît sans recharger la page. Les heures sont celles du
+serveur de bord (heure locale), comme le jeu de démonstration.
 
 Il faut `npm run dev:server` + `BORNE_TOKEN` dans `server/.env` pour que
 l'envoi aboutisse.

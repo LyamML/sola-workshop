@@ -233,3 +233,19 @@ export const evenementSchema = z
     intensite_g: z.number().min(0).max(16).nullable().default(null),
   })
   .strict();
+
+/**
+ * Signal de gravite emis par la borne en cours de conversation.
+ *
+ * Le motif est generique (ex. "Urgence physique detectee — J+4128") :
+ * aucun verbatim du resident n'est accepte. refuseVerbatim est appele
+ * cote serveur avant la validation de forme.
+ */
+export const signalSchema = z
+  .object({
+    resident: codeResident,
+    motif: z.string().min(5).max(255),
+    severite: z.enum(["critique", "surveillance", "info"]),
+    survenu_at: horodatage,
+  })
+  .strict();

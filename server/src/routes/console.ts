@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { RequestHandler, Response } from "express";
 import { compte } from "../auth.js";
 import { config } from "../config.js";
-import { ecrire, requete, transaction } from "../db.js";
+import { ecrire, heureDeBord, recalculerStatut, requete, transaction } from "../db.js";
 import type { Compte } from "../sessions.js";
 
 /**
@@ -66,6 +66,13 @@ const jourVolDe = (colonne: string) =>
 /** Ordre de gravite. SQLite n'a pas FIELD() : un CASE fait la meme chose. */
 const ORDRE_SEVERITE = `
   CASE s.severite WHEN 'critique' THEN 1 WHEN 'surveillance' THEN 2 ELSE 3 END`;
+
+/**
+ * Les signaux se lisent du plus recent au plus ancien, sur les trois ecrans.
+ * L'identifiant departage deux signaux de la meme seconde : sans lui, leur
+ * ordre changerait d'une relecture a l'autre.
+ */
+const PLUS_RECENT = "s.ouvert_at DESC, s.id DESC";
 
 /**
  * A qui revient un signal.
@@ -177,8 +184,9 @@ export function lireCrew() {
 
   const physio = requete("SELECT libelle, pct FROM v_alertes_physio ORDER BY ordre");
 
-  // La file : la plus grave d'abord, puis la plus ancienne. Huit lignes, le
-  // reste est a un clic dans le registre.
+  // La file : la plus recente d'abord, quelle que soit sa gravite, que chaque
+  // ligne affiche. Huit lignes, le reste est a un clic dans le registre, et
+  // les compteurs d'en-tete portent sur tous les signaux a traiter.
   const triage = requete(
     `SELECT s.id, s.severite, s.origine, s.motif, s.statut,
             r.code AS resident, r.prenom, r.nom, r.cabine,
@@ -190,7 +198,7 @@ export function lireCrew() {
        JOIN residents r ON r.id = s.resident_id
        ${JOINTURE_ASSIGNE}
       WHERE s.statut <> 'clos'
-      ORDER BY ${ORDRE_SEVERITE}, s.ouvert_at
+      ORDER BY ${PLUS_RECENT}
       LIMIT 8`,
     { ancre: a.jour, ancre_vol: a.jour_vol },
   );
@@ -302,7 +310,7 @@ export function lireResident(code: string) {
        FROM signaux s
        ${JOINTURE_ASSIGNE}
       WHERE s.resident_id = :id AND s.statut <> 'clos'
-      ORDER BY ${ORDRE_SEVERITE}, s.ouvert_at`,
+      ORDER BY ${PLUS_RECENT}`,
     { id, ancre: a.jour, ancre_vol: a.jour_vol },
   ).map((s) => ({ ...s, motifs_cloture: MOTIFS_CLOTURE[s.origine] ?? [] }));
 
@@ -660,8 +668,8 @@ consoleApi.get("/signaux", (req, res, next) => {
          JOIN residents r ON r.id = s.resident_id
          ${JOINTURE_ASSIGNE}
          ${filtre}
-        ORDER BY ${ordre(TRIS_SIGNAUX, req.query.tri, req.query.sens, "ordre_severite")},
-                 s.ouvert_at
+        ORDER BY ${ordre(TRIS_SIGNAUX, req.query.tri, req.query.sens, "s.ouvert_at")},
+                 ${PLUS_RECENT}
         LIMIT :taille OFFSET :decalage`,
       { ...params, taille, decalage, ancre: a.jour, ancre_vol: a.jour_vol },
     ).map((l) => ({
@@ -727,25 +735,6 @@ consoleApi.get("/signaux/stats", (_req, res, next) => {
 });
 
 // ---------------------------------------------- gestes : prendre et clore ---
-/**
- * Le statut d'un resident suit ses signaux ouverts : critique s'il en reste
- * un critique, surveillance s'il en reste un autre, ok sinon. Des EXISTS et
- * non un MIN sur les gravites : sur un ensemble vide, MIN rend NULL, et un
- * resident sans signal serait retombe en surveillance.
- */
-const RECALCUL_STATUT = `
-  UPDATE residents
-     SET statut = CASE
-           WHEN EXISTS (SELECT 1 FROM signaux
-                         WHERE resident_id = :rid AND statut <> 'clos'
-                           AND severite = 'critique') THEN 'critique'
-           WHEN EXISTS (SELECT 1 FROM signaux
-                         WHERE resident_id = :rid AND statut <> 'clos') THEN 'surveillance'
-           ELSE 'ok'
-         END,
-         updated_at = datetime('now')
-   WHERE id = :rid`;
-
 interface Signal {
   id: number;
   resident_id: number;
@@ -832,13 +821,13 @@ consoleApi.patch("/signaux/:id", (req, res, next) => {
       const statutResident = transaction(() => {
         const { changes } = ecrire(
           `UPDATE signaux
-              SET statut = 'clos', clos_at = datetime('now'),
+              SET statut = 'clos', clos_at = :maintenant,
                   clos_motif = :motif, assigne_id = :moi, assigne_a = NULL
             WHERE id = :id AND statut <> 'clos'`,
-          { id, motif, moi: moi.id },
+          { id, motif, moi: moi.id, maintenant: heureDeBord() },
         );
         if (!changes) return null;
-        ecrire(RECALCUL_STATUT, { rid: signal.resident_id });
+        recalculerStatut(signal.resident_id);
         return (
           requete<{ statut: string }>("SELECT statut FROM residents WHERE id = :rid", {
             rid: signal.resident_id,

@@ -12,7 +12,7 @@ import { entier } from "../format";
 import { REPLI_CREW } from "../repli";
 import { useCompte } from "../session";
 import type { CleIndicateur, LigneFile, Periode } from "../types";
-import { useSource } from "../useSource";
+import { RELECTURE_MS, useSource } from "../useSource";
 
 type Vue = "motifs" | "modules" | "physio";
 
@@ -37,7 +37,7 @@ const VUES: { cle: Vue; libelle: string }[] = [
  */
 export function CrewPage() {
   const { compte } = useCompte();
-  const { vue, source, rafraichir } = useSource(api.crew, adapterCrew, REPLI_CREW);
+  const { vue, source, rafraichir } = useSource(api.crew, adapterCrew, REPLI_CREW, [], RELECTURE_MS);
   const { montrer, rendu: avis } = useAvis();
 
   const [periode, setPeriode] = useState<Periode["cle"]>("30");

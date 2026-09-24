@@ -29,6 +29,43 @@ export type ResultatRemontee =
   | { ok: true; remontee_auto: boolean }
   | { ok: false; raison: "resume" | "serveur" };
 
+/**
+ * Envoie un signal de gravité au serveur de bord en cours de conversation.
+ *
+ * Appelé par App.tsx dès qu'un seuil de score est franchi, sans attendre
+ * la fin de l'échange. Le motif est générique — jamais du verbatim.
+ * Une seconde tentative après un raté réseau ou un 5xx ; un 4xx ne se
+ * rejoue pas, la même charge serait refusée pareil. `false` si rien n'est
+ * parti : la barre d'état le dit, la conversation continue.
+ */
+export async function envoyerSignal(opts: {
+  motif: string;
+  severite: "critique" | "surveillance" | "info";
+  survenu_at: string;
+}): Promise<boolean> {
+  const corps = JSON.stringify({
+    resident: RESIDENT_CODE,
+    motif: opts.motif,
+    severite: opts.severite,
+    survenu_at: opts.survenu_at,
+  });
+  for (let tentative = 0; tentative < 2; tentative++) {
+    if (tentative) await new Promise((fin) => setTimeout(fin, 3000));
+    try {
+      const reponse = await fetch("/bord/ingest/signal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: corps,
+      });
+      if (reponse.status === 201) return true;
+      if (reponse.status < 500) return false;
+    } catch {
+      // réseau : on retente
+    }
+  }
+  return false;
+}
+
 export async function envoyerResume(opts: {
   debut_at: string;
   duree_min: number;

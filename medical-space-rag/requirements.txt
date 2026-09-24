@@ -5,3 +5,5 @@ pymupdf
 sqlalchemy
 pandas
 numpy
+fastapi
+uvicorn[standard]

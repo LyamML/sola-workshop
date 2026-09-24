@@ -5,7 +5,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
 } from "react";
 import { SolaAvatar } from "./components/SolaAvatar";
 import { Wave } from "./components/Wave";
@@ -24,8 +23,17 @@ import {
 import { connectBracelet, type BraceletReading } from "./bracelet";
 import { libelleTransmission, useTransmission } from "./transmission";
 import { correspond, useVoix } from "./voix";
-import { discuter, EchecIA, prechauffer, resumer, type Tour } from "./ia";
-import { envoyerResume } from "./remontee";
+import {
+  chargerContexteResident,
+  discuter,
+  EchecIA,
+  evaluerGravite,
+  prechauffer,
+  resumer,
+  type EtatAlerte,
+  type Tour,
+} from "./ia";
+import { envoyerResume, envoyerSignal, JOUR_VOL } from "./remontee";
 
 interface Replique {
   id: number;
@@ -171,14 +179,29 @@ export default function App() {
   // la pastille qui le dit, comme toute sortie — et d'une scène à l'autre.
   const [remontee, setRemontee] = useState<{ texte: string; alerte: boolean } | null>(null);
   const [resumeParti, setResumeParti] = useState<Sortie | null>(null);
-  const [saisie, setSaisie] = useState("");
-  const champ = useRef<HTMLInputElement>(null);
 
   // L'échange avec le modèle ne vit qu'ici, dans la mémoire de la page.
   // À la sortie de « Échange », un résumé part ; le verbatim, lui, disparaît.
   const historique = useRef<Tour[]>([]);
   const debutEchange = useRef<string | null>(null);
   const requete = useRef<AbortController | null>(null);
+
+  // Contexte de santé enrichi : chargé une seule fois au démarrage de la
+  // scène « Échange » (sola.db via le serveur).
+  // Null si le serveur ne répond pas — Sola fonctionne sans contexte.
+  const contexteRef = useRef<string | null>(null);
+
+  // Score de gravité le plus haut déjà traité dans la conversation en cours.
+  // Empêche d'envoyer plusieurs signaux au même palier pour la même séance.
+  // Remis à 0 à chaque changement de scène.
+  const scoreMax = useRef(0);
+  // Une alerte « surveillance » ou plus enregistrée par le serveur pendant
+  // l'échange : Sola peut dire que l'équipe médicale est prévenue.
+  const alerteTransmise = useRef(false);
+
+  // Basculement automatique de scène depuis le bracelet.
+  // prevFalls : dernier compteur de chutes connu (null = pas encore de lecture).
+  const prevFalls = useRef<number | null>(null);
 
   // --- la voix ---------------------------------------------------------------
   // Le gestionnaire de phrase dépend de presque tout l'état de l'écran, et la
@@ -240,6 +263,8 @@ export default function App() {
         // la prononce ici, sans la recopier dans la trace : elle est à l'écran.
         if (q.dit) parler(q.dit);
       }
+      // setSceneKey est un setter React stable : pas besoin de l'ajouter aux dépendances.
+      if (beat.gotoScene) setSceneKey(beat.gotoScene);
     },
     [dire, parler],
   );
@@ -270,6 +295,22 @@ export default function App() {
     debutEchange.current = scene.ia ? new Date().toISOString() : null;
     setIaErreur(null);
     if (scene.ia && actif) prechauffer();
+
+    // Score de gravité et compteur de chutes remis à zéro à chaque scène.
+    scoreMax.current = 0;
+    alerteTransmise.current = false;
+    prevFalls.current = null;
+
+    // Chargement du profil de santé depuis sola.db au démarrage de la scène
+    // « Échange ». Silencieux en cas d'échec : Sola fonctionne sans contexte.
+    if (scene.ia) {
+      contexteRef.current = null;
+      void chargerContexteResident(RESIDENT).then((profil) => {
+        contexteRef.current = profil;
+      });
+    } else {
+      contexteRef.current = null;
+    }
     setVoice(scene.ouverture.state);
     setHint(scene.ouverture.hint);
     compteur.current += 1;
@@ -342,6 +383,22 @@ export default function App() {
 
   // --- bracelet ---------------------------------------------------------------
   const [reading, setReading] = useState<BraceletReading | null>(null);
+
+  // Basculement automatique de scène depuis le bracelet.
+  // Évalué à chaque nouvelle lecture ; n'agit que depuis la scène « Échange ».
+  useEffect(() => {
+    if (!reading) return;
+
+    // Chute → Alerte (depuis Échange uniquement, une seule fois par chute).
+    const nowFalls = reading.falls ?? 0;
+    if (sceneKey === "jour" && prevFalls.current !== null && nowFalls > prevFalls.current) {
+      prevFalls.current = nowFalls;
+      setSceneKey("alerte");
+      return;
+    }
+    prevFalls.current = nowFalls;
+  }, [reading, sceneKey]);
+
   const [bleError, setBleError] = useState<string | null>(null);
   const disconnect = useRef<(() => void) | null>(null);
   const transmission = useTransmission(RESIDENT);
@@ -382,10 +439,60 @@ export default function App() {
   useEffect(() => () => disconnect.current?.(), []);
 
   // --- conversation avec le modèle local ------------------------------------
+
+  /** Construit un motif générique pour le signal médecin (jamais du verbatim). */
+  const construireMotif = (score: number): string => {
+    const j = `J+${JOUR_VOL}`;
+    if (score >= 10) return `Détresse émotionnelle signalée en conversation (${j})`;
+    if (score >= 9) return `Urgence physique signalée en conversation (${j})`;
+    if (score >= 7) return `Symptôme préoccupant mentionné en conversation (${j})`;
+    if (score === 6) return `Demande d’aide médicale formulée en conversation (${j})`;
+    return `Symptôme léger mentionné en conversation (${j})`;
+  };
+
   const converser = async (texte: string) => {
+    // Horodaté dès la parole, avant l’appel au modèle : le signal
+    // médecin doit marquer l’instant où le résident a dit quelque chose,
+    // pas celui où Sola a fini de répondre (décalage possible de 5-60 s).
+    const survenu_at = new Date().toISOString();
     // Écrire par-dessus elle la coupe, comme lui parler par-dessus.
     taire();
     dire("resident", texte);
+
+    // ---- scoring de gravité -------------------------------------------------
+    // Évalué sur la phrase du résident, et avant l'appel au modèle : un Ollama
+    // éteint, ou un résident qui coupe Sola en reparlant, ne doit pas faire
+    // perdre l'alerte. Le signal ne part que si le score dépasse le maximum
+    // déjà traité.
+    const score = evaluerGravite(texte);
+    const nouvelleAlerte = score > 0 && score > scoreMax.current;
+    let envoi: Promise<boolean> | null = null;
+    if (nouvelleAlerte) {
+      const precedent = scoreMax.current;
+      scoreMax.current = score;
+      const severite: "critique" | "surveillance" | "info" =
+        score >= 9 ? "critique" : score >= 5 ? "surveillance" : "info";
+      envoi = envoyerSignal({ motif: construireMotif(score), severite, survenu_at }).then((ok) => {
+        if (!ok) {
+          // Non transmise : la phrase suivante du même niveau doit pouvoir la renvoyer.
+          if (scoreMax.current === score) scoreMax.current = precedent;
+          setRemontee({ texte: "Alerte non transmise · serveur de bord injoignable", alerte: true });
+          return false;
+        }
+        if (score >= 5) alerteTransmise.current = true;
+        // « Médecin informé » seulement une fois le signal en base. Pour
+        // surveillance (5-8) : critique bascule en Alerte, info reste silencieux.
+        if (score >= 5 && score <= 8) {
+          setSorties((prev) =>
+            prev.some((s) => s.id === "alerte-medecin")
+              ? prev
+              : [...prev, { id: "alerte-medecin", texte: "Médecin informé", ton: "chaud" as const }],
+          );
+        }
+        return true;
+      });
+    }
+
     historique.current = [...historique.current, { role: "user", content: texte }];
     const controle = new AbortController();
     requete.current = controle;
@@ -401,27 +508,50 @@ export default function App() {
     };
 
     let dit: string;
+    let alerte: EtatAlerte = alerteTransmise.current ? "transmise" : "aucune";
     try {
+      // Sola ne dit que l'équipe médicale est prévenue qu'une fois le serveur
+      // de bord l'a enregistré : quelques dizaines de millisecondes en local.
+      const envoyee = envoi ? await envoi : null;
+      if (controle.signal.aborted) return;
+      if (envoyee === false && score >= 5) alerte = "echec";
+      else if (alerteTransmise.current) alerte = "transmise";
+
       const reponse = await discuter(historique.current, {
         signal: controle.signal,
         onMorceau: (t) => {
           if (t) ecrire(t);
         },
+        contexte: contexteRef.current,
+        alerte,
+        annoncer: envoyee === true && score >= 5 && score <= 8,
       });
       dit = reponse || "Je n’ai pas trouvé mes mots. Tu peux répéter ?";
       historique.current = [...historique.current, { role: "assistant", content: dit }];
+      // Basculement de scène depuis Échange uniquement : Critique → Alerte.
+      // Pas sur un échec : la scène Alerte dit le médecin prévenu, et Sola
+      // vient de dire d'appeler l'infirmerie.
+      if (nouvelleAlerte && sceneKey === "jour" && score >= 9 && alerte === "transmise") {
+        setSceneKey("alerte");
+      }
     } catch (erreur) {
       const raison = erreur instanceof EchecIA ? erreur.raison : "injoignable";
       if (raison === "annule") return;
       setIaErreur(
         raison === "modele" && erreur instanceof EchecIA ? erreur.message : "IA locale injoignable",
       );
-      // Même en panne, Sola ne laisse pas une question sans réponse — et elle
-      // rappelle où aller si ce qu'on vient de lui dire ne pouvait pas attendre.
-      dit =
+      // Même en panne, Sola ne laisse pas une question sans réponse. Elle ne
+      // renvoie vers l'infirmerie que si une alerte nécessaire n'a pas pu partir.
+      const debut =
         raison === "delai"
-          ? "Je mets trop de temps à te répondre. Tu peux me le redire ? Si c’est urgent, appelle l’infirmerie."
-          : "Je n’arrive pas à réfléchir pour l’instant. Si c’est urgent, appelle l’infirmerie.";
+          ? "Je mets trop de temps à te répondre."
+          : "Je n’arrive pas à réfléchir pour l’instant.";
+      dit =
+        alerte === "transmise"
+          ? `${debut} Mais l’équipe médicale est prévenue.`
+          : alerte === "echec"
+            ? `${debut} Je n’arrive pas non plus à joindre l’équipe médicale : si c’est urgent, appelle l’infirmerie B.`
+            : `${debut} Tu peux me le redire dans un moment ?`;
     } finally {
       if (requete.current === controle) {
         requete.current = null;
@@ -515,19 +645,8 @@ export default function App() {
     }
     if (e.code === "Space" || e.code === "Enter") {
       e.preventDefault();
-      // Sans micro, le modèle n'a pas de réplique toute prête à recevoir : il
-      // faut la lui écrire.
-      if (scene.ia) champ.current?.focus();
-      else avancer();
+      if (!scene.ia) avancer();
     }
-  };
-
-  const envoyer = (e: FormEvent) => {
-    e.preventDefault();
-    const texte = saisie.trim();
-    if (!texte || busy || question) return;
-    setSaisie("");
-    avancer(texte);
   };
 
   useEffect(() => {
@@ -718,18 +837,7 @@ export default function App() {
               {enEcoute && piedTexte ? <Icone nom="micro" /> : null}
               {insecable(piedTexte)}
             </p>
-            {scene.ia && actif ? (
-              <form className="b-saisie" onSubmit={envoyer}>
-                <input
-                  ref={champ}
-                  value={saisie}
-                  onChange={(e) => setSaisie(e.target.value)}
-                  placeholder="Ou écris à Sola, puis Entrée"
-                  aria-label="Écrire à Sola"
-                  autoComplete="off"
-                />
-              </form>
-            ) : null}
+
           </div>
         </section>
 

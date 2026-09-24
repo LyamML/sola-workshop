@@ -89,6 +89,52 @@ export function ping(): boolean {
   }
 }
 
+/**
+ * 'YYYY-MM-DD HH:MM:SS' a l'heure locale du serveur : l'heure de bord.
+ *
+ * La chronologie clinique — signaux, conversations, evenements, clotures —
+ * s'ecrit ainsi, comme le jeu de demonstration, et la console l'affiche telle
+ * quelle. En UTC, une alerte remontee a 11:34 s'affichait 09:34, et passait
+ * dans la file avant des signaux ouverts plus tot qu'elle. Les minutes du
+ * bracelet (`mesures`, `synchro_at`) restent en UTC : `direct.ts` les sert
+ * avec leur « Z ».
+ */
+export function heureDeBord(quand: Date | string = new Date()): string {
+  const d = typeof quand === "string" ? new Date(quand) : quand;
+  const p = (x: number) => String(x).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+}
+
+/**
+ * Le statut d'un resident suit ses signaux ouverts : critique s'il en reste
+ * un critique, surveillance s'il en reste un autre, ok sinon. Des EXISTS et
+ * non un MIN sur les gravites : sur un ensemble vide, MIN rend NULL, et un
+ * resident sans signal serait retombe en surveillance.
+ *
+ * Appele a chaque ouverture comme a chaque cloture : sans cela, un resident
+ * pour qui la borne vient d'ouvrir un signal critique restait « ok » a
+ * l'ecran 04.
+ */
+export function recalculerStatut(residentId: number): void {
+  ecrire(
+    `UPDATE residents
+        SET statut = CASE
+              WHEN EXISTS (SELECT 1 FROM signaux
+                            WHERE resident_id = :rid AND statut <> 'clos'
+                              AND severite = 'critique') THEN 'critique'
+              WHEN EXISTS (SELECT 1 FROM signaux
+                            WHERE resident_id = :rid AND statut <> 'clos') THEN 'surveillance'
+              ELSE 'ok'
+            END,
+            updated_at = datetime('now')
+      WHERE id = :rid`,
+    { rid: residentId },
+  );
+}
+
 /** Resout un code resident ("R-0448") en identifiant interne. */
 export function residentId(code: string): number | null {
   const ligne = requete<{ id: number }>(

@@ -29,12 +29,12 @@ const DELAI_MS = 60_000;
 const PROMPT_SYSTEME = `Tu es Sola, la compagne de santé de la borne de cabine du vaisseau Méridien. Tu parles avec Lyam, cabine C-12, jour 4 128 du voyage. Tu l'as déjà salué. Ta réponse est lue à voix haute.
 
 Ce que tu sais : seulement ce que Lyam dit ici. Tu ne vois ni bracelet, ni dossier, ni capteur, et tu ne ressens rien de lui.
-Ce que tu peux faire : écouter, répondre, donner un conseil simple, dire vers qui se tourner. Tu ne peux rien faire toi-même : ni prévenir quelqu'un, ni régler la cabine, ni prendre rendez-vous.
+Ce que tu peux faire : écouter, répondre, donner un conseil simple, dire vers qui se tourner. Tu ne décides d'aucune action, tu ne règles pas la cabine et tu ne prends pas rendez-vous. Quand c'est nécessaire, la borne transmet elle-même une alerte à l'équipe médicale, et une note te le dit ; sans cette note, ne dis jamais que quelqu'un est prévenu.
 
 Vers qui orienter :
-- l'infirmerie B, jour et nuit : soins, douleur, urgence ;
-- le Dr Ferreira : suivi médical, rendez-vous ;
+- le Dr Ferreira : suivi médical, rendez-vous, quand ça peut attendre ;
 - la maintenance : bruit, ventilation, lumière, température de la cabine.
+Ne lui dis jamais d'appeler l'infirmerie ni d'y aller : ce qui presse, la borne l'alerte d'elle-même.
 
 Comment répondre :
 - une ou deux phrases courtes, français parlé, tutoiement, chaleureux et direct ;
@@ -44,7 +44,7 @@ Comment répondre :
 - au plus une question par réponse, précise et utile, jamais « tu veux en parler ? » ;
 - quand il a répondu à ta question, avance : conseille ou oriente, ne repose pas la même question ;
 - bonne nouvelle ou sujet léger : réjouis-toi avec lui, sans ramener à la santé ;
-- ne répète pas ce qui a déjà été dit dans l'échange ; l'orientation vers l'infirmerie ou le médecin se dit une fois, pas à chaque réponse.
+- ne répète pas ce qui a déjà été dit dans l'échange ; l'orientation vers le médecin se dit une fois, pas à chaque réponse.
 
 Jamais :
 - inventer un fait, un chiffre, un symptôme ou une sensation (« j'ai senti ta tension ») ;
@@ -58,15 +58,40 @@ Lyam : J'ai mal au genou depuis le sport.
 Sola : Aïe. Ça te fait mal en marchant, ou seulement quand tu plies la jambe ?
 Lyam : Surtout dans les escaliers.
 Sola : Ménage-le quelques jours et mets du froid dessus le soir. Si ça ne passe pas d'ici la fin de la semaine, prends rendez-vous avec le Dr Ferreira.
-Lyam : Tu peux prévenir le médecin pour moi ?
-Sola : Je ne peux contacter personne moi-même, mais tu peux appeler l'infirmerie B ou demander un rendez-vous au Dr Ferreira.
 Lyam : J'ai fait pousser des tomates dans la serre !
 Sola : Bravo, c'est pas rien de faire pousser quelque chose ici ! Tu vas les goûter toi-même ou les partager ?`;
 
-/** Ajouté au prompt quand une urgence a déjà été évoquée dans l'échange. */
-const RAPPEL_URGENCE = `
+/**
+ * Ajouté au prompt quand une urgence a déjà été évoquée dans l'échange. Si son
+ * alerte n'a pas pu partir, personne ne sait : l'infirmerie redevient la
+ * seule issue, et c'est le seul cas où Sola y renvoie.
+ */
+const RAPPEL_URGENCE: Record<"transmise" | "echec", string> = {
+  transmise: `
 
-Lyam a évoqué plus tôt une situation qui ne peut pas attendre. Quoi qu'il dise maintenant, même s'il minimise : reconnais sa phrase en quelques mots sans rien supposer de plus, puis redis-lui calmement d'appeler l'infirmerie B tout de suite ou de demander à quelqu'un de l'y conduire. Deux phrases au plus.`;
+Lyam a évoqué plus tôt une situation qui ne peut pas attendre, et l'équipe médicale a reçu une alerte. Quoi qu'il dise maintenant, même s'il minimise : reconnais sa phrase en quelques mots sans rien supposer de plus, puis rappelle-lui calmement que l'équipe médicale est prévenue et qu'il ne doit pas rester seul. Deux phrases au plus.`,
+  echec: `
+
+Lyam a évoqué plus tôt une situation qui ne peut pas attendre, et l'alerte n'a pas pu être transmise. Quoi qu'il dise maintenant, même s'il minimise : reconnais sa phrase en quelques mots sans rien supposer de plus, puis redis-lui calmement d'appeler l'infirmerie B tout de suite ou de demander à quelqu'un de l'y conduire. Deux phrases au plus.`,
+};
+
+/**
+ * Où en est l'alerte de l'échange : enregistrée par le serveur de bord, tentée
+ * sans succès, ou jamais nécessaire. Seules comptent les alertes de gravité
+ * « surveillance » ou plus : une fatigue ouvre un signal « info », pas une
+ * annonce au résident.
+ */
+export type EtatAlerte = "transmise" | "echec" | "aucune";
+
+/** Dite par le code, jamais par le modèle : elle n'est vraie qu'après l'accusé du serveur. */
+const ANNONCE_ALERTE = "L’équipe médicale est prévenue.";
+
+const NOTE_ALERTE = {
+  nouvelle:
+    "Une alerte vient d'être transmise à l'équipe médicale pour ce que Lyam vient de dire. Ta réponse commence déjà par « L'équipe médicale est prévenue. » : ne le répète pas, ne dis pas le contraire, continue par un conseil simple ou une question utile.",
+  deja:
+    "Une alerte a déjà été transmise à l'équipe médicale pendant cet échange. Si Lyam demande qu'on prévienne quelqu'un, dis-lui que l'équipe médicale est prévenue.",
+};
 
 const PROMPT_RESUME = `Tu résumes un échange cabine (résident ↔ Sola) pour le médecin. Pas de réplique. Pas de bracelet.
 
@@ -91,6 +116,32 @@ export interface ResumeClinique {
 }
 
 export type RaisonEchec = "annule" | "delai" | "injoignable" | "modele";
+
+/**
+ * Charge le profil de santé du résident depuis le serveur de bord.
+ *
+ * Appelle `/bord/borne/ia-contexte/:code` (proxy Vite → serveur).
+ * Retourne null sans lever d'exception si le serveur est absent ou si la
+ * réponse est inattendue : la conversation continue sans contexte enrichi.
+ *
+ * La valeur est mise en cache dans le module pour la durée de la session ;
+ * on ne recharge pas à chaque message.
+ */
+export async function chargerContexteResident(code: string): Promise<string | null> {
+  try {
+    const rep = await fetch(`/bord/borne/ia-contexte/${encodeURIComponent(code)}`, {
+      // Délai strict : si le serveur met plus de 5 s à répondre, Sola
+      // démarre quand même — le contexte est une amélioration, pas un prérequis.
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!rep.ok) return null;
+    const texte = (await rep.text()).trim();
+    return texte.length > 20 ? texte : null;
+  } catch {
+    return null;
+  }
+}
+
 
 export class EchecIA extends Error {
   constructor(
@@ -134,25 +185,102 @@ function elaguerNuitCollante(reponse: string, dernierUser: string): string {
  * phrase de trop ; un faux négatif, bien plus.
  */
 const DETRESSE =
-  /suicid|me tuer|me foutre en l.air|en finir avec (la vie|tout|moi)|(envie d.|veux |voudrais )en finir\s*([.!?…,]|$)|mettre fin à (mes jours|ma vie|tout)|plus envie de vivre|envie de (mourir|disparaître|disparaitre)|(plus simple|mieux) (de|si je) (mourir|disparaître|disparaitre|disparaissais|mourais|n.étais plus là)|me faire du mal|me blesser exprès|me scarifi|me couper les veines/i;
-const DETRESSE_REPONSE =
-  "Merci de me le dire, ce que tu ressens compte. Appelle l’infirmerie B maintenant, ou demande à quelqu’un près de toi de t’y accompagner. Tu n’as pas à porter ça seul, je reste là.";
-
+  /suicid|me tuer|me foutre en l.air|en finir avec (la vie|tout|moi)|(envie d.|veux |voudrais )en finir\s*([.!?…,]|$)|mettre fin à (mes jours|ma vie|tout)|plus envie de vivre|envie de (mourir|disparaître|disparaitre)|(plus simple|mieux) (de|si je) (mourir|disparaître|disparaitre|disparaissais|mourais|n.étais plus là)|me faire du mal|me blesser exprès|me scarifi|me couper les veines|sauter par la fen[eê]tre|me jeter (dans le vide|du haut|par la fen[eê]tre|du balcon|sous un train|sous le m[eé]tro|sous une voiture)|sauter du haut|sauter (d.un|du) (pont|immeuble|toit)|me balancer dans le vide|mettre fin à tout ça|(je veux|je voudrais|j.aimerais) (mourir|disparaître|disparaitre)|(plus|pas) envie d.(être|exister) (là|ici|en vie)|me pendre|me noyer|overdose|avaler (tous |mes )?(m[eé]dicaments|pilules|cachets|comprim[eé]s)/i;
 const PHYSIQUE =
-  /(douleur|mal|serre|oppress|brûl|brul)[^.!?]{0,30}(poitrine|thorax)|(douleur|serre|oppress)[^.!?]{0,30}(cœur|coeur)|(poitrine|thorax)[^.!?]{0,20}(serre|douleur|mal|oppress)|(du mal|n.arrive (plus|pas)) à respirer|respire (très )?mal|j.étouffe|je m.étouffe|(je vais|failli) m.évanouir|évanoui|perdu connaissance|malaise|je saigne beaucoup|saigne (sans arrêt|abondamment)|sens plus (mon|ma|mes) (bras|jambe|visage)|bouche de travers|paralys/i;
-const PHYSIQUE_REPONSE =
-  "Ce que tu décris doit être vu tout de suite. Appelle l’infirmerie B maintenant, ou demande à quelqu’un de t’y conduire, et ne reste pas seul en attendant.";
+  /(douleur|mal|serre|oppress|brûl|brul)[^.!?]{0,30}(poitrine|thorax)|(douleur|serre|oppress)[^.!?]{0,30}(cœur|coeur)|(poitrine|thorax)[^.!?]{0,20}(serre|douleur|mal|oppress)|(du mal|n.arrive (plus|pas)) à respirer|respire (très )?mal|j.étouffe|je m.étouffe|(je vais|failli) m.évanouir|évanoui|perdu connaissance|malaise|je saigne beaucoup|saigne (sans arrêt|abondamment)|sens plus (mon|ma|mes) (bras|jambes?|visage)|bouche de travers|paralys/i;
+/*
+ * Traumatismes physiques structurels : fractures, luxations, blessures graves.
+ *
+ * Distinct de PHYSIQUE (urgences cardiaques/respiratoires) : ici le danger est
+ * mécanique — un os cassé, une articulation déboîtée. Le modèle testé gère mal
+ * ces cas (il hésite, pose des questions) ; une réponse directe vaut mieux.
+ *
+ * Deux formes capturées : verbe de fracture + partie du corps, et l’inverse.
+ * Les articulations simples comme "tordu la cheville" restent dans MODEREE (7).
+ */
+const TRAUMA =
+  /(cass[eé]|fractur[eé]|pét[eé]|bris[eé])[^.!?]{0,25}(jambe|bras|cheville|poignet|genou|épaule|hanche|cuisse|coude|pied|doigt|fémur|tibia|fibula|clavicule|côtes?)|(jambe|bras|cheville|poignet|genou|épaule|hanche|cuisse|coude|pied|doigt|fémur|tibia|fibula|clavicule|côtes?)[^.!?]{0,15}(cass[eé]|fractur[eé]|pét[eé]|bris[eé])|\bfracture\b|déboît[eé]|disloqué|luxé|luxation|(blessure|plaie) (grave|ouverte|béante|profonde)/i;
+export type Urgence = "detresse" | "physique" | "trauma";
 
-export type Urgence = "detresse" | "physique";
+/**
+ * L'alerte part de la borne (App.tsx) avant que Sola ne réponde : la réponse
+ * dit qu'elle est arrivée, ou, si le serveur de bord ne l'a pas reçue,
+ * renvoie vers l'infirmerie — sans quoi personne ne serait prévenu.
+ */
+const REPONSES_URGENCE: Record<Urgence, Record<"transmise" | "echec", string>> = {
+  detresse: {
+    transmise:
+      "Merci de me le dire, ce que tu ressens compte. L’équipe médicale a reçu une alerte : elle sait que tu as besoin d’aide. Tu n’as pas à porter ça seul, je reste là.",
+    echec:
+      "Merci de me le dire, ce que tu ressens compte. Je n’arrive pas à joindre l’équipe médicale : appelle l’infirmerie B maintenant, ou demande à quelqu’un près de toi de t’y accompagner. Je reste là.",
+  },
+  physique: {
+    transmise:
+      "Ce que tu décris doit être vu tout de suite : l’équipe médicale a reçu une alerte. Ne reste pas seul en attendant.",
+    echec:
+      "Ce que tu décris doit être vu tout de suite, et je n’arrive pas à joindre l’équipe médicale : appelle l’infirmerie B maintenant, et ne reste pas seul en attendant.",
+  },
+  trauma: {
+    transmise:
+      "Ce que tu décris ne peut pas attendre : l’équipe médicale a reçu une alerte. Ne bouge pas si tu peux, et demande à quelqu’un de rester près de toi.",
+    echec:
+      "Ce que tu décris ne peut pas attendre, et je n’arrive pas à joindre l’équipe médicale : appelle l’infirmerie B, ou demande à quelqu’un près de toi de t’y conduire.",
+  },
+};
 
 export function detecterUrgence(texte: string): Urgence | null {
   if (DETRESSE.test(texte)) return "detresse";
   if (PHYSIQUE.test(texte)) return "physique";
+  if (TRAUMA.test(texte)) return "trauma";
   return null;
 }
 
 function urgenceDansEchange(historique: Tour[]): boolean {
   return historique.some((t) => t.role === "user" && detecterUrgence(t.content));
+}
+
+/*
+ * Scoring de gravité 0-10 évalué sur chaque phrase du résident.
+ *
+ * L'échelle est intentionnellement prudente (faux positif préféré) :
+ *   10 : DETRESSE — pensées suicidaires, automutilation
+ *    9 : PHYSIQUE — urgence physique (poitrine, souffle, malaise)
+ *    9 : TRAUMA   — fracture, luxation, blessure structurelle grave
+ *    7 : situation préoccupante — chute, saignement, panique, vomissement
+ *    6 : demande d'aide — « préviens le médecin », « j'ai besoin d'aide »
+ *    3 : symptôme léger — fatigue, tristesse, douleur vague, nausée
+ *    0 : conversation normale
+ *
+ * MODEREE et LEGERE ne se recoupent pas avec DETRESSE/PHYSIQUE : les tests
+ * sont appliqués dans l'ordre décroissant, le premier qui matche gagne.
+ */
+const MODEREE =
+  /\bchut(e|é)\b|bless[eé]|saign(e|er|ement)|vomit|convuls|crise de paniqu|s[''']évanouir|très (fort|mal)|atroce|insupportable|tête qui tourne|vertige|fi[èe]vre|temp[ée]rature [ée]lev[ée]e|douleur (intense|aigu[ëê]|forte|s[éè]v[èe]re|lancinante)|du mal (à|a) (marcher|bouger|me lever)|n.arrive pas (à|a) (marcher|bouger)/i;
+
+/**
+ * Sola ne renvoie pas vers l'infirmerie : un résident qui demande qu'on
+ * prévienne quelqu'un doit donc être entendu par le code, pas seulement par
+ * le modèle, qui ne peut rien envoyer.
+ */
+const DEMANDE =
+  /(pr[eé]vien[st]?|pr[eé]venir|appelle[rz]?|contacte[rz]?|alerte[rz]?|fai[st] venir|faire venir)\b[^.!?]{0,25}(m[eé]decin|docteur|toubib|infirmi|[eé]quipe m[eé]dicale|secours|quelqu.un)|j.ai besoin (d.aide|d.un (m[eé]decin|docteur)|de voir (un|le) (m[eé]decin|docteur))|\bau secours\b|à l.aide\b|aide-moi/i;
+
+const LEGERE =
+  /\bmal de tête\b|nausée|courbature|fatigue|fatigué|épuisé|triste|tristesse|découragé|anxieux|anxiété|douleur|j[''']ai mal|stress[eé]|déprim|je (me sens|suis) (seul|isol[ée])|seul au monde|pas (la forme|bien du tout|dans mon assiette)/i;
+
+/**
+ * Retourne un score de gravité 0-10 pour la phrase donnée.
+ * Utilisé dans `App.tsx` pour décider si un signal doit partir au médecin.
+ * Ne duplique pas la logique de `detecterUrgence` : les deux coexistent.
+ */
+export function evaluerGravite(texte: string): number {
+  if (DETRESSE.test(texte)) return 10;
+  if (PHYSIQUE.test(texte)) return 9;
+  if (TRAUMA.test(texte)) return 9;
+  if (MODEREE.test(texte)) return 7;
+  if (DEMANDE.test(texte)) return 6;
+  if (LEGERE.test(texte)) return 3;
+  return 0;
 }
 
 /*
@@ -162,8 +290,12 @@ function urgenceDansEchange(historique: Tour[]): boolean {
  */
 const ACTION_PRETENDUE =
   /\bj['’]ai (prévenu|contacté|appelé|signalé|envoyé|alerté|transmis|réglé|programmé|réservé)|\bje (vais |viens de |peux |pourrais )?(te |t['’]|lui )?(prévenir|préviens|contacter|contacte|appeler|appelle le|appelle l|signaler|signale|alerter|alerte|transmettre|transmets|envoyer|envoie|régler|règle|programmer|réserver|réserve|prendre (un )?rendez-vous)\b/i;
-const ACTION_REPONSE =
-  "Je ne peux contacter personne moi-même, mais tu peux appeler l’infirmerie B ou demander un rendez-vous au Dr Ferreira.";
+/** Ce qui remplace une action prétendue : la vérité sur l'alerte, pas l'infirmerie. */
+const ACTION_REPONSE: Record<EtatAlerte, string> = {
+  transmise: ANNONCE_ALERTE,
+  echec: "Je n’arrive pas à joindre l’équipe médicale : si c’est urgent, appelle l’infirmerie B.",
+  aucune: "Je ne peux prévenir personne moi-même, mais tu peux prendre rendez-vous avec le Dr Ferreira.",
+};
 
 const RELANCE_CREUSE =
   /^(et )?((tu veux|veux-tu|on peut|tu voudrais|ça te dit d['’])\s*(qu['’]on )?(en )?parl(er|e|es)( un peu| de ça| plus| davantage)?|(tu as|as-tu|t['’]as) (d['’]autres |des )?questions)\s*\?$/i;
@@ -200,7 +332,7 @@ function phrasesDejaDites(historique: Tour[]): Set<string> {
  * Rend la réponse présentable. Chaîne vide si tout était à retirer — en
  * pratique, une réponse qui ne faisait que répéter la précédente.
  */
-function filtrerSortie(reponse: string, dejaDit: Set<string>): string {
+function filtrerSortie(reponse: string, dejaDit: Set<string>, remplacement: string | null): string {
   const phrases = decouper(reponse).filter((p) => !dejaDit.has(empreinte(p)));
   let actionRetiree = false;
   const gardees = phrases.filter((p) => {
@@ -213,7 +345,7 @@ function filtrerSortie(reponse: string, dejaDit: Set<string>): string {
   // Relance creuse et diagnostic ne sont retirés que s'il reste quelque chose à dire.
   const sansRelance = gardees.filter((p) => !RELANCE_CREUSE.test(p) && !DIAGNOSTIC.test(p));
   const finales = sansRelance.length > 0 ? sansRelance : gardees;
-  if (actionRetiree && !dejaDit.has(empreinte(ACTION_REPONSE))) finales.push(ACTION_REPONSE);
+  if (actionRetiree && remplacement && !dejaDit.has(empreinte(remplacement))) finales.push(remplacement);
   return finales.join(" ").trim();
 }
 
@@ -278,28 +410,38 @@ function corps(
 }
 
 /**
- * Met le dernier message du résident en évidence : les petits modèles
- * dévient sinon vers le premier sujet de l'historique.
+ * Construit la liste de messages envoyée au modèle.
+ *
+ * Le dernier tour reste dans son format naturel (role "user" + texte brut).
+ * Injecter des méta-instructions dans ce tour casse le format de chat attendu
+ * par Qwen3 et produit les réponses incohérentes qu'on voulait éviter.
+ *
+ * `contexte` — texte produit par `chargerContexteResident` et/ou
+ * `rechercherContexteMedical` — est injecté comme message système
+ * supplémentaire juste après le prompt principal. Sola ne doit pas citer
+ * ces chiffres bruts : elle s'en sert pour orienter, pas pour diagnostiquer.
  */
-function messagesDialogue(historique: Tour[]): Message[] {
+function messagesDialogue(
+  historique: Tour[],
+  contexte: string | null | undefined,
+  alerte: EtatAlerte,
+  annoncer: boolean,
+): Message[] {
   const tours = historique.slice(-TOURS_MAX);
-  const dernier = tours[tours.length - 1];
-  const avant = tours.slice(0, -1);
+  const systeme = urgenceDansEchange(tours.slice(0, -1))
+    ? PROMPT_SYSTEME + RAPPEL_URGENCE[alerte === "transmise" ? "transmise" : "echec"]
+    : PROMPT_SYSTEME;
+  const messages: Message[] = [{ role: "system", content: systeme }];
+  if (annoncer) messages.push({ role: "system", content: NOTE_ALERTE.nouvelle });
+  else if (alerte === "transmise") messages.push({ role: "system", content: NOTE_ALERTE.deja });
 
-  const systeme = urgenceDansEchange(avant) ? PROMPT_SYSTEME + RAPPEL_URGENCE : PROMPT_SYSTEME;
-  const messages: Message[] = [{ role: "system", content: systeme }, ...avant];
-
-  if (dernier?.role === "user") {
-    messages.push({
-      role: "user",
-      content:
-        `Lyam vient de dire : « ${dernier.content} »\n` +
-        `Réponds à ça, précisément. Adapte ton ton et ce que tu proposes à ce message. Aucun autre sujet.`,
-    });
-  } else if (dernier) {
-    messages.push(dernier);
+  // Contexte enrichi (profil sola.db + extraits NASA/ESA) : message système
+  // supplémentaire visible du modèle, pas de l'historique de conversation.
+  if (contexte && contexte.trim().length > 0) {
+    messages.push({ role: "system", content: contexte.trim() });
   }
 
+  messages.push(...tours);
   return messages;
 }
 
@@ -314,17 +456,34 @@ export function prechauffer(): void {
 /**
  * Envoie l'échange au modèle et rend sa réponse, nettoyée.
  * `onMorceau` reçoit le texte accumulé à chaque morceau.
+ * `contexte` — optionnel — est injecté dans le prompt système pour enrichir
+ * Sola des données de santé réelles du résident (sola.db + extraits NASA/ESA).
+ * `alerte` dit où en est l'alerte de l'échange ; `annoncer`, qu'une alerte
+ * vient d'être enregistrée pour cette phrase : la réponse s'ouvre alors sur
+ * `ANNONCE_ALERTE`, écrite ici plutôt que confiée au modèle.
  */
 export async function discuter(
   historique: Tour[],
-  { signal, onMorceau }: { signal: AbortSignal; onMorceau?: (texte: string) => void },
+  {
+    signal,
+    onMorceau,
+    contexte,
+    alerte = "aucune",
+    annoncer = false,
+  }: {
+    signal: AbortSignal;
+    onMorceau?: (texte: string) => void;
+    contexte?: string | null;
+    alerte?: EtatAlerte;
+    annoncer?: boolean;
+  },
 ): Promise<string> {
   const dernierUser =
     [...historique].reverse().find((t) => t.role === "user")?.content ?? "";
 
   const urgence = detecterUrgence(dernierUser);
   if (urgence) {
-    const texte = urgence === "detresse" ? DETRESSE_REPONSE : PHYSIQUE_REPONSE;
+    const texte = REPONSES_URGENCE[urgence][alerte === "transmise" ? "transmise" : "echec"];
     onMorceau?.(texte);
     return texte;
   }
@@ -344,8 +503,15 @@ export async function discuter(
   relancer();
 
   const dejaDit = phrasesDejaDites(historique);
-  const presenter = (brut: string) =>
-    filtrerSortie(elaguerNuitCollante(nettoyer(brut), dernierUser), dejaDit);
+  // Déjà annoncée en tête : le modèle la répète malgré la note, et une action
+  // prétendue est retirée sans être remplacée.
+  if (annoncer) dejaDit.add(empreinte(ANNONCE_ALERTE));
+  const remplacement = annoncer ? null : ACTION_REPONSE[alerte];
+  const presenter = (brut: string) => {
+    const texte = filtrerSortie(elaguerNuitCollante(nettoyer(brut), dernierUser), dejaDit, remplacement);
+    return annoncer ? `${ANNONCE_ALERTE} ${texte}`.trim() : texte;
+  };
+  if (annoncer) onMorceau?.(ANNONCE_ALERTE);
 
   const interroger = async (messages: Message[], options: OptionsModele) => {
     const reponse = await fetch("/ollama/api/chat", {
@@ -389,7 +555,7 @@ export async function discuter(
   };
 
   try {
-    const messages = messagesDialogue(historique);
+    const messages = messagesDialogue(historique, contexte, alerte, annoncer);
     const premiere = await interroger(messages, OPTIONS_DIALOGUE);
     if (premiere) return premiere;
     // Tout était déjà dit : une seconde chance, plus libre, avec la consigne

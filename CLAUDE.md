@@ -130,10 +130,16 @@ la borne ne transmet que servie par Vite, dont le relais porte le jeton, une
 partie de la trame est reçue sans être conservée — une chute comptée par le
 bracelet n'ouvre pas de signal —, la conversation libre de la borne exige Ollama
 sur la machine, le résumé clinique à la sortie d'« Échange » exige Ollama et le
-serveur de bord (sinon la barre d'état le dit), Sola ne déclenche aucune action
-et, hors urgences gérées dans le code (réponses écrites, sévérité forcée), ses
+serveur de bord (sinon la barre d'état le dit), le modèle de Sola ne déclenche
+aucune action — seul le code de la borne transmet une alerte, sur mots-clés — et,
+hors urgences gérées dans le code (réponses écrites, sévérité forcée), ses
 règles ne sont que des consignes données au modèle, la détection d'urgence ne
-repose que sur des mots-clés, les bilans sanguins du jeu de démonstration sont
+repose que sur des mots-clés — une urgence qu'ils manquent n'ouvre aucune
+alerte, et Sola ne renvoie vers l'infirmerie que si une alerte a échoué —, la
+file de triage se lit du plus récent au plus ancien — avant 16:05, les signaux
+de démonstration de l'après-midi passent devant une alerte que la borne vient
+d'ouvrir —, les
+bilans sanguins du jeu de démonstration sont
 simulés (`source = 'simule'`, et la fiche le dit), la reconnaissance vocale de
 la borne n'existe que dans les navigateurs à moteur Chromium — ailleurs elle
 bascule au clavier et le dit dans sa barre d'état —, dans Chrome, Sola parle

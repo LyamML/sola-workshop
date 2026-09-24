@@ -543,8 +543,8 @@ function Signaux({ stats, onGeste }: { stats: StatsSignauxApi | null; onGeste: (
   const [recherche, setRecherche] = useState("");
   const [severite, setSeverite] = useState("");
   const [sansPersonne, setSansPersonne] = useState(false);
-  const [tri, setTri] = useState("severite");
-  const [sens, setSens] = useState<Sens>("asc");
+  const [tri, setTri] = useState("ouvert");
+  const [sens, setSens] = useState<Sens>("desc");
   const [page, setPage] = useState(1);
   const [pris, setPris] = useState<Record<number, SignalApi>>({});
   const [enCours, setEnCours] = useState<number | null>(null);
@@ -568,8 +568,8 @@ function Signaux({ stats, onGeste }: { stats: StatsSignauxApi | null; onGeste: (
 
   function changer(l: Liste) {
     setListe(l);
-    setTri(l === "clos" ? "clos" : "severite");
-    setSens(l === "clos" ? "desc" : "asc");
+    setTri(l === "clos" ? "clos" : "ouvert");
+    setSens("desc");
   }
 
   async function prendre(l: LigneSignal) {
@@ -636,7 +636,7 @@ function Signaux({ stats, onGeste }: { stats: StatsSignauxApi | null; onGeste: (
             cle: "ouvert",
             titre: "Ouvert",
             classe: "m2",
-            sens: "asc",
+            sens: "desc",
             rendu: (l) => `${jv(l.ouvert_jour_vol)} · ${heure(l.ouvert_at)}`,
           },
           {
@@ -784,11 +784,7 @@ function Signaux({ stats, onGeste }: { stats: StatsSignauxApi | null; onGeste: (
                 ordre={
                   liste === "clos"
                     ? ordreLu(colonnes, tri, sens, { tri: "clos", sens: "desc", texte: "les plus récents d'abord" })
-                    : ordreLu(colonnes, tri, sens, {
-                        tri: "severite",
-                        sens: "asc",
-                        texte: "gravité d'abord, puis ancienneté",
-                      })
+                    : ordreLu(colonnes, tri, sens, { tri: "ouvert", sens: "desc", texte: "les plus récents d'abord" })
                 }
                 onPage={setPage}
               />
