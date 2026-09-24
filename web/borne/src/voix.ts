@@ -92,19 +92,24 @@ export function correspond(phrase: string, mots: string[]): boolean {
  * question contient « regarde » et « laisse », qui sont les mots-clés de ses
  * deux réponses. Sans lui, Sola répond à sa propre question.
  */
-export function estEcho(phrase: string, dit: string): boolean {
+export function estEcho(phrase: string, dit: string, seuil = 0.6): boolean {
   if (!dit) return false;
   const sien = ` ${normaliser(dit)} `;
   const mots = normaliser(phrase).split(" ").filter(Boolean);
   if (!mots.length) return true;
 
+  // Reprise littérale d'un bout de sa phrase (ex. « Je suis là. » dans
+  // « Salut. Je suis là. ») : toujours un écho, même avec peu de mots longs.
+  const brut = ` ${mots.join(" ")} `;
+  if (sien.includes(brut)) return true;
+
   const porteurs = mots.filter((m) => m.length >= 3);
   // Rien que des broutilles (« ok », « eh ») : seule une reprise littérale
   // compte, sans quoi un bruit de cabine lui couperait la parole.
-  if (!porteurs.length) return sien.includes(` ${mots.join(" ")} `);
+  if (!porteurs.length) return sien.includes(brut);
 
   const siens = porteurs.filter((m) => sien.includes(` ${m} `)).length;
-  return siens / porteurs.length >= 0.6;
+  return siens / porteurs.length >= seuil;
 }
 
 /**
@@ -129,10 +134,10 @@ export function apresEcho(phrase: string, dit: string): string {
 /**
  * Combien de temps une réplique reste comparable après qu'elle s'est tue.
  * Chrome rend ce qu'il entend avec retard et ne ferme un résultat qu'après un
- * silence : l'écho de sa voix arrive quand elle a fini. Deux secondes sont une
- * marge choisie, pas une mesure — à revoir après l'essai à la vraie voix.
+ * silence : l'écho de sa voix arrive quand elle a fini. La voix Google, distante,
+ * décale encore. 3,5 s : marge pour ne pas se répondre à elle-même.
  */
-const TRAINE_ECHO = 2000;
+const TRAINE_ECHO = 3500;
 
 interface Replique {
   texte: string;
@@ -376,11 +381,19 @@ export function useVoix(
         if (!phrase) continue;
 
         const sienne = reference(i);
-        if (sienne && estEcho(phrase, sienne)) {
+        // Pendant qu'elle parle, seuil plus bas : la voix Google déforme le
+        // texte, et 60 % laissait passer son propre écho comme une interruption.
+        const seuilEcho = enParole.current ? 0.45 : 0.6;
+        if (sienne && estEcho(phrase, sienne, seuilEcho)) {
           echos.current.set(i, sienne);
           const reste = apresEcho(phrase, sienne);
+          // Écho pur : on ignore. Un reste après l'écho = barge-in collé par Chrome.
+          if (!reste) {
+            if (res.isFinal) consomme.current = i;
+            continue;
+          }
           const dite = enCours.current;
-          if (reste && auVol.current(reste)) {
+          if (auVol.current(reste)) {
             // Répondre relance le scénario : on ne coupe que la réplique qui
             // était dite, pas celle qui vient peut-être de partir.
             if (enParole.current && enCours.current === dite) taire();
@@ -390,7 +403,7 @@ export function useVoix(
         }
 
         // Quelqu'un parle par-dessus elle : elle se tait, et la phrase suit
-        // son cours normal.
+        // son cours normal. Pas sur un écho (déjà filtré plus haut).
         if (enParole.current) taire();
 
         if (res.isFinal) {

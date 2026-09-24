@@ -1,11 +1,11 @@
 {
   "ancre": {
-    "jour": "2026-09-23",
+    "jour": "2026-09-24",
     "jour_vol": 4128
   },
   "fenetre": {
-    "debut": "2026-09-10",
-    "fin": "2026-09-23",
+    "debut": "2026-09-11",
+    "fin": "2026-09-24",
     "debut_jour_vol": 4115,
     "fin_jour_vol": 4128
   },
@@ -34,11 +34,11 @@
     "serie": "BR-0448",
     "firmware": "bracelet-i2c",
     "batterie_pct": 61,
-    "synchro_at": "2026-09-23 16:03:00"
+    "synchro_at": "2026-09-24 10:21:22"
   },
   "constantes": [
     {
-      "jour": "2026-09-10",
+      "jour": "2026-09-11",
       "jour_vol": 4115,
       "fc_repos_bpm": 61,
       "rmssd_ms": 49,
@@ -50,7 +50,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-11",
+      "jour": "2026-09-12",
       "jour_vol": 4116,
       "fc_repos_bpm": 62,
       "rmssd_ms": 47,
@@ -62,7 +62,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-12",
+      "jour": "2026-09-13",
       "jour_vol": 4117,
       "fc_repos_bpm": 60,
       "rmssd_ms": 51,
@@ -74,7 +74,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-13",
+      "jour": "2026-09-14",
       "jour_vol": 4118,
       "fc_repos_bpm": 63,
       "rmssd_ms": 46,
@@ -86,7 +86,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-14",
+      "jour": "2026-09-15",
       "jour_vol": 4119,
       "fc_repos_bpm": 62,
       "rmssd_ms": 48,
@@ -98,7 +98,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-15",
+      "jour": "2026-09-16",
       "jour_vol": 4120,
       "fc_repos_bpm": 64,
       "rmssd_ms": 44,
@@ -110,7 +110,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-16",
+      "jour": "2026-09-17",
       "jour_vol": 4121,
       "fc_repos_bpm": 61,
       "rmssd_ms": 41,
@@ -122,7 +122,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-17",
+      "jour": "2026-09-18",
       "jour_vol": 4122,
       "fc_repos_bpm": 63,
       "rmssd_ms": 43,
@@ -134,7 +134,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-18",
+      "jour": "2026-09-19",
       "jour_vol": 4123,
       "fc_repos_bpm": 65,
       "rmssd_ms": 37,
@@ -146,7 +146,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-19",
+      "jour": "2026-09-20",
       "jour_vol": 4124,
       "fc_repos_bpm": 64,
       "rmssd_ms": 34,
@@ -158,7 +158,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-20",
+      "jour": "2026-09-21",
       "jour_vol": 4125,
       "fc_repos_bpm": 63,
       "rmssd_ms": 33,
@@ -170,7 +170,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-21",
+      "jour": "2026-09-22",
       "jour_vol": 4126,
       "fc_repos_bpm": 62,
       "rmssd_ms": 31,
@@ -182,7 +182,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-22",
+      "jour": "2026-09-23",
       "jour_vol": 4127,
       "fc_repos_bpm": 64,
       "rmssd_ms": 33,
@@ -194,7 +194,7 @@
       "source": "mixte"
     },
     {
-      "jour": "2026-09-23",
+      "jour": "2026-09-24",
       "jour_vol": 4128,
       "fc_repos_bpm": 62,
       "rmssd_ms": 31,
@@ -208,7 +208,7 @@
   ],
   "nuits": [
     {
-      "nuit_du": "2026-09-10",
+      "nuit_du": "2026-09-11",
       "jour_vol": 4115,
       "sommeil_min": 426,
       "latence_min": 14,
@@ -216,7 +216,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-11",
+      "nuit_du": "2026-09-12",
       "jour_vol": 4116,
       "sommeil_min": 408,
       "latence_min": 17,
@@ -224,7 +224,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-12",
+      "nuit_du": "2026-09-13",
       "jour_vol": 4117,
       "sommeil_min": 444,
       "latence_min": 11,
@@ -232,7 +232,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-13",
+      "nuit_du": "2026-09-14",
       "jour_vol": 4118,
       "sommeil_min": 372,
       "latence_min": 22,
@@ -240,7 +240,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-14",
+      "nuit_du": "2026-09-15",
       "jour_vol": 4119,
       "sommeil_min": 420,
       "latence_min": 15,
@@ -248,7 +248,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-15",
+      "nuit_du": "2026-09-16",
       "jour_vol": 4120,
       "sommeil_min": 396,
       "latence_min": 19,
@@ -256,7 +256,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-16",
+      "nuit_du": "2026-09-17",
       "jour_vol": 4121,
       "sommeil_min": 354,
       "latence_min": 28,
@@ -264,7 +264,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-17",
+      "nuit_du": "2026-09-18",
       "jour_vol": 4122,
       "sommeil_min": 384,
       "latence_min": 21,
@@ -272,7 +272,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-18",
+      "nuit_du": "2026-09-19",
       "jour_vol": 4123,
       "sommeil_min": 312,
       "latence_min": 41,
@@ -280,7 +280,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-19",
+      "nuit_du": "2026-09-20",
       "jour_vol": 4124,
       "sommeil_min": 294,
       "latence_min": 47,
@@ -288,7 +288,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-20",
+      "nuit_du": "2026-09-21",
       "jour_vol": 4125,
       "sommeil_min": 324,
       "latence_min": 38,
@@ -296,7 +296,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-21",
+      "nuit_du": "2026-09-22",
       "jour_vol": 4126,
       "sommeil_min": 306,
       "latence_min": 44,
@@ -304,7 +304,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-22",
+      "nuit_du": "2026-09-23",
       "jour_vol": 4127,
       "sommeil_min": 360,
       "latence_min": 26,
@@ -312,7 +312,7 @@
       "source": "estime"
     },
     {
-      "nuit_du": "2026-09-23",
+      "nuit_du": "2026-09-24",
       "jour_vol": 4128,
       "sommeil_min": 318,
       "latence_min": 39,
@@ -327,7 +327,7 @@
       "severite": "surveillance",
       "origine": "physio",
       "motif": "RMSSD sous le seuil personnel depuis 6 jours · 5 nuits sur 14 sous 5 h 30",
-      "ouvert_at": "2026-09-23 06:20:00",
+      "ouvert_at": "2026-09-24 09:48:22",
       "statut": "en_cours",
       "ouvert_jour_vol": 4128,
       "assigne_a": "Dr. Ferreira",
@@ -343,14 +343,14 @@
   "conversations": [
     {
       "id": 1,
-      "debut_at": "2026-09-23 12:41:00",
+      "debut_at": "2026-09-24 09:35:22",
       "jour_vol": 4128,
       "duree_min": 11,
       "severite": "surveillance",
       "resume": "Dernière nuit à 5 h 18, la cinquième sous 5 h 30 en quatorze jours. Attribue les réveils à un bruit de ventilation dans le module C — demande de contrôle acoustique transmise à la maintenance. Ton irritable, phrases courtes, plusieurs ruptures de conversation. Dépistage d'idéation suicidaire négatif (C-SSRS, items 1-2). Lumière de cabine avancée et contact social proposés, acceptés.",
       "actions_proposees": 2,
       "actions_acceptees": 2,
-      "resident_notifie_at": "2026-09-23 12:42:00",
+      "resident_notifie_at": "2026-09-24 09:36:22",
       "tags": [
         "Anxiété, stress chronique",
         "Troubles du sommeil"
@@ -358,14 +358,14 @@
     },
     {
       "id": 3,
-      "debut_at": "2026-09-14 20:15:00",
+      "debut_at": "2026-09-15 07:38:22",
       "jour_vol": 4119,
       "duree_min": 19,
       "severite": "surveillance",
       "resume": "Évoque un sentiment d'inutilité après l'incident du bac 7 (J+4 117). Décline le repas collectif pour la 3e fois de la semaine. Sola a proposé un appel à l'équipe hydroponie — refusé à deux reprises. Repli verbal marqué en fin d'échange.",
       "actions_proposees": 3,
       "actions_acceptees": 0,
-      "resident_notifie_at": "2026-09-14 20:16:00",
+      "resident_notifie_at": "2026-09-15 07:39:22",
       "tags": [
         "Humeur basse",
         "Isolement social"
@@ -375,7 +375,7 @@
   "contexte": [
     {
       "id": 2,
-      "debut_at": "2026-09-20 23:02:00",
+      "debut_at": "2026-09-21 09:01:22",
       "jour_vol": 4125,
       "duree_min": 6,
       "severite": "info",
@@ -386,7 +386,7 @@
     },
     {
       "id": 4,
-      "debut_at": "2026-08-22 21:30:00",
+      "debut_at": "2026-08-23 07:53:22",
       "jour_vol": 4096,
       "duree_min": 41,
       "severite": "info",
@@ -398,33 +398,33 @@
     },
     {
       "id": 738,
-      "debut_at": "2026-08-12 23:50:00",
+      "debut_at": "2026-08-13 23:50:00",
       "jour_vol": 4086,
       "duree_min": 24,
       "severite": "info",
-      "resident_notifie_at": "2026-08-12 23:59:00",
+      "resident_notifie_at": "2026-08-13 23:59:00",
       "tags": [
         "Désynchronisation circadienne"
       ]
     },
     {
       "id": 740,
-      "debut_at": "2026-08-09 21:49:00",
+      "debut_at": "2026-08-10 21:49:00",
       "jour_vol": 4083,
       "duree_min": 21,
       "severite": "surveillance",
-      "resident_notifie_at": "2026-08-09 23:59:00",
+      "resident_notifie_at": "2026-08-10 23:59:00",
       "tags": [
         "Isolement social"
       ]
     },
     {
       "id": 813,
-      "debut_at": "2026-07-17 23:05:00",
+      "debut_at": "2026-07-18 23:05:00",
       "jour_vol": 4060,
       "duree_min": 27,
       "severite": "info",
-      "resident_notifie_at": "2026-07-17 23:59:00",
+      "resident_notifie_at": "2026-07-18 23:59:00",
       "tags": [
         "Dépendance au compagnon"
       ]
@@ -517,9 +517,9 @@
   "bilans": [
     {
       "id": 1,
-      "preleve_le": "2026-09-23",
+      "preleve_le": "2026-09-24",
       "jour_vol": 4128,
-      "prochain_le": "2026-10-07",
+      "prochain_le": "2026-10-08",
       "statut": "rendu",
       "commentaire": null,
       "source": "simule",
@@ -849,9 +849,9 @@
     },
     {
       "id": 2,
-      "preleve_le": "2026-09-09",
+      "preleve_le": "2026-09-10",
       "jour_vol": 4114,
-      "prochain_le": "2026-09-23",
+      "prochain_le": "2026-09-24",
       "statut": "rendu",
       "commentaire": "Contrôle de suivi, pas de plainte nouvelle.",
       "source": "simule",
@@ -1181,9 +1181,9 @@
     },
     {
       "id": 3,
-      "preleve_le": "2026-08-26",
+      "preleve_le": "2026-08-27",
       "jour_vol": 4100,
-      "prochain_le": "2026-09-09",
+      "prochain_le": "2026-09-10",
       "statut": "rendu",
       "commentaire": null,
       "source": "simule",

@@ -3,10 +3,10 @@
     "nom": "Meridien",
     "residents": 1240,
     "jour_vol": 4128,
-    "synchro_at": "2026-09-23 16:04:00"
+    "synchro_at": "2026-09-24 12:22:00"
   },
   "ancre": {
-    "jour": "2026-09-23",
+    "jour": "2026-09-24",
     "jour_vol": 4128
   },
   "depistage": {
@@ -21,7 +21,7 @@
   },
   "serie": [
     {
-      "jour": "2025-09-28",
+      "jour": "2025-09-29",
       "jour_vol": 3768,
       "indice": 78.1,
       "pct_phq9": 6.2,
@@ -30,7 +30,7 @@
       "residents": 1240
     },
     {
-      "jour": "2025-10-28",
+      "jour": "2025-10-29",
       "jour_vol": 3798,
       "indice": 77.4,
       "pct_phq9": 6.3,
@@ -39,7 +39,7 @@
       "residents": 1240
     },
     {
-      "jour": "2025-11-27",
+      "jour": "2025-11-28",
       "jour_vol": 3828,
       "indice": 76.9,
       "pct_phq9": 6.4,
@@ -48,7 +48,7 @@
       "residents": 1240
     },
     {
-      "jour": "2025-12-27",
+      "jour": "2025-12-28",
       "jour_vol": 3858,
       "indice": 77.8,
       "pct_phq9": 6.5,
@@ -57,7 +57,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-01-26",
+      "jour": "2026-01-27",
       "jour_vol": 3888,
       "indice": 75.2,
       "pct_phq9": 6.5,
@@ -66,7 +66,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-02-25",
+      "jour": "2026-02-26",
       "jour_vol": 3918,
       "indice": 74,
       "pct_phq9": 6.6,
@@ -75,7 +75,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-03-27",
+      "jour": "2026-03-28",
       "jour_vol": 3948,
       "indice": 71.1,
       "pct_phq9": 6.7,
@@ -84,7 +84,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-04-26",
+      "jour": "2026-04-27",
       "jour_vol": 3978,
       "indice": 69.8,
       "pct_phq9": 6.8,
@@ -93,7 +93,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-05-26",
+      "jour": "2026-05-27",
       "jour_vol": 4008,
       "indice": 72.6,
       "pct_phq9": 6.8,
@@ -102,7 +102,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-06-25",
+      "jour": "2026-06-26",
       "jour_vol": 4038,
       "indice": 74.3,
       "pct_phq9": 6.9,
@@ -111,7 +111,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-07-25",
+      "jour": "2026-07-26",
       "jour_vol": 4068,
       "indice": 75.1,
       "pct_phq9": 6.9,
@@ -120,7 +120,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-08-24",
+      "jour": "2026-08-25",
       "jour_vol": 4098,
       "indice": 75.1,
       "pct_phq9": 7,
@@ -129,7 +129,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-08-27",
+      "jour": "2026-08-28",
       "jour_vol": 4101,
       "indice": 74.8,
       "pct_phq9": 7,
@@ -138,7 +138,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-08-30",
+      "jour": "2026-08-31",
       "jour_vol": 4104,
       "indice": 74.2,
       "pct_phq9": 7,
@@ -147,7 +147,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-01",
+      "jour": "2026-09-02",
       "jour_vol": 4106,
       "indice": 73.9,
       "pct_phq9": 7.1,
@@ -156,7 +156,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-02",
+      "jour": "2026-09-03",
       "jour_vol": 4107,
       "indice": 74,
       "pct_phq9": 7.1,
@@ -165,7 +165,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-04",
+      "jour": "2026-09-05",
       "jour_vol": 4109,
       "indice": 74.4,
       "pct_phq9": 7.1,
@@ -174,7 +174,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-07",
+      "jour": "2026-09-08",
       "jour_vol": 4112,
       "indice": 73.6,
       "pct_phq9": 7.1,
@@ -183,7 +183,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-08",
+      "jour": "2026-09-09",
       "jour_vol": 4113,
       "indice": 73.1,
       "pct_phq9": 7.1,
@@ -192,7 +192,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-09",
+      "jour": "2026-09-10",
       "jour_vol": 4114,
       "indice": 73,
       "pct_phq9": 7.1,
@@ -201,7 +201,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-11",
+      "jour": "2026-09-12",
       "jour_vol": 4116,
       "indice": 72.8,
       "pct_phq9": 7.1,
@@ -210,7 +210,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-14",
+      "jour": "2026-09-15",
       "jour_vol": 4119,
       "indice": 73.3,
       "pct_phq9": 7.1,
@@ -219,7 +219,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-16",
+      "jour": "2026-09-17",
       "jour_vol": 4121,
       "indice": 72.6,
       "pct_phq9": 7.1,
@@ -228,7 +228,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-17",
+      "jour": "2026-09-18",
       "jour_vol": 4122,
       "indice": 74.1,
       "pct_phq9": 7.1,
@@ -237,7 +237,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-18",
+      "jour": "2026-09-19",
       "jour_vol": 4123,
       "indice": 73.6,
       "pct_phq9": 7.3,
@@ -246,7 +246,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-19",
+      "jour": "2026-09-20",
       "jour_vol": 4124,
       "indice": 73.2,
       "pct_phq9": 7.4,
@@ -255,7 +255,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-20",
+      "jour": "2026-09-21",
       "jour_vol": 4125,
       "indice": 72.9,
       "pct_phq9": 7.8,
@@ -264,7 +264,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-21",
+      "jour": "2026-09-22",
       "jour_vol": 4126,
       "indice": 73.4,
       "pct_phq9": 8,
@@ -273,7 +273,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-22",
+      "jour": "2026-09-23",
       "jour_vol": 4127,
       "indice": 72.7,
       "pct_phq9": 8.2,
@@ -282,7 +282,7 @@
       "residents": 1240
     },
     {
-      "jour": "2026-09-23",
+      "jour": "2026-09-24",
       "jour_vol": 4128,
       "indice": 72.4,
       "pct_phq9": 8.4,
@@ -378,132 +378,132 @@
   ],
   "triage": [
     {
-      "id": 1,
-      "severite": "critique",
-      "origine": "conversation",
-      "motif": "Verbalisation de désespoir détectée en conversation · dépistage C-SSRS positif",
+      "id": 92,
+      "severite": "info",
+      "origine": "usage",
+      "motif": "Usage du compagnon en forte hausse, interactions humaines en baisse",
       "statut": "ouvert",
-      "resident": "R-0912",
-      "prenom": "Nour",
-      "nom": "Belkacem",
-      "cabine": "C-14",
+      "resident": "R-1009",
+      "prenom": "Idris",
+      "nom": "Ibarra",
+      "cabine": "E-20",
+      "age": 36,
+      "ouvert_at": "2026-09-24 12:21:00",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": null,
+      "assigne_id": null
+    },
+    {
+      "id": 75,
+      "severite": "surveillance",
+      "origine": "conversation",
+      "motif": "Humeur basse rapportée sur 3 échanges consécutifs",
+      "statut": "en_cours",
+      "resident": "R-0876",
+      "prenom": "Sofia",
+      "nom": "Engel",
+      "cabine": "D-102",
       "age": 34,
-      "ouvert_at": "2026-09-23 00:12:00",
+      "ouvert_at": "2026-09-24 12:21:00",
       "ouvert_jour_vol": 4128,
-      "assigne_a": null,
-      "assigne_id": null
+      "assigne_a": "Dr. Nakamura",
+      "assigne_id": 3
     },
     {
-      "id": 2,
-      "severite": "critique",
-      "origine": "physio",
-      "motif": "SpO₂ à 88 % au repos pendant 6 min · antécédent BPCO",
-      "statut": "en_cours",
-      "resident": "R-1147",
-      "prenom": "Tomas",
-      "nom": "Ferreira",
-      "cabine": "E-03",
-      "age": 51,
-      "ouvert_at": "2026-09-23 00:41:00",
-      "ouvert_jour_vol": 4128,
-      "assigne_a": "Dr. Oyelaran",
-      "assigne_id": 1
-    },
-    {
-      "id": 3,
-      "severite": "critique",
-      "origine": "chute",
-      "motif": "Chute détectée par l'accéléromètre · aucune réponse à la borne après 90 s",
-      "statut": "en_cours",
-      "resident": "R-0233",
-      "prenom": "Helene",
-      "nom": "Park",
-      "cabine": "A-07",
-      "age": 62,
-      "ouvert_at": "2026-09-23 02:05:00",
-      "ouvert_jour_vol": 4128,
-      "assigne_a": "Équipe d'intervention",
-      "assigne_id": null
-    },
-    {
-      "id": 4,
-      "severite": "surveillance",
-      "origine": "physio",
-      "motif": "RMSSD sous le seuil personnel depuis 6 jours · 5 nuits sur 14 sous 5 h 30",
-      "statut": "en_cours",
-      "resident": "R-0448",
-      "prenom": "Lyam",
-      "nom": "Mafray",
-      "cabine": "C-12",
-      "age": 28,
-      "ouvert_at": "2026-09-23 06:20:00",
-      "ouvert_jour_vol": 4128,
-      "assigne_a": "Dr. Ferreira",
-      "assigne_id": 2
-    },
-    {
-      "id": 5,
-      "severite": "surveillance",
-      "origine": "conversation",
-      "motif": "Retrait social depuis 12 jours · 4 invitations déclinées · activité -48 %",
-      "statut": "ouvert",
-      "resident": "R-0781",
-      "prenom": "Samuel",
-      "nom": "Diaz",
-      "cabine": "B-22",
-      "age": 41,
-      "ouvert_at": "2026-09-23 09:15:00",
-      "ouvert_jour_vol": 4128,
-      "assigne_a": null,
-      "assigne_id": null
-    },
-    {
-      "id": 35,
-      "severite": "surveillance",
-      "origine": "physio",
-      "motif": "HRV en baisse de plus de 30 % sur la base personnelle",
-      "statut": "en_cours",
-      "resident": "R-0585",
-      "prenom": "Tarek",
-      "nom": "Zamora",
-      "cabine": "C-40",
-      "age": 19,
-      "ouvert_at": "2026-09-23 09:22:00",
-      "ouvert_jour_vol": 4128,
-      "assigne_a": "Dr. Oyelaran",
-      "assigne_id": 1
-    },
-    {
-      "id": 30,
-      "severite": "surveillance",
-      "origine": "physio",
-      "motif": "Activité quotidienne en baisse de plus de 40 %",
-      "statut": "en_cours",
-      "resident": "R-0206",
-      "prenom": "Hugo",
-      "nom": "Rossi",
-      "cabine": "B-127",
-      "age": 43,
-      "ouvert_at": "2026-09-23 09:28:00",
-      "ouvert_jour_vol": 4128,
-      "assigne_a": "Inf. Haddad",
-      "assigne_id": 5
-    },
-    {
-      "id": 83,
+      "id": 26,
       "severite": "surveillance",
       "origine": "physio",
       "motif": "3 nuits consécutives sous 5 h 30",
       "statut": "ouvert",
-      "resident": "R-1060",
-      "prenom": "Adrien",
-      "nom": "Moreau",
-      "cabine": "E-117",
-      "age": 44,
-      "ouvert_at": "2026-09-23 09:29:00",
+      "resident": "R-0237",
+      "prenom": "Tarek",
+      "nom": "Ximenes",
+      "cabine": "B-65",
+      "age": 37,
+      "ouvert_at": "2026-09-24 12:20:00",
       "ouvert_jour_vol": 4128,
       "assigne_a": null,
       "assigne_id": null
+    },
+    {
+      "id": 81,
+      "severite": "surveillance",
+      "origine": "conversation",
+      "motif": "Retrait social : invitations collectives déclinées",
+      "statut": "ouvert",
+      "resident": "R-0702",
+      "prenom": "Lena",
+      "nom": "Thorne",
+      "cabine": "D-44",
+      "age": 26,
+      "ouvert_at": "2026-09-24 12:19:00",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": null,
+      "assigne_id": null
+    },
+    {
+      "id": 84,
+      "severite": "surveillance",
+      "origine": "physio",
+      "motif": "HRV en baisse de plus de 30 % sur la base personnelle",
+      "statut": "ouvert",
+      "resident": "R-1059",
+      "prenom": "Ingrid",
+      "nom": "Okonkwo",
+      "cabine": "E-27",
+      "age": 50,
+      "ouvert_at": "2026-09-24 12:18:00",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": null,
+      "assigne_id": null
+    },
+    {
+      "id": 46,
+      "severite": "surveillance",
+      "origine": "conversation",
+      "motif": "Retrait social : invitations collectives déclinées",
+      "statut": "ouvert",
+      "resident": "R-0576",
+      "prenom": "Amina",
+      "nom": "Bergstrom",
+      "cabine": "C-85",
+      "age": 46,
+      "ouvert_at": "2026-09-24 12:17:00",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": null,
+      "assigne_id": null
+    },
+    {
+      "id": 16,
+      "severite": "surveillance",
+      "origine": "physio",
+      "motif": "Activité quotidienne en baisse de plus de 40 %",
+      "statut": "ouvert",
+      "resident": "R-0007",
+      "prenom": "Ilan",
+      "nom": "Doric",
+      "cabine": "A-13",
+      "age": 44,
+      "ouvert_at": "2026-09-24 12:17:00",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": null,
+      "assigne_id": null
+    },
+    {
+      "id": 23,
+      "severite": "info",
+      "origine": "usage",
+      "motif": "Usage du compagnon en forte hausse, interactions humaines en baisse",
+      "statut": "en_cours",
+      "resident": "R-0177",
+      "prenom": "Sofia",
+      "nom": "Dubois",
+      "cabine": "B-137",
+      "age": 39,
+      "ouvert_at": "2026-09-24 12:15:00",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": "Dr. Ferreira",
+      "assigne_id": 2
     }
   ],
   "compteurs": {

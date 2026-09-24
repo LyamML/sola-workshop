@@ -199,14 +199,13 @@ const MS_JOUR = 86400000;
 const AUJOURDHUI = new Date();
 AUJOURDHUI.setHours(12, 0, 0, 0);
 
-// L'horloge de demonstration : aujourd'hui, 16:05. Les heures de la journee
-// (signaux ouverts, synchronisations des bracelets) partent de cet instant et
-// non de l'horloge du poste : generee a 9 h ou a 23 h, la base montre les
-// memes heures, et le repli de la console (web/console/src/data/) reste
-// juste. Seule la date suit le calendrier, comme dans le seed SQL.
-const HEURE_DEMO = 16 * 60 + 5;
-const MAINTENANT = new Date(AUJOURDHUI);
-MAINTENANT.setHours(0, HEURE_DEMO, 0, 0);
+// L'horloge de demonstration : maintenant, a la minute. Les heures de la
+// journee (signaux ouverts, synchronisations des bracelets) partent de cet
+// instant : une alerte a 16 h n'apparait plus a 12 h. Le repli de la console
+// se regenerera avec `npm run db:repli` apres chaque generation.
+const MAINTENANT = new Date();
+MAINTENANT.setSeconds(0, 0);
+const HEURE_DEMO = MAINTENANT.getHours() * 60 + MAINTENANT.getMinutes();
 
 /** Date ISO (AAAA-MM-JJ) a J moins `n` jours. */
 function jour(n) {
@@ -776,13 +775,11 @@ try {
   // Les signaux qu'un moteur de regles ouvre au fil de l'eau, hors urgence.
   const SIGNAUX_COURANTS = MOTIFS_SIGNAL.filter(([sev]) => sev !== "critique");
 
-  // Fenetre d'ouverture, en minutes depuis minuit. Le dernier signal scripte
-  // de gravite « surveillance » tombe a 09:15 (+555) ; on ouvre juste apres,
-  // et on s'arrete deux minutes avant l'horloge de demonstration. Le sixieme
-  // scripte, a 11:02, est de gravite « info » : la file etant triee par
-  // gravite d'abord, il reste en bas quoi qu'il arrive.
-  const DEBUT_SIGNAUX = 556;
-  const finSignaux = HEURE_DEMO - 2;
+  // Fenetre d'ouverture : les deux heures qui precedent l'horloge, jamais
+  // dans le futur. Les six signaux scriptes du seed sont eux aussi dans ce
+  // passe recent (datetime('now', '-N minutes')).
+  const finSignaux = Math.max(HEURE_DEMO - 2, 0);
+  const DEBUT_SIGNAUX = Math.max(0, finSignaux - 120);
 
   const insSignal = db.prepare(`
     INSERT INTO signaux
@@ -807,11 +804,8 @@ try {
       // noierait la file de triage sous des cas qui ne racontent rien.
       const [severite, origine, motif] = piocher(SIGNAUX_COURANTS);
       const assigne = rnd() < 0.62 ? tirerSoignant() : { assigne_id: null, assigne_a: null };
-      // Ouverts apres le dernier signal scripte (09:15) et jamais dans le
-      // futur. Deux contraintes a la fois : la file de triage trie par
-      // gravite puis par anciennete, donc les six scriptes du matin doivent
-      // rester en tete ; et l'ecran des alertes recentes affiche des heures,
-      // or une alerte ouverte dans huit heures ne veut rien dire.
+      // Ouverts dans les deux heures qui precedent l'horloge, jamais dans le
+      // futur : la file triee par date montrerait sinon des alertes a venir.
       const quand = aujourdhuiA(entier(DEBUT_SIGNAUX, finSignaux));
       // Un signal que quelqu'un a pris est « en cours » : c'est le geste
       // « Je prends » de la console. Le tirage qui en decidait est garde, sans

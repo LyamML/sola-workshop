@@ -28,6 +28,8 @@ import {
   discuter,
   EchecIA,
   evaluerGravite,
+  estMenaceSante,
+  estViolence,
   prechauffer,
   resumer,
   type EtatAlerte,
@@ -339,14 +341,18 @@ export default function App() {
 
       historique.current = [];
       debutEchange.current = null;
+      // Une alerte ouverte pendant l'échange (y compris info, score ≥ 3) exige
+      // un résumé remonté : sinon le médecin voit un signal sans conversation.
+      const alerteOuverte = alerteTransmise.current;
 
       void (async () => {
         setRemontee({ texte: "Résumé en cours…", alerte: false });
-        const clinique = await resumer(tours);
-        if (!clinique) {
+        const produit = await resumer(tours);
+        if (!produit) {
           setRemontee({ texte: "Résumé non produit", alerte: true });
           return;
         }
+        const clinique = alerteOuverte ? { ...produit, remontee_auto: true } : produit;
         const ecoule = Date.now() - Date.parse(debut);
         const duree_min = Number.isFinite(ecoule)
           ? Math.max(0, Math.min(600, Math.round(ecoule / 60_000)))
@@ -441,12 +447,15 @@ export default function App() {
   // --- conversation avec le modèle local ------------------------------------
 
   /** Construit un motif générique pour le signal médecin (jamais du verbatim). */
-  const construireMotif = (score: number): string => {
+  const construireMotif = (score: number, texte: string): string => {
     const j = `J+${JOUR_VOL}`;
+    if (estViolence(texte)) return `Violence ou menace mentionnée en conversation (${j})`;
     if (score >= 10) return `Détresse émotionnelle signalée en conversation (${j})`;
     if (score >= 9) return `Urgence physique signalée en conversation (${j})`;
+    if (estMenaceSante(texte) || score === 5)
+      return `Menace pour la santé mentionnée en conversation (${j})`;
     if (score >= 7) return `Symptôme préoccupant mentionné en conversation (${j})`;
-    if (score === 6) return `Demande d’aide médicale formulée en conversation (${j})`;
+    if (score >= 6) return `Demande d’aide médicale formulée en conversation (${j})`;
     return `Symptôme léger mentionné en conversation (${j})`;
   };
 
@@ -462,26 +471,30 @@ export default function App() {
     // ---- scoring de gravité -------------------------------------------------
     // Évalué sur la phrase du résident, et avant l'appel au modèle : un Ollama
     // éteint, ou un résident qui coupe Sola en reparlant, ne doit pas faire
-    // perdre l'alerte. Le signal ne part que si le score dépasse le maximum
-    // déjà traité.
+    // perdre l'alerte. Seuil 3 (stade info) : toute alerte ouverte exige un
+    // résumé remonté en fin d'échange (`remontee_auto`).
     const score = evaluerGravite(texte);
-    const nouvelleAlerte = score > 0 && score > scoreMax.current;
+    const nouvelleAlerte = score >= 3 && score > scoreMax.current;
     let envoi: Promise<boolean> | null = null;
     if (nouvelleAlerte) {
       const precedent = scoreMax.current;
       scoreMax.current = score;
       const severite: "critique" | "surveillance" | "info" =
         score >= 9 ? "critique" : score >= 5 ? "surveillance" : "info";
-      envoi = envoyerSignal({ motif: construireMotif(score), severite, survenu_at }).then((ok) => {
+      envoi = envoyerSignal({
+        motif: construireMotif(score, texte),
+        severite,
+        survenu_at,
+      }).then((ok) => {
         if (!ok) {
           // Non transmise : la phrase suivante du même niveau doit pouvoir la renvoyer.
           if (scoreMax.current === score) scoreMax.current = precedent;
           setRemontee({ texte: "Alerte non transmise · serveur de bord injoignable", alerte: true });
           return false;
         }
-        if (score >= 5) alerteTransmise.current = true;
-        // « Médecin informé » seulement une fois le signal en base. Pour
-        // surveillance (5-8) : critique bascule en Alerte, info reste silencieux.
+        alerteTransmise.current = true;
+        // « Médecin informé » pour surveillance (5-8) ; critique bascule en Alerte ;
+        // info (3-4) ouvre le signal sans pastille ni annonce orale.
         if (score >= 5 && score <= 8) {
           setSorties((prev) =>
             prev.some((s) => s.id === "alerte-medecin")
@@ -514,7 +527,7 @@ export default function App() {
       // de bord l'a enregistré : quelques dizaines de millisecondes en local.
       const envoyee = envoi ? await envoi : null;
       if (controle.signal.aborted) return;
-      if (envoyee === false && score >= 5) alerte = "echec";
+      if (envoyee === false) alerte = "echec";
       else if (alerteTransmise.current) alerte = "transmise";
 
       const reponse = await discuter(historique.current, {

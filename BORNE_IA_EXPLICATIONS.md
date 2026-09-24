@@ -117,8 +117,8 @@ maintenant tranchés dans `ia.ts`, pas par le modèle :
 
 | Garde-fou | Ce qu'il fait |
 |---|---|
-| **Urgence détectée** (mots-clés) | L'alerte part d'abord ; puis une réponse écrite à l'avance, sans appel au modèle : « l'équipe médicale a reçu une alerte, ne reste pas seul ». Si le serveur de bord ne l'a pas reçue : « je n'arrive pas à joindre l'équipe médicale, appelle l'infirmerie B ». Les réponses suivantes rappellent l'urgence même si Lyam minimise. Le résumé passe en `critique` |
-| **Demande d'aide** (« préviens le médecin », « j'ai besoin d'aide »…) | Alerte `surveillance` ; une fois enregistrée, la réponse s'ouvre sur « L'équipe médicale est prévenue. », écrite par le code |
+| **Urgence détectée** (mots-clés) | Détresse, violence (meurtre, menace de tuer), urgence physique, trauma : l'alerte critique part d'abord ; puis une réponse écrite à l'avance. Si le serveur de bord ne l'a pas reçue : renvoi vers l'infirmerie B. Le résumé passe en `critique` |
+| **Demande d'aide** (« préviens le médecin », « j'ai besoin d'aide »…) | Alerte `surveillance` (score ≥ 5) ; une fois enregistrée, la réponse s'ouvre sur « L'équipe médicale est prévenue. », écrite par le code. Score 3-4 : signal `info` sans pastille ; le résumé de fin est quand même remonté |
 | **Action prétendue** (« je préviens », « j'ai contacté »…) | La phrase est remplacée par la vérité sur l'alerte : « L'équipe médicale est prévenue » si elle est partie, l'infirmerie B si elle a échoué, sinon un rendez-vous avec le Dr Ferreira |
 | **Nom de maladie ou de lésion** (« entorse », « migraine »…) | La phrase est retirée |
 | **Sensation inventée** (« j'ai senti ta tension ») | La phrase est retirée |
@@ -224,8 +224,13 @@ puis `ollama pull qwen3:4b` et relancer `npm run dev:borne`.
 
 **Pendant l'échange**, chaque phrase du résident reçoit un score de gravité
 par mots-clés (`evaluerGravite`, 0 à 10), **avant** l'appel au modèle : un
-Ollama éteint ou une interruption ne fait pas perdre l'alerte. Si le score
-dépasse le plus haut déjà envoyé :
+Ollama éteint ou une interruption ne fait pas perdre l'alerte. Une alerte
+ne part que si le score est **≥ 3** (info, surveillance ou critique) et
+dépasse le plus haut déjà envoyé. Meurtre, menace de tuer autrui : score 10
+(critique). Menaces qui nuisent à la santé (blesser, frapper, empoisonner,
+menacer…) : score 5 (surveillance). Si une alerte a été ouverte, le
+résumé de fin d'échange est forcément remonté (`remontee_auto`), même en
+sévérité `info` : le médecin ne voit pas un signal sans conversation.
 
 1. la borne envoie un motif générique à `POST /bord/ingest/signal`, jamais du
    verbatim, avec une seconde tentative après un raté réseau ;
@@ -241,9 +246,10 @@ dépasse le plus haut déjà envoyé :
 
 1. Ollama produit un JSON (`resume`, `severite`, `tags`) ;
 2. la borne l'envoie à `POST /bord/ingest/conversation` (jeton ajouté par Vite) ;
-3. si `severite` ≠ `info`, le serveur ouvre un signal `origine = conversation`
-   — sauf si l'échange en a déjà ouvert un : il en relève alors la gravité
-   plutôt que d'en créer un second ;
+3. si une alerte a déjà été ouverte pendant l'échange, `remontee_auto` est
+   forcé : le résumé apparaît dans les conversations remontées. Sinon, si
+   `severite` ≠ `info`, le serveur ouvre (ou relève) un signal
+   `origine = conversation` ;
 4. la barre d'état affiche « Résumé transmis », « Remontée médecin », ou une
    erreur (« Résumé non produit », « Serveur de bord injoignable »).
 

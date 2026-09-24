@@ -136,9 +136,8 @@ hors urgences gérées dans le code (réponses écrites, sévérité forcée), s
 règles ne sont que des consignes données au modèle, la détection d'urgence ne
 repose que sur des mots-clés — une urgence qu'ils manquent n'ouvre aucune
 alerte, et Sola ne renvoie vers l'infirmerie que si une alerte a échoué —, la
-file de triage se lit du plus récent au plus ancien — avant 16:05, les signaux
-de démonstration de l'après-midi passent devant une alerte que la borne vient
-d'ouvrir —, les
+file de triage se lit du plus récent au plus ancien — l'horloge du jeu de
+démonstration est celle du poste au moment de `npm run db:demo` —, les
 bilans sanguins du jeu de démonstration sont
 simulés (`source = 'simule'`, et la fiche le dit), la reconnaissance vocale de
 la borne n'existe que dans les navigateurs à moteur Chromium — ailleurs elle
@@ -146,7 +145,7 @@ bascule au clavier et le dit dans sa barre d'état —, dans Chrome, Sola parle
 avec la voix distante de Google — ce qu'elle dit part chez Google ; hors ligne,
 une voix de Windows reprend —, Sola ne reconnaît sa propre voix que par le
 texte : un mot qu'elle vient de dire ne vaut pas réponse dans
-les deux secondes qui suivent, un geste clinique ne se défait pas — ni signal à
+les 3,5 secondes qui suivent, un geste clinique ne se défait pas — ni signal à
 rouvrir ou à réassigner, ni note à retirer —, aucun dossier ne se corrige à
 l'écran, serveur éteint, seule la fiche de R-0448 s'affiche — le repli ne
 contient qu'elle —, et, sous Docker, le relais de la borne ne reconnaît plus le

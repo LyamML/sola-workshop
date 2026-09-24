@@ -103,7 +103,7 @@ resume : 2 à 4 phrases cliniques, fidèles à l'échange (mental ET physique é
 - N'ajoute ni intensité, ni durée, ni cause qu'il n'a pas dites.
 - Seules les lignes « Résident » renseignent sur lui : une supposition de Sola n'est pas un fait rapporté.
 - Une phrase au plus sur ce que Sola a conseillé.
-severite : critique = idée suicidaire, automutilation, douleur thoracique, gêne respiratoire, malaise ; surveillance = plainte physique ou morale utile au suivi ; info = sinon (échange léger, question pratique).
+severite : critique = idée suicidaire, automutilation, violence envers autrui, douleur thoracique, gêne respiratoire, malaise ; surveillance = menace pour la santé, plainte physique ou morale utile au suivi ; info = sinon (échange léger, question pratique).
 tags : 1 à 6 mots-clés tirés des mots du résident.`;
 
 export type Severite = "critique" | "surveillance" | "info";
@@ -186,6 +186,23 @@ function elaguerNuitCollante(reponse: string, dernierUser: string): string {
  */
 const DETRESSE =
   /suicid|me tuer|me foutre en l.air|en finir avec (la vie|tout|moi)|(envie d.|veux |voudrais )en finir\s*([.!?…,]|$)|mettre fin à (mes jours|ma vie|tout)|plus envie de vivre|envie de (mourir|disparaître|disparaitre)|(plus simple|mieux) (de|si je) (mourir|disparaître|disparaitre|disparaissais|mourais|n.étais plus là)|me faire du mal|me blesser exprès|me scarifi|me couper les veines|sauter par la fen[eê]tre|me jeter (dans le vide|du haut|par la fen[eê]tre|du balcon|sous un train|sous le m[eé]tro|sous une voiture)|sauter du haut|sauter (d.un|du) (pont|immeuble|toit)|me balancer dans le vide|mettre fin à tout ça|(je veux|je voudrais|j.aimerais) (mourir|disparaître|disparaitre)|(plus|pas) envie d.(être|exister) (là|ici|en vie)|me pendre|me noyer|overdose|avaler (tous |mes )?(m[eé]dicaments|pilules|cachets|comprim[eé]s)/i;
+
+/**
+ * Violence envers autrui — même rang que la détresse (score 10), réponse
+ * d'urgence écrite. Distinct de « me tuer » (DETRESSE) : ici la cible est
+ * quelqu'un d'autre.
+ */
+const VIOLENCE =
+  /\bmeurtres?\b|\bassassinats?\b|\bhomicides?\b|\bmassacres?\b|assassine[rz]?|étrangl|poignard|égorg|(je (vais|veux|voudrais)|j.aimerais|je compte) (tuer|assassiner)|tuer (quelqu.?un|des gens|tout le monde|ma |mon |mes |le |la |les )|faire (un )?massacre|parle[rz]? de meurtre/i;
+
+/**
+ * Menaces qui nuisent à la santé d'autrui ou de soi, sans atteindre le meurtre
+ * (score 5 → surveillance). Distinct de VIOLENCE (critique) et de DETRESSE
+ * (« me faire du mal » suicidaire).
+ */
+const MENACE_SANTE =
+  /\bmenac(?:e|es|er|[ée]e?s?)(?=\s|$|[.,!?…'’])|\bmenaç|faire du mal (à|au|aux)|lui faire du mal|leur faire du mal|te faire (du )?mal|vous faire (du )?mal|blesser (quelqu.?un|un |une |des |le |la |les )|(je (vais|veux|voudrais)|j.aimerais) (le |la |les |te |vous )?(blesser|frapper|cogner|taper|battre)|empoisonn|\bagress(?:er|ion|[ée]e?)(?=\s|$|[.,!?…'’])|\btabass|\bfrapper (quelqu.?un|un |une |des )|\bcoups? de (poing|pied|couteau)\b|mettre en danger|nuire (à|au)|je (vais|veux) (le |la |les )?faire souffrir/i;
+
 const PHYSIQUE =
   /(douleur|mal|serre|oppress|brûl|brul)[^.!?]{0,30}(poitrine|thorax)|(douleur|serre|oppress)[^.!?]{0,30}(cœur|coeur)|(poitrine|thorax)[^.!?]{0,20}(serre|douleur|mal|oppress)|(du mal|n.arrive (plus|pas)) à respirer|respire (très )?mal|j.étouffe|je m.étouffe|(je vais|failli) m.évanouir|évanoui|perdu connaissance|malaise|je saigne beaucoup|saigne (sans arrêt|abondamment)|sens plus (mon|ma|mes) (bras|jambes?|visage)|bouche de travers|paralys/i;
 /*
@@ -229,10 +246,20 @@ const REPONSES_URGENCE: Record<Urgence, Record<"transmise" | "echec", string>> =
 };
 
 export function detecterUrgence(texte: string): Urgence | null {
-  if (DETRESSE.test(texte)) return "detresse";
+  if (DETRESSE.test(texte) || VIOLENCE.test(texte)) return "detresse";
   if (PHYSIQUE.test(texte)) return "physique";
   if (TRAUMA.test(texte)) return "trauma";
   return null;
+}
+
+/** True si la phrase évoque une violence envers autrui (pas l'automutilation). */
+export function estViolence(texte: string): boolean {
+  return VIOLENCE.test(texte);
+}
+
+/** True si la phrase évoque une menace qui nuit à la santé (surveillance). */
+export function estMenaceSante(texte: string): boolean {
+  return MENACE_SANTE.test(texte);
 }
 
 function urgenceDansEchange(historique: Tour[]): boolean {
@@ -244,15 +271,21 @@ function urgenceDansEchange(historique: Tour[]): boolean {
  *
  * L'échelle est intentionnellement prudente (faux positif préféré) :
  *   10 : DETRESSE — pensées suicidaires, automutilation
+ *   10 : VIOLENCE — meurtre, menace de tuer autrui
  *    9 : PHYSIQUE — urgence physique (poitrine, souffle, malaise)
  *    9 : TRAUMA   — fracture, luxation, blessure structurelle grave
  *    7 : situation préoccupante — chute, saignement, panique, vomissement
  *    6 : demande d'aide — « préviens le médecin », « j'ai besoin d'aide »
+ *    5 : MENACE_SANTE — menaces qui nuisent à la santé (surveillance)
  *    3 : symptôme léger — fatigue, tristesse, douleur vague, nausée
+ *        (ouvre un signal « info » ; le résumé de fin est forcé en remontée)
  *    0 : conversation normale
  *
- * MODEREE et LEGERE ne se recoupent pas avec DETRESSE/PHYSIQUE : les tests
- * sont appliqués dans l'ordre décroissant, le premier qui matche gagne.
+ * Seuil d'envoi d'alerte pendant l'échange : score ≥ 3.
+ *
+ * MODEREE, MENACE_SANTE et LEGERE ne se recoupent pas avec
+ * DETRESSE/VIOLENCE/PHYSIQUE : les tests sont appliqués dans l'ordre
+ * décroissant, le premier qui matche gagne.
  */
 const MODEREE =
   /\bchut(e|é)\b|bless[eé]|saign(e|er|ement)|vomit|convuls|crise de paniqu|s[''']évanouir|très (fort|mal)|atroce|insupportable|tête qui tourne|vertige|fi[èe]vre|temp[ée]rature [ée]lev[ée]e|douleur (intense|aigu[ëê]|forte|s[éè]v[èe]re|lancinante)|du mal (à|a) (marcher|bouger|me lever)|n.arrive pas (à|a) (marcher|bouger)/i;
@@ -274,11 +307,12 @@ const LEGERE =
  * Ne duplique pas la logique de `detecterUrgence` : les deux coexistent.
  */
 export function evaluerGravite(texte: string): number {
-  if (DETRESSE.test(texte)) return 10;
+  if (DETRESSE.test(texte) || VIOLENCE.test(texte)) return 10;
   if (PHYSIQUE.test(texte)) return 9;
   if (TRAUMA.test(texte)) return 9;
   if (MODEREE.test(texte)) return 7;
   if (DEMANDE.test(texte)) return 6;
+  if (MENACE_SANTE.test(texte)) return 5;
   if (LEGERE.test(texte)) return 3;
   return 0;
 }
