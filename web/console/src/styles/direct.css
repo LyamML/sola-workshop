@@ -68,6 +68,12 @@
   stroke-linejoin: round;
 }
 
+/* Un mot plutôt qu'un chiffre : au corps d'un chiffre, « signalée » ne
+   laisserait pas de place à son heure. */
+.dl-v.mot .v {
+  font-size: 22px;
+}
+
 /* Plus rien n'arrive : les valeurs restent, mais ne se donnent plus pour
    vivantes. */
 .direct.fige .dl-v .v {
@@ -75,6 +81,17 @@
 }
 .direct.fige .dl-sp path {
   stroke: var(--ink-3);
+}
+
+/* Après la règle du bracelet muet, et au-dessus d'elle : une chute signalée
+   reste ce qu'il faut voir, qu'il envoie encore ou non. */
+.dl-v.chute {
+  border-color: var(--crit);
+  background: var(--crit-soft);
+}
+.dl-v.chute .v,
+.direct.fige .dl-v.chute .v {
+  color: var(--crit);
 }
 
 .dl-jour {

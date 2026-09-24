@@ -326,7 +326,7 @@ const ECRANS: Ecran[] = [
   },
   {
     ecran: "02 — Santé de l’équipage",
-    aide: () => ["GET /api/crew"],
+    aide: () => ["GET /api/crew", "GET /api/crew/empreinte · toutes les 5 s"],
     blocs: [
       {
         bloc: "File de triage",
@@ -412,6 +412,7 @@ const ECRANS: Ecran[] = [
     ecran: "03 — Fiche résident",
     aide: (c) => [
       "GET /api/residents/:code",
+      "GET /api/residents/:code/direct · toutes les 10 s",
       c.temoin === null ? `${TEMOIN} absent de la base` : `valeurs de ${TEMOIN}`,
     ],
     blocs: [
@@ -544,7 +545,7 @@ const ECRANS: Ecran[] = [
     blocs: [
       {
         bloc: "Résidents",
-        source: "residents · mesures_jour · nuits · etat_mental · signaux · bracelets",
+        source: "residents · mesures_jour · mesures · nuits · etat_mental · signaux · bracelets",
         lire: () =>
           pluriel(
             requete<{ n: number }>("SELECT COUNT(*) AS n FROM residents")[0]?.n ?? 0,

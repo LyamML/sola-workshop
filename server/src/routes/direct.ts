@@ -1,9 +1,15 @@
 import { Router } from "express";
 import { requete, residentId } from "../db.js";
+import { FENETRE_MIN, lecturesDe } from "./ingest.js";
 
 /**
  * Ce que le bracelet d'un resident vient d'envoyer : la carte « en direct »
  * de la fiche, qui la relit toutes les dix secondes.
+ *
+ * Deux sources pour les dix dernieres minutes : les lectures, a la seconde,
+ * que le serveur garde en memoire (routes/ingest.ts), et les minutes de la
+ * base, qui n'en gardent que la moyenne. La carte affiche les lectures et ne
+ * prend aux minutes que ce qu'un redemarrage du serveur a fait oublier.
  *
  * Une route a part plutot qu'un champ de plus dans /api/residents/:code : la
  * fiche sert aussi le repli fige de la console (scripts/db-repli.mjs), et une
@@ -17,7 +23,7 @@ import { requete, residentId } from "../db.js";
 export const directApi = Router();
 
 const MINUTE = `strftime('%Y-%m-%dT%H:%M:%SZ', mesure_at) AS at,
-                fc_bpm, spo2_pct, rmssd_ms, activite_g, qualite`;
+                fc_bpm, spo2_pct, rmssd_ms, temp_c, activite_g, pas, qualite`;
 
 directApi.get("/residents/:code/direct", (req, res, next) => {
   try {
@@ -46,26 +52,36 @@ directApi.get("/residents/:code/direct", (req, res, next) => {
 
     const minutes = requete(
       `SELECT ${MINUTE} FROM mesures
-        WHERE resident_id = :id AND mesure_at >= datetime('now', '-60 minutes')
+        WHERE resident_id = :id AND mesure_at >= datetime('now', :fenetre)
         ORDER BY mesure_at`,
-      { id },
+      { id, fenetre: `-${FENETRE_MIN} minutes` },
     );
 
     // Le jour de `mesures_jour` — la date UTC, les minutes good et fair —,
-    // pour que la carte et les tuiles comptent la meme journee.
+    // pour que la carte et les tuiles comptent la meme journee. Des minutes ce
+    // jour-la disent aussi qu'il n'est pas fini : la fiche ne juge pas ses pas.
     const jour = requete(
       `SELECT (SELECT jour_vol FROM mesures_jour
                 WHERE resident_id = :id AND jour = date('now')) AS jour_vol,
               COUNT(*) AS minutes,
               MIN(fc_bpm) AS fc_min, ROUND(AVG(fc_bpm), 1) AS fc_moy, MAX(fc_bpm) AS fc_max,
-              MIN(spo2_pct) AS spo2_min, ROUND(AVG(spo2_pct), 1) AS spo2_moy
+              MIN(spo2_pct) AS spo2_min, ROUND(AVG(spo2_pct), 1) AS spo2_moy,
+              MIN(temp_c) AS temp_min, MAX(temp_c) AS temp_max,
+              MAX(pas) AS pas
          FROM mesures
         WHERE resident_id = :id AND mesure_at >= date('now')
           AND qualite IN ('good', 'fair')`,
       { id },
     )[0]!;
 
-    res.json({ maintenant: new Date().toISOString(), bracelet, derniere, minutes, jour });
+    res.json({
+      maintenant: new Date().toISOString(),
+      bracelet,
+      derniere,
+      minutes,
+      lectures: lecturesDe(id),
+      jour,
+    });
   } catch (e) {
     next(e);
   }

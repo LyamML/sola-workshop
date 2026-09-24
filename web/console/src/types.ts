@@ -124,6 +124,21 @@ export interface Constante {
   ecart: string | null;
   /** La suite, en clair : « base 47 », « — dans la norme · seuil 75 ». */
   repere: string | null;
+  /**
+   * La tuile à une lecture du bracelet, pour une constante qu'il mesure à
+   * chaque envoi : la fiche la prend tant qu'il envoie (`suivreLeDirect`).
+   */
+  enDirect?: {
+    champ: "spo2_pct" | "rmssd_ms" | "temp_c" | "pas";
+    lire: (v: number) => Pick<Constante, "valeur" | "alerte" | "ecart" | "repere">;
+  };
+  /**
+   * Une constante qui s'accumule dans la journée — les pas —, quand son
+   * dernier jour, `x`, n'est peut-être pas fini : la tuile qui le dit en
+   * cours, avec le verdict de la veille plutôt que le sien. La fiche la prend
+   * si le bracelet remplit encore ce jour-là (`suivreLeDirect`).
+   */
+  enCours?: { x: number } & Pick<Constante, "alerte" | "ecart" | "repere">;
   courbe: Courbe;
 }
 

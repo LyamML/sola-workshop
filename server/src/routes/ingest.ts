@@ -12,6 +12,7 @@ import {
   nuitSchema,
   refuseVerbatim,
   signalSchema,
+  type Evenement,
   type Mesure,
   type Trame,
 } from "../validation.js";
@@ -237,10 +238,23 @@ function moyenne(
 }
 
 /**
+ * Le plus haut compteur de pas, zero compris : contrairement a une constante,
+ * zero pas est une valeur. La journee garde de meme le plus haut compteur de
+ * ses minutes (SQL_JOUR).
+ */
+function compteur(valeurs: (number | undefined)[]): number | null {
+  const utiles = valeurs.filter(
+    (v): v is number => v !== undefined && v >= BORNES.pas.min && v <= BORNES.pas.max,
+  );
+  return utiles.length === 0 ? null : Math.max(...utiles);
+}
+
+/**
  * Une minute de trames devient une ligne de `mesures`. Les constantes issues
  * du capteur optique ne sont moyennees que sur les secondes `good` ou `fair`,
- * celles que db-rollup retient ; l'accelerometre ne depend pas du contact du
- * doigt, son activite se prend sur toutes les secondes.
+ * celles que db-rollup retient, et la temperature cutanee avec elles : sans
+ * contact avec la peau, c'est l'air qu'elle mesure. L'activite et les pas ne
+ * dependent pas du contact, ils se prennent sur toutes les secondes.
  */
 function resumerMinute(at: string, trames: Trame[]): Mesure {
   const fiables = trames.filter((t) => t.q === "good" || t.q === "fair");
@@ -250,33 +264,39 @@ function resumerMinute(at: string, trames: Trame[]): Mesure {
     bpm: moyenne(fiables.map((t) => t.bpm), BORNES.bpm, 1),
     rmssd: moyenne(fiables.map((t) => t.rmssd), BORNES.rmssd, 1),
     spo2: moyenne(fiables.map((t) => t.spo2), BORNES.spo2, 1),
+    temp: moyenne(fiables.map((t) => t.temperature), BORNES.temp, 2),
     activite: moyenne(trames.map((t) => t.act), BORNES.activite, 4),
+    pas: compteur(trames.map((t) => t.steps)),
     dort: sommeil.length === 0 ? null : sommeil.filter((s) => s === 1).length * 2 > sommeil.length,
     source: "mesure",
     qualite: qualiteMajoritaire(trames),
   });
 }
 
-type Ecartees = Partial<Record<"bpm" | "rmssd" | "spo2" | "act", number[]>>;
+type Ecartees = Partial<
+  Record<"bpm" | "rmssd" | "spo2" | "temperature" | "act" | "steps", number[]>
+>;
 
 /**
- * Ce que les moyennes n'ont pas retenu parce que c'est hors de BORNES — zero
- * mis a part, qui veut dire « pas de valeur ». Ce ne sont pas des mesures, et
- * les CHECK de `mesures` les refuseraient ; mais une valeur aberrante reste
- * une information — le capteur ne mesure pas, ou mal — et l'emetteur doit le
+ * Ce que la minute n'a pas retenu parce que c'est hors de BORNES — zero mis a
+ * part, qui veut dire « pas de valeur ». Ce ne sont pas des mesures, et les
+ * CHECK de `mesures` les refuseraient ; mais une valeur aberrante reste une
+ * information — le capteur ne mesure pas, ou mal — et l'emetteur doit le
  * savoir plutot que de la voir disparaitre en silence.
  */
 function valeursEcartees(trames: Trame[]): Ecartees {
-  // Les memes secondes que resumerMinute : l'optique sur good et fair,
-  // l'accelerometre sur toutes.
+  // Les memes secondes que resumerMinute : l'optique et la temperature sur
+  // good et fair, l'activite et les pas sur toutes.
   const fiables = trames.filter((t) => t.q === "good" || t.q === "fair");
   const hors = (valeurs: (number | undefined)[], borne: { min: number; max: number }) =>
-    valeurs.filter((v): v is number => v !== undefined && v > 0 && (v < borne.min || v > borne.max));
+    valeurs.filter((v): v is number => v !== undefined && v !== 0 && (v < borne.min || v > borne.max));
   const ecartees: Ecartees = {
     bpm: hors(fiables.map((t) => t.bpm), BORNES.bpm),
     rmssd: hors(fiables.map((t) => t.rmssd), BORNES.rmssd),
     spo2: hors(fiables.map((t) => t.spo2), BORNES.spo2),
+    temperature: hors(fiables.map((t) => t.temperature), BORNES.temp),
     act: hors(trames.map((t) => t.act), BORNES.activite),
+    steps: hors(trames.map((t) => t.steps), BORNES.pas),
   };
   for (const champ of Object.keys(ecartees) as (keyof Ecartees)[]) {
     if (ecartees[champ]?.length === 0) delete ecartees[champ];
@@ -284,14 +304,24 @@ function valeursEcartees(trames: Trame[]): Ecartees {
   return ecartees;
 }
 
-/** L'accuse de reception : les comptes, et les valeurs ecartees s'il y en a. */
-function accuse(res: Response, trames: Trame[], minutes: number): void {
+/**
+ * L'accuse de reception : les comptes, les valeurs ecartees s'il y en a, et
+ * ce qu'est devenue une chute signalee.
+ */
+function accuse(
+  res: Response,
+  trames: Trame[],
+  minutes: number,
+  chute?: "signal ouvert" | "deja signalee",
+): void {
   const ecartees = valeursEcartees(trames);
   res.status(202).json({
     trames: trames.length,
     minutes,
-    // Absent quand tout a ete retenu : la reponse ordinaire ne change pas.
+    // Absents quand tout a ete retenu et que rien n'est tombe : la reponse
+    // ordinaire ne change pas.
     ...(Object.keys(ecartees).length > 0 ? { ecartees } : {}),
+    ...(chute ? { chute } : {}),
   });
 }
 
@@ -323,6 +353,76 @@ function braceletDuResident(
     return null;
   }
   return { id, braceletId: b.id };
+}
+
+/** La largeur de la carte « en direct » : assez courte pour qu'une tendance s'y dessine en quelques minutes. */
+export const FENETRE_MIN = 10;
+
+/**
+ * Une seconde de bracelet, dans les colonnes de `mesures` : la carte les lit
+ * comme ses minutes. Plus la chute, que `mesures` ne garde pas : elle va a
+ * `evenements`.
+ */
+export interface Lecture {
+  at: string;
+  fc_bpm: number | null;
+  spo2_pct: number | null;
+  rmssd_ms: number | null;
+  temp_c: number | null;
+  activite_g: number | null;
+  pas: number | null;
+  qualite: Trame["q"];
+  /** Ce que le croquis Wi-Fi dit d'une chute ; null quand l'emetteur n'en dit rien. */
+  chute: boolean | null;
+}
+
+/**
+ * Les lectures des dix dernieres minutes de chaque resident, pour la carte
+ * « en direct » : `mesures` ne garde que la moyenne de chaque minute, et une
+ * valeur qui change en cours de minute ne s'y lit qu'a moitie. En memoire,
+ * comme la minute en cours : apres un redemarrage, la carte reprend les
+ * minutes de la base en attendant les lectures suivantes.
+ */
+const lecturesRecentes = new Map<number, Lecture[]>();
+
+const limiteFenetre = () => Date.now() - FENETRE_MIN * 60_000;
+
+/** A appeler une fois les minutes ecrites : une lecture refusee n'a rien a montrer. */
+function retenir(resident: number, trames: Trame[], chute: boolean | null = null): void {
+  // Les filtres de la minute, sur une seule seconde : zero et hors BORNES ne
+  // sont pas des valeurs, l'optique et la temperature ne valent que sur good
+  // et fair.
+  const nouvelles = trames.map((t): Lecture => {
+    const optique = t.q === "good" || t.q === "fair";
+    return {
+      at: new Date(t.at).toISOString(),
+      fc_bpm: optique ? moyenne([t.bpm], BORNES.bpm, 1) : null,
+      spo2_pct: optique ? moyenne([t.spo2], BORNES.spo2, 1) : null,
+      rmssd_ms: optique ? moyenne([t.rmssd], BORNES.rmssd, 1) : null,
+      temp_c: optique ? moyenne([t.temperature], BORNES.temp, 2) : null,
+      activite_g: moyenne([t.act], BORNES.activite, 4),
+      pas: compteur([t.steps]),
+      qualite: t.q,
+      chute,
+    };
+  });
+  // Rangees par instant, sans doublon : la borne reemet ce qu'elle n'a pas pu
+  // confirmer, et rien ne l'oblige a envoyer dans l'ordre.
+  const parInstant = new Map((lecturesRecentes.get(resident) ?? []).map((l) => [l.at, l]));
+  for (const l of nouvelles) parInstant.set(l.at, l);
+  const limite = limiteFenetre();
+  lecturesRecentes.set(
+    resident,
+    [...parInstant.values()]
+      .filter((l) => Date.parse(l.at) >= limite)
+      .sort((a, b) => Date.parse(a.at) - Date.parse(b.at)),
+  );
+}
+
+/** Les lectures de la fenetre, de la plus ancienne a la plus recente. */
+export function lecturesDe(resident: number): Lecture[] {
+  const limite = limiteFenetre();
+  return (lecturesRecentes.get(resident) ?? []).filter((l) => Date.parse(l.at) >= limite);
 }
 
 /**
@@ -373,6 +473,7 @@ function recevoirTrames(req: Request, res: Response, next: NextFunction): void {
       ecrireMinutes(id, braceletId, minutes);
       ecrire("UPDATE bracelets SET synchro_at = datetime('now') WHERE id = :id", { id: braceletId });
     });
+    retenir(id, trames);
 
     accuse(res, trames, minutes.length);
   } catch (e) {
@@ -392,6 +493,15 @@ ingest.post("/bracelet", recevoirTrames);
 const minutesEnCours = new Map<number, { debut: number; trames: Trame[] }>();
 
 /**
+ * Ce que la derniere lecture de chaque bracelet disait d'une chute. Un croquis
+ * peut laisser `fall` a true jusqu'a ce qu'on le rearme : seul le passage a
+ * true ouvre un signal, sans quoi chaque lecture en ouvrirait un. En memoire :
+ * apres un redemarrage du serveur, une chute encore signalee en rouvre un — un
+ * doublon plutot qu'une chute manquee.
+ */
+const chutesSignalees = new Map<number, boolean>();
+
+/**
  * Une lecture seule du bracelet en Wi-Fi, horodatee a l'arrivee : sans relais,
  * c'est le serveur qui tient l'horloge que la borne tient en BLE.
  */
@@ -402,7 +512,7 @@ function recevoirLecture(req: Request, res: Response, next: NextFunction): void 
       res.status(400).json({ erreur: "Charge utile invalide.", detail: lecture.error.issues });
       return;
     }
-    const { resident, bracelet, ...valeurs } = lecture.data;
+    const { resident, bracelet, fall, ...valeurs } = lecture.data;
 
     const cible = braceletDuResident(res, resident, bracelet);
     if (!cible) return;
@@ -418,15 +528,21 @@ function recevoirLecture(req: Request, res: Response, next: NextFunction): void 
     const trame: Trame = { ...valeurs, at: new Date(maintenant).toISOString() };
     minute.trames.push(trame);
     const resume = resumerMinute(new Date(debut).toISOString(), minute.trames);
+    const chute = fall === true && chutesSignalees.get(braceletId) !== true;
 
     transaction(() => {
       ecrireMinutes(id, braceletId, [resume]);
       ecrire("UPDATE bracelets SET synchro_at = datetime('now') WHERE id = :id", { id: braceletId });
+      if (chute) enregistrerEvenement(id, "chute", heureDeBord(new Date(maintenant)), null);
     });
+    // Une fois la chute ecrite seulement : si l'ecriture a echoue, la lecture
+    // suivante doit encore l'ouvrir.
+    if (fall !== undefined) chutesSignalees.set(braceletId, fall);
+    retenir(id, [trame], fall ?? null);
 
     // Les ecarts de cette lecture-ci, pas de toute la minute : chaque reponse
     // parle de ce que l'emetteur vient d'envoyer.
-    accuse(res, [trame], 1);
+    accuse(res, [trame], 1, fall ? (chute ? "signal ouvert" : "deja signalee") : undefined);
   } catch (e) {
     next(e);
   }
@@ -597,6 +713,36 @@ ingest.post("/conversation", (req, res, next) => {
 });
 
 // --------------------------------------------------------------- evenements -
+/**
+ * Un evenement du bracelet, deja a l'heure de bord ; a appeler dans une
+ * transaction. Une chute sans acquittement est une urgence : elle ouvre un
+ * signal critique, qui entre dans la file sans attendre le prochain agregat.
+ * La borne l'envoie ici, le croquis Wi-Fi dans sa lecture.
+ */
+function enregistrerEvenement(
+  id: number,
+  type: Evenement["type"],
+  survenu: string,
+  intensite: number | null,
+): void {
+  ecrire(
+    `INSERT INTO evenements (resident_id, type, survenu_at, intensite_g)
+     VALUES (:id, :type, :survenu, :intensite)`,
+    { id, type, survenu, intensite },
+  );
+  if (type === "chute") {
+    ecrire(
+      `INSERT INTO signaux
+         (resident_id, severite, motif, origine, ouvert_at, statut)
+       VALUES (:id, 'critique',
+               'Chute détectée par le bracelet · en attente de réponse',
+               'chute', :ouvert, 'ouvert')`,
+      { id, ouvert: survenu },
+    );
+    recalculerStatut(id);
+  }
+}
+
 ingest.post("/evenement", (req, res, next) => {
   try {
     const evt = evenementSchema.safeParse(req.body);
@@ -611,32 +757,14 @@ ingest.post("/evenement", (req, res, next) => {
       return;
     }
 
-    transaction(() => {
-      ecrire(
-        `INSERT INTO evenements (resident_id, type, survenu_at, intensite_g)
-         VALUES (:id, :type, :survenu, :intensite)`,
-        {
-          id,
-          type: evt.data.type,
-          survenu: heureDeBord(evt.data.survenu_at),
-          intensite: evt.data.intensite_g,
-        },
-      );
-
-      // Une chute sans acquittement est une urgence : elle entre dans la file
-      // sans attendre le prochain agregat.
-      if (evt.data.type === "chute") {
-    ecrire(
-        `INSERT INTO signaux
-             (resident_id, severite, motif, origine, ouvert_at, statut)
-           VALUES (:id, 'critique',
-                   'Chute detectee par l''accelerometre · en attente de reponse',
-                   'chute', :ouvert, 'ouvert')`,
-          { id, ouvert: heureDeBord(evt.data.survenu_at) },
-        );
-        recalculerStatut(id);
-      }
-    });
+    transaction(() =>
+      enregistrerEvenement(
+        id,
+        evt.data.type,
+        heureDeBord(evt.data.survenu_at),
+        evt.data.intensite_g,
+      ),
+    );
 
     res.status(202).json({ enregistre: true });
   } catch (e) {
