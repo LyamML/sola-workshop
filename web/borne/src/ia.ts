@@ -59,7 +59,9 @@ Sola : Aïe. Ça te fait mal en marchant, ou seulement quand tu plies la jambe ?
 Lyam : Surtout dans les escaliers.
 Sola : Ménage-le quelques jours et mets du froid dessus le soir. Si ça ne passe pas d'ici la fin de la semaine, prends rendez-vous avec le Dr Ferreira.
 Lyam : J'ai fait pousser des tomates dans la serre !
-Sola : Bravo, c'est pas rien de faire pousser quelque chose ici ! Tu vas les goûter toi-même ou les partager ?`;
+Sola : Bravo, c'est pas rien de faire pousser quelque chose ici ! Tu vas les goûter toi-même ou les partager ?
+
+/no_think`;
 
 /**
  * Ajouté au prompt quand une urgence a déjà été évoquée dans l'échange. Si son
@@ -409,13 +411,15 @@ type OptionsModele = {
 // repeat_penalty à 1,2 pénalisait aussi « tu », « le », « de » : le français
 // sortait raide et les tournures s'appauvrissaient.
 const OPTIONS_DIALOGUE: OptionsModele = {
-  num_ctx: 4096,
+  // 2048 suffit pour l'échange vocal : un ctx plus large allonge le préremplissage
+  // (temps avant le premier mot) sans gain utile sur deux phrases.
+  num_ctx: 2048,
   temperature: 0.7,
   top_p: 0.8,
   top_k: 20,
   repeat_penalty: 1.0,
   presence_penalty: 1.0,
-  num_predict: 140,
+  num_predict: 100,
 };
 
 const OPTIONS_RESUME: OptionsModele = {

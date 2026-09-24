@@ -216,7 +216,7 @@ export default function App() {
     (phrase) => gestionnaire.current(phrase),
     (phrase) => auVol.current(phrase),
   );
-  const { parler, taire, demarrer } = voix;
+  const { parler, enchainer, taire, demarrer } = voix;
 
   const compteur = useRef(0);
   const dire = useCallback((qui: "sola" | "resident", texte: string) => {
@@ -520,6 +520,40 @@ export default function App() {
       else reecrire(replique, t);
     };
 
+    // La voix démarre dès la première phrase complète du flux — sans attendre
+    // la fin du modèle, sinon « Sola réfléchit » dure toute la génération.
+    let parleJusqua = 0;
+    let voixLancee = false;
+    const pousserVoix = (t: string) => {
+      const zone = t.slice(parleJusqua);
+      const re = /[.!?…]+(?:\s+|$)/g;
+      let m: RegExpExecArray | null;
+      let avance = 0;
+      while ((m = re.exec(zone)) !== null) {
+        const fin = m.index + m[0].length;
+        const phrase = zone.slice(avance, fin).trim();
+        avance = fin;
+        if (phrase.length < 8) continue;
+        if (!voixLancee) {
+          parler(phrase);
+          voixLancee = true;
+        } else {
+          enchainer(phrase);
+        }
+      }
+      parleJusqua += avance;
+    };
+    const finirVoix = (t: string) => {
+      pousserVoix(t);
+      const reste = t.slice(parleJusqua).trim();
+      if (reste) {
+        if (!voixLancee) parler(reste);
+        else enchainer(reste);
+      } else if (!voixLancee && t.trim()) {
+        parler(t);
+      }
+    };
+
     let dit: string;
     let alerte: EtatAlerte = alerteTransmise.current ? "transmise" : "aucune";
     try {
@@ -533,7 +567,9 @@ export default function App() {
       const reponse = await discuter(historique.current, {
         signal: controle.signal,
         onMorceau: (t) => {
-          if (t) ecrire(t);
+          if (!t) return;
+          ecrire(t);
+          pousserVoix(t);
         },
         contexte: contexteRef.current,
         alerte,
@@ -574,7 +610,7 @@ export default function App() {
     ecrire(dit);
     setVoice("idle");
     setHint("");
-    parler(dit);
+    finirVoix(dit);
   };
 
   // --- conduite de l'échange --------------------------------------------------

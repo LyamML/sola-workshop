@@ -293,6 +293,8 @@ export interface Voix {
   demarrer: () => void;
   /** Prononce une réplique. Le micro reste ouvert : on peut la couper. */
   parler: (texte: string) => void;
+  /** Enfile une suite après la réplique en cours, sans couper. */
+  enchainer: (texte: string) => void;
   /** Coupe tout — changement de scénario. */
   taire: () => void;
 }
@@ -346,8 +348,12 @@ export function useVoix(
     }
   }, []);
 
+  // Suite de phrases à enchaîner sans couper (streaming LLM → voix).
+  const fileSuite = useRef<string[]>([]);
+
   // Elle se tait, qu'on la coupe ou qu'on change de scène.
   const taire = useCallback(() => {
+    fileSuite.current = [];
     enCours.current = null;
     window.speechSynthesis?.cancel();
     enParole.current = false;
@@ -478,88 +484,105 @@ export function useVoix(
     return () => synth.removeEventListener("voiceschanged", choisir);
   }, []);
 
-  const parler = useCallback(
-    (texte: string) => {
-      const synth = window.speechSynthesis;
-      if (!synth) return;
-      // La réplique précédente cède sa place avant d'être annulée : ce qu'elle
-      // émettra encore en s'arrêtant ne doit plus rien relancer.
-      enCours.current = null;
-      synth.cancel();
-      // La réplique interrompue par celle-ci ne finira jamais d'elle-même : on
-      // la date ici, et on oublie ce qui ne peut plus résonner.
+  // `demarrerDiction` lance une phrase sans toucher à la file d'attente.
+  // Référence pour enchaîner à la fin sans recréer le callback à chaque fois.
+  const demarrerDictionRef = useRef<(dit: string) => void>(() => {});
+  demarrerDictionRef.current = (dit: string) => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+
+    const seuil = performance.now() - TRAINE_ECHO;
+    recentes.current = [
+      ...recentes.current.filter((r) => r.fin > seuil),
+      { texte: dit, fin: Infinity },
+    ];
+    enParole.current = true;
+    setParle(true);
+
+    const diction: Diction = {};
+    enCours.current = diction;
+    const fini = () => {
+      if (enCours.current !== diction) return;
+      const suite = fileSuite.current.shift();
+      if (suite) {
+        demarrerDictionRef.current(suite);
+        return;
+      }
+      enParole.current = false;
       clore(recentes.current);
-      const seuil = performance.now() - TRAINE_ECHO;
-      recentes.current = [
-        ...recentes.current.filter((r) => r.fin > seuil),
-        { texte, fin: Infinity },
-      ];
-      enParole.current = true;
-      setParle(true);
+      setParle(false);
+      if (voulue.current) {
+        setEcoute(true);
+        window.setTimeout(ouvrir, 160);
+      }
+    };
 
-      const diction: Diction = {};
-      enCours.current = diction;
-      const fini = () => {
-        // Une réplique coupée par la suivante termine quand même, en retard.
-        // Sans ce garde-fou elle déclarerait Sola muette pendant qu'elle dit
-        // la suivante : plus d'interruption possible, et deux secondes plus
-        // tard l'écho de la nouvelle réplique ne serait plus reconnu.
+    const parts = morceaux(dit);
+    const { principale, reserve } = voixFr.current;
+
+    const dire = (i: number, voix: SpeechSynthesisVoice | null) => {
+      if (enCours.current !== diction) return;
+      if (i >= parts.length) {
+        fini();
+        return;
+      }
+      const mot = new SpeechSynthesisUtterance(parts[i]);
+      mot.lang = "fr-FR";
+      if (voix) mot.voice = voix;
+      mot.rate = 1.05;
+      diction.mot = mot;
+
+      const lacher = () => {
         if (enCours.current !== diction) return;
-        enParole.current = false;
-        clore(recentes.current);
-        setParle(false);
-        if (voulue.current) {
-          setEcoute(true);
-          window.setTimeout(ouvrir, 160);
-        }
+        mot.onstart = mot.onend = mot.onerror = null;
+        synth.cancel();
+        panne.current = performance.now();
+        if (reserve) dire(i, reserve);
+        else fini();
       };
-
-      const parts = morceaux(texte);
-      const { principale, reserve } = voixFr.current;
-
-      // Un morceau après l'autre, plutôt que tous dans la file de Chrome : si
-      // la voix distante lâche, la suite de la réplique change de voix.
-      const dire = (i: number, voix: SpeechSynthesisVoice | null) => {
-        if (enCours.current !== diction) return;
-        if (i >= parts.length) {
-          fini();
-          return;
-        }
-        const mot = new SpeechSynthesisUtterance(parts[i]);
-        mot.lang = "fr-FR";
-        if (voix) mot.voice = voix;
-        mot.rate = 0.98;
-        diction.mot = mot;
-
-        const lacher = () => {
-          if (enCours.current !== diction) return;
-          mot.onstart = mot.onend = mot.onerror = null;
-          synth.cancel();
-          panne.current = performance.now();
-          if (reserve) dire(i, reserve);
-          else fini();
-        };
-        const distante = voix !== null && !voix.localService;
-        const garde = distante ? window.setTimeout(lacher, DEMARRAGE_MAX) : undefined;
-        mot.onstart = () => window.clearTimeout(garde);
-        mot.onend = () => {
-          window.clearTimeout(garde);
-          dire(i + 1, voix);
-        };
-        mot.onerror = (e) => {
-          window.clearTimeout(garde);
-          // Annulé par `taire` ou par la réplique suivante : rien à reprendre.
-          if (e.error === "interrupted" || e.error === "canceled") return;
-          if (distante) lacher();
-          else fini();
-        };
-        synth.speak(mot);
+      const distante = voix !== null && !voix.localService;
+      const garde = distante ? window.setTimeout(lacher, DEMARRAGE_MAX) : undefined;
+      mot.onstart = () => window.clearTimeout(garde);
+      mot.onend = () => {
+        window.clearTimeout(garde);
+        dire(i + 1, voix);
       };
+      mot.onerror = (e) => {
+        window.clearTimeout(garde);
+        if (e.error === "interrupted" || e.error === "canceled") return;
+        if (distante) lacher();
+        else fini();
+      };
+      synth.speak(mot);
+    };
 
-      const enPanne = performance.now() - panne.current < REPIT_PANNE;
-      dire(0, enPanne && reserve ? reserve : principale);
+    const enPanne = performance.now() - panne.current < REPIT_PANNE;
+    dire(0, enPanne && reserve ? reserve : principale);
+  };
+
+  const parler = useCallback((texte: string) => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const dit = texte.trim();
+    if (!dit) return;
+    fileSuite.current = [];
+    enCours.current = null;
+    synth.cancel();
+    clore(recentes.current);
+    demarrerDictionRef.current(dit);
+  }, []);
+
+  const enchainer = useCallback(
+    (texte: string) => {
+      const dit = texte.trim();
+      if (!dit) return;
+      if (!enParole.current && fileSuite.current.length === 0) {
+        parler(dit);
+        return;
+      }
+      fileSuite.current.push(dit);
     },
-    [ouvrir],
+    [parler],
   );
 
   return {
@@ -570,6 +593,7 @@ export function useVoix(
     erreur,
     demarrer,
     parler,
+    enchainer,
     taire,
   };
 }
