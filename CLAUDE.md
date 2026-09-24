@@ -13,7 +13,7 @@ même commit. Une carte fausse est pire que pas de carte.
 ## Le projet en cinq lignes
 
 **Sola**, workshop EPSI *Horizon 2080*, catégorie **Santé humaine**. Un compagnon
-de santé pour les 1 240 résidents du vaisseau générationnel *Méridien*, en route
+de santé pour les 1 240 résidents du vaisseau générationnel *Projet Odyssée*, en route
 depuis 4 128 jours. **Quatre écrans répartis sur trois applications web
 distinctes**, un serveur de bord, une base SQLite de 17 tables, un bracelet
 ESP32.

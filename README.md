@@ -1,6 +1,6 @@
 # Sola
 
-**Compagnon de santé embarqué du vaisseau générationnel *Méridien* — 1 240 résidents, 4 128 jours de vol, aucun retour possible.**
+**Compagnon de santé embarqué du vaisseau générationnel *Projet Odyssée* — 1 240 résidents, 4 128 jours de vol, aucun retour possible.**
 
 Workshop EPSI — *Horizon 2080*, catégorie **Santé humaine**
 Aylie · Lyam · Alexandre LS
@@ -242,7 +242,7 @@ npm run compte -- medecin
 ```
 
 ```bash
-npm run compte -- mdp quelquun@meridien.vol
+npm run compte -- mdp quelquun@odyssee.vol
 ```
 
 `npm run compte -- liste` affiche les comptes existants. Le mot de passe se
@@ -554,7 +554,7 @@ C'est la promesse du projet rendue exécutable : l'architecture ne se contente p
 
 ## L'équipe nutrition
 
-Une autre équipe du workshop adapte les cultures du *Méridien* aux carences de l'équipage. Elle lit les bilans sanguins de Sola **en moyennes, jamais en dossiers** : une requête quand elle veut, aussi souvent qu'elle veut, et l'historique se tient chez elle.
+Une autre équipe du workshop adapte les cultures du *Projet Odyssée* aux carences de l'équipage. Elle lit les bilans sanguins de Sola **en moyennes, jamais en dossiers** : une requête quand elle veut, aussi souvent qu'elle veut, et l'historique se tient chez elle.
 
 ```bash
 curl.exe -H "Authorization: Bearer <NUTRITION_TOKEN>" "http://<adresse du poste>:5177/partenaires/nutrition/bilans"
