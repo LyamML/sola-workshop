@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { adapterCrew } from "../adapt";
 import { ErreurApi, api, type SignalApi } from "../api";
@@ -12,9 +12,13 @@ import { entier } from "../format";
 import { REPLI_CREW } from "../repli";
 import { useCompte } from "../session";
 import type { CleIndicateur, LigneFile, Periode } from "../types";
-import { RELECTURE_MS, useSource } from "../useSource";
+import { useSource } from "../useSource";
+import { useVeilleSignaux } from "../veille";
 
 type Vue = "motifs" | "modules" | "physio";
+
+/** Le temps de voir que la file a bougé avant qu'un « Je prends » parte. */
+const GEL_MS = 1_000;
 
 const PERIODES: { cle: Periode["cle"]; libelle: string }[] = [
   { cle: "7", libelle: "7 jours" },
@@ -37,8 +41,38 @@ const VUES: { cle: Vue; libelle: string }[] = [
  */
 export function CrewPage() {
   const { compte } = useCompte();
-  const { vue, source, rafraichir } = useSource(api.crew, adapterCrew, REPLI_CREW, [], RELECTURE_MS);
+  // L'empreinte servie avec la file affichée : la veille lui compare celle du
+  // serveur. Pas de `RELECTURE_MS` ici, contrairement à la fiche : la veille
+  // recharge déjà l'écran dès qu'un signal bouge, en cinq secondes au lieu de
+  // quinze, et une relecture de plus déplacerait des lignes sans le gel de
+  // « Je prends ».
+  const empreinte = useRef<string | null>(null);
+  const { vue, source, rafraichir } = useSource(
+    () =>
+      api.crew().then((d) => {
+        empreinte.current = d.empreinte ?? null;
+        return d;
+      }),
+    adapterCrew,
+    REPLI_CREW,
+  );
   const { montrer, rendu: avis } = useAvis();
+
+  // Un signal qui remonte, se prend ou se clôt ailleurs recharge l'écran. Une
+  // ligne qui glisse sous le pointeur ferait prendre un autre signal que celui
+  // visé, et une prise ne se défait pas : « Je prends » attend une seconde
+  // après chaque mise à jour venue d'ailleurs.
+  const relue = useRef(false);
+  const bougee = useRef(0);
+  useVeilleSignaux(source === "api", empreinte, () => {
+    relue.current = true;
+    rafraichir();
+  });
+  useEffect(() => {
+    if (!relue.current) return;
+    relue.current = false;
+    bougee.current = Date.now();
+  }, [vue]);
 
   const [periode, setPeriode] = useState<Periode["cle"]>("30");
   const [indicateur, setIndicateur] = useState<CleIndicateur>("indice");
@@ -64,6 +98,10 @@ export function CrewPage() {
   });
 
   async function prendre(l: LigneFile) {
+    if (Date.now() - bougee.current < GEL_MS) {
+      montrer("La file vient de bouger : vérifiez la ligne, puis cliquez de nouveau sur « Je prends ».");
+      return;
+    }
     setEnCours(l.id);
     try {
       const { signal } = await api.prendre(l.id);

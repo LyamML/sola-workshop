@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Router } from "express";
 import type { RequestHandler, Response } from "express";
 import { compte } from "../auth.js";
@@ -150,6 +151,21 @@ function compterATraiter() {
   )[0]!;
 }
 
+/**
+ * Les signaux a traiter reduits a une empreinte : elle change quand un signal
+ * s'ouvre, se prend ou se clot, quel que soit le programme qui l'ecrit. L'ecran
+ * 02 la relit toutes les cinq secondes et ne recharge /crew que quand elle a
+ * bouge : relire /crew a ce rythme recalculerait toutes ses vues pour rien.
+ */
+function empreinteFile(): string {
+  const lignes = requete(
+    `SELECT id, statut, assigne_id, assigne_a
+       FROM signaux WHERE statut <> 'clos'
+      ORDER BY id`,
+  );
+  return createHash("sha1").update(JSON.stringify(lignes)).digest("hex").slice(0, 16);
+}
+
 // ------------------------------------------------------- ecran 02 : equipage
 export function lireCrew() {
   const a = ancre();
@@ -218,9 +234,24 @@ export function lireCrew() {
   };
 }
 
+// L'empreinte part avec la file qu'elle decrit : l'ecran compare la suivante a
+// celle-ci, pas a sa premiere relecture, ou un signal ouvert entre les deux
+// passerait pour l'etat de depart. Prise avant la file : si un signal
+// s'intercale, l'empreinte est en retard sur la file et l'ecran recharge une
+// fois de trop, au lieu de le manquer. Hors de `lireCrew`, qui ecrit le repli :
+// une valeur qui change avec la base n'a rien a faire dans un fichier commite.
 consoleApi.get("/crew", (_req, res, next) => {
   try {
-    res.json(lireCrew());
+    const empreinte = empreinteFile();
+    res.json({ ...lireCrew(), empreinte });
+  } catch (e) {
+    next(e);
+  }
+});
+
+consoleApi.get("/crew/empreinte", (_req, res, next) => {
+  try {
+    res.json({ empreinte: empreinteFile() });
   } catch (e) {
     next(e);
   }

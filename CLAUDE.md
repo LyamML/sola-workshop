@@ -269,6 +269,7 @@ racine, réglé par `DB_FILE`.
 | L'appel à l'API, le POST d'une note, le PATCH d'un signal | `src/api.ts` |
 | Le mécanisme de repli et `rafraichir` | `src/useSource.ts` |
 | La file « À traiter maintenant » de l'écran 02 | `src/components/FileTriage.tsx` |
+| L'écran 02 qui se recharge seul quand un signal s'ouvre, se prend ou se clôt — empreinte relue toutes les cinq secondes, onglet visible | `src/veille.ts`, `GET /api/crew/empreinte` dans `server/src/routes/console.ts` |
 | Le signal ouvert de la fiche : prendre, clore avec un motif | `src/components/SignalOuvert.tsx` |
 | La carte « en direct » de la fiche et sa ligne bracelet, relues toutes les dix secondes | `src/components/EnDirect.tsx`, `src/direct.ts`, `src/styles/direct.css` |
 | Les tuiles de constantes, la courbe et les barres | `src/components/TuileConstante.tsx`, `src/components/Courbe.tsx`, `src/components/Barres.tsx` |

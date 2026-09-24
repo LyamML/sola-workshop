@@ -326,7 +326,7 @@ const ECRANS: Ecran[] = [
   },
   {
     ecran: "02 — Santé de l’équipage",
-    aide: () => ["GET /api/crew"],
+    aide: () => ["GET /api/crew", "GET /api/crew/empreinte · toutes les 5 s"],
     blocs: [
       {
         bloc: "File de triage",

@@ -99,6 +99,8 @@ export const api = {
   deconnexion: () => envoyer<{ ok: true }>("POST", "/auth/deconnexion", {}),
 
   crew: () => lire<CrewApi>("/api/crew"),
+  /** Relue toutes les cinq secondes par l'écran 02 : elle dit seulement si la file a bougé. */
+  empreinteCrew: () => lire<{ empreinte: string }>("/api/crew/empreinte"),
   resident: (code: string) => lire<ResidentApi>(`/api/residents/${encodeURIComponent(code)}`),
   /** Hors du repli : ce qui change à la seconde ne se fige pas dans un fichier commité. */
   direct: (code: string) => lire<DirectApi>(`/api/residents/${encodeURIComponent(code)}/direct`),
@@ -190,6 +192,8 @@ export interface CrewApi {
     assigne_id: number | null;
   }[];
   compteurs: { ouverts: number; critiques: number; non_assignes: number };
+  /** Celle des signaux à traiter, prise avec la file. Absente du repli, qui ne bouge pas. */
+  empreinte?: string;
 }
 
 export interface ResidentApi {

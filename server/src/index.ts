@@ -101,6 +101,8 @@ app.get("/", (_req, res) => {
     },
     lecture: {
       "GET /api/crew": "ecran 02 — sante de l'equipage",
+      "GET /api/crew/empreinte":
+        "ecran 02 — empreinte des signaux a traiter, relue toutes les cinq secondes",
       "GET /api/residents/:code": "ecran 03 — fiche resident, ex. /api/residents/R-0448",
       "GET /api/residents/:code/direct":
         "ecran 03 — derniere minute du bracelet, heure ecoulee et jour en cours",

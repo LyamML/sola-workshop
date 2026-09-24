@@ -518,6 +518,7 @@ La fiche, elle, ne fait pas la différence, et c'est voulu : dans le jeu de dém
 | `POST /ingest/conversation` | la borne | **résumé** clinique — voir ci-dessous |
 | `POST /ingest/evenement` | la borne | chute, secousse, bouton d'urgence |
 | `GET /api/crew` | la console | écran 02 : indicateurs, courbes, file de triage |
+| `GET /api/crew/empreinte` | la console | écran 02 : l'empreinte des signaux à traiter, relue toutes les cinq secondes ; l'écran ne recharge `/api/crew` que quand elle change |
 | `GET /api/residents/:code` | la console | écran 03 : la fiche complète |
 | `GET /api/residents/:code/direct` | la console | écran 03 : la dernière minute du bracelet, l'heure écoulée et le jour en cours, relus toutes les dix secondes |
 | `GET /api/equipage` | la console | écran 04 : les 1 240 résidents, triés et filtrés par le serveur |
