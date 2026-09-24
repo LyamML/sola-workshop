@@ -35,7 +35,9 @@ export const BORNES = {
   // respiratoire, fin de vie — et c'est celle qu'un soignant doit voir. Seul
   // zero reste dehors, puisqu'il veut dire « pas de valeur ».
   spo2: { min: 1, max: 100 },
+  temp: { min: 25, max: 43 },
   activite: { min: 0, max: 16 },
+  pas: { min: 0, max: 65535 },
 } as const;
 
 export const mesureSchema = z
@@ -48,7 +50,7 @@ export const mesureSchema = z
     rmssd: z.number().min(BORNES.rmssd.min).max(BORNES.rmssd.max).nullable().default(null),
     spo2: z.number().min(BORNES.spo2.min).max(BORNES.spo2.max).nullable().default(null),
     resp: z.number().min(4).max(60).nullable().default(null),
-    temp: z.number().min(25).max(43).nullable().default(null),
+    temp: z.number().min(BORNES.temp.min).max(BORNES.temp.max).nullable().default(null),
     eda: z.number().min(0).max(50).nullable().default(null),
     activite: z
       .number()
@@ -56,7 +58,7 @@ export const mesureSchema = z
       .max(BORNES.activite.max)
       .nullable()
       .default(null),
-    pas: z.number().int().min(0).max(65535).nullable().default(null),
+    pas: z.number().int().min(BORNES.pas.min).max(BORNES.pas.max).nullable().default(null),
     dort: z.boolean().nullable().default(null),
     source: z.enum(["mesure", "simule"]).default("mesure"),
     qualite: z.enum(["good", "fair", "poor", "warmup"]).default("good"),
@@ -81,9 +83,10 @@ export const lotMesuresSchema = z
  *
  * Les deux firmwares ne publient pas les memes cles — le KY-039 ajoute
  * `beats` et `amp`, le MAX30102 la SpO2, l'activite, le sommeil et les
- * compteurs de chutes. Toutes sont declarees et `.strict()` refuse les
- * autres : une cle que le firmware viendrait d'ajouter doit echouer ici, pas
- * disparaitre en silence.
+ * compteurs de chutes —, et le croquis Wi-Fi envoie la temperature et les
+ * pas. Toutes sont declarees et `.strict()` refuse les autres : une cle que
+ * le firmware viendrait d'ajouter doit echouer ici, pas disparaitre en
+ * silence.
  *
  * Seule la forme est verifiee ici, pas la physiologie : zero y veut dire
  * « pas de valeur fiable », et c'est en faisant la minute que le serveur
@@ -110,6 +113,12 @@ export const trameSchema = z
     hrRest: z.number().min(0).optional(),
     fall: z.number().int().min(0).optional(),
     shake: z.number().int().min(0).optional(),
+    // Croquis Wi-Fi. La temperature cutanee, en °C, sans minimum : un capteur
+    // debranche rend une valeur absurde, qui doit etre ecartee et signalee,
+    // pas faire refuser la lecture. Les pas, un compteur qui repart de zero
+    // quand le bracelet redemarre, pas a minuit.
+    temperature: z.number().optional(),
+    steps: z.number().int().min(0).optional(),
   })
   .strict();
 
@@ -134,6 +143,9 @@ export const lotTramesSchema = z
  * croquis Arduino n'a souvent ni `rmssd` ni indice de qualite : zero veut deja
  * dire « pas de valeur », et une lecture sans qualite passe pour `fair` — les
  * bornes physiologiques ecartent toujours ce qui est aberrant.
+ *
+ * `fall` n'y compte pas les chutes comme dans la trame BLE : il dit si le
+ * croquis en detecte une. Absent, le croquis ne dit rien des chutes.
  */
 export const lectureSchema = trameSchema
   .omit({ at: true, id: true })
@@ -142,6 +154,7 @@ export const lectureSchema = trameSchema
     bracelet: numeroBracelet,
     rmssd: z.number().min(0).default(0),
     q: z.enum(["good", "fair", "poor", "warmup"]).default("fair"),
+    fall: z.boolean().optional(),
   })
   .strict();
 
@@ -233,6 +246,8 @@ export const evenementSchema = z
     intensite_g: z.number().min(0).max(16).nullable().default(null),
   })
   .strict();
+
+export type Evenement = z.infer<typeof evenementSchema>;
 
 /**
  * Signal de gravite emis par la borne en cours de conversation.

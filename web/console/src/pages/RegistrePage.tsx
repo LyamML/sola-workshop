@@ -237,6 +237,8 @@ const VUES: { cle: VueRegistre; libelle: string }[] = [
  * en-tête porte son seuil, et une cellule qui le franchit est teintée : on
  * repère un dépassement sans connaître les échelles par cœur.
  */
+const sousPlancher = (pas: number | null) => pas !== null && pas < 4000;
+
 const COLONNES: Record<string, Colonne<LigneEquipage>> = {
   res: {
     cle: "nom",
@@ -359,8 +361,19 @@ const COLONNES: Record<string, Colonne<LigneEquipage>> = {
     titre: "Pas",
     sous: "< 4 000",
     sens: "asc",
-    rendu: (l) => entier(l.pas),
-    chaud: (l) => l.pas !== null && l.pas < 4000,
+    // Une journée que le bracelet remplit encore ne se juge pas : à midi,
+    // 3 000 pas ne sont pas encore sous le plancher. La veille, finie, en
+    // décide, comme sur la fiche, et la cellule la montre quand elle alerte.
+    rendu: (l) =>
+      l.jour_en_cours && l.pas !== null ? (
+        <>
+          {entier(l.pas)}{" "}
+          <small>{sousPlancher(l.pas_veille) ? `en cours · veille ${entier(l.pas_veille)}` : "en cours"}</small>
+        </>
+      ) : (
+        entier(l.pas)
+      ),
+    chaud: (l) => sousPlancher(l.jour_en_cours && l.pas !== null ? l.pas_veille : l.pas),
     date: (l) => l.constantes_du,
   },
 };

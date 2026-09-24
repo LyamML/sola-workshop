@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { adapterResident, statut } from "../adapt";
+import { adapterResident, statut, suivreLeDirect } from "../adapt";
 import { ErreurApi, api, type SignalApi } from "../api";
 import { AjoutNote } from "../components/AjoutNote";
 import { useAvis } from "../components/Avis";
@@ -13,7 +13,7 @@ import { Icone } from "../components/Icone";
 import { MentionDemo } from "../components/MentionDemo";
 import { SignalFerme, SignalOuvert, type SignalClos } from "../components/SignalOuvert";
 import { TuileConstante } from "../components/TuileConstante";
-import { useDirect } from "../direct";
+import { etatDirect, useDirect } from "../direct";
 import { REPLI_RESIDENT } from "../repli";
 import { useCompte } from "../session";
 import type { CleConstante, SignalFiche, VueResident } from "../types";
@@ -136,6 +136,12 @@ function Fiche({
     }
     minuteVue.current = minute;
   }, [direct, minute, rafraichir]);
+  // Recalculé à chaque relecture du direct : trente secondes de silence, et
+  // les tuiles reviennent au jour. Un jour où le bracelet a écrit des minutes
+  // n'est pas fini, qu'il envoie encore ou non : ses pas ne s'y jugent pas.
+  const etat = direct ? etatDirect(direct) : null;
+  const jourEnCours = direct && direct.donnees.jour.minutes > 0 ? direct.donnees.jour.jour_vol : null;
+  const constantes = suivreLeDirect(vue.constantes, etat?.vivant ? etat.mesure : null, jourEnCours);
 
   const moi = compte?.role === "medecin" ? compte.id : null;
   const peutAgir = moi !== null && source === "api";
@@ -263,7 +269,7 @@ function Fiche({
             <span className="sub">{vue.fenetre}</span>
           </div>
           <div className="vt-g" role="group" aria-label="Constante affichée">
-            {vue.constantes.map((c) => (
+            {constantes.map((c) => (
               <TuileConstante
                 key={c.cle}
                 constante={c}
