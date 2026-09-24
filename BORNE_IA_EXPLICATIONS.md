@@ -216,14 +216,20 @@ puis `ollama pull qwen3:4b` et relancer `npm run dev:borne`.
   répond plus vite mais invente nettement plus : il n'est pas retenu.
 - **La détection d'urgence repose sur des mots-clés.** Une formulation
   inconnue passe au modèle, qui n'a plus que sa consigne.
-- **La borne lit désormais sola.db** pour enrichir Sola au démarrage de la
-  scène « Échange » : profil de santé du résident (constantes 14 jours,
-  sommeil 7 nuits, scores PHQ-9/GAD-7/ISI, particularités, signaux ouverts).
-  Sola ne cite pas ces chiffres — elle s'en sert pour orienter. Le bracelet
-  (mesures en temps réel) et la littérature médicale NASA/ESA (RAG, outil
-  médecin) ne sont pas lus pendant l'échange.
+- **Le bracelet en temps réel et le RAG NASA/ESA** ne sont pas lus pendant
+  l'échange. Le profil sola.db de Lyam (R-0448), lui, est chargé : voir plus bas.
 - **La vraie voix n'a pas été testée par moi** : le micro est bloqué dans le
   navigateur intégré de Cursor. C'est à tester dans Chrome.
+
+## Profil sola.db (fait)
+
+Au démarrage d'« Échange », la borne appelle `GET /borne/ia-contexte/R-0448`
+(via le proxy `/bord` + `BORNE_TOKEN`). Le serveur renvoie un texte : identité,
+particularités, constantes 14 jours, sommeil 7 nuits, scores PHQ-9 / GAD-7 /
+ISI, alertes ouvertes. Ce bloc est injecté dans le prompt système ; Sola
+l'utilise pour orienter, sans citer les chiffres. Sans serveur ou sans jeton,
+l'échange continue sans ce contexte. Le premier message **attend** la fin du
+chargement pour ne pas parler « à vide ».
 
 ## Résumé et alertes (fait)
 

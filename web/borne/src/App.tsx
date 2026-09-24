@@ -191,7 +191,9 @@ export default function App() {
   // Contexte de santé enrichi : chargé une seule fois au démarrage de la
   // scène « Échange » (sola.db via le serveur).
   // Null si le serveur ne répond pas — Sola fonctionne sans contexte.
+  // La promesse évite qu'un premier message parte avant le profil de Lyam.
   const contexteRef = useRef<string | null>(null);
+  const contexteCharge = useRef<Promise<string | null>>(Promise.resolve(null));
 
   // Score de gravité le plus haut déjà traité dans la conversation en cours.
   // Empêche d'envoyer plusieurs signaux au même palier pour la même séance.
@@ -304,14 +306,16 @@ export default function App() {
     prevFalls.current = null;
 
     // Chargement du profil de santé depuis sola.db au démarrage de la scène
-    // « Échange ». Silencieux en cas d'échec : Sola fonctionne sans contexte.
+    // « Échange » (R-0448 / Lyam). Silencieux en cas d'échec.
     if (scene.ia) {
       contexteRef.current = null;
-      void chargerContexteResident(RESIDENT).then((profil) => {
+      contexteCharge.current = chargerContexteResident(RESIDENT).then((profil) => {
         contexteRef.current = profil;
+        return profil;
       });
     } else {
       contexteRef.current = null;
+      contexteCharge.current = Promise.resolve(null);
     }
     setVoice(scene.ouverture.state);
     setHint(scene.ouverture.hint);
@@ -564,6 +568,9 @@ export default function App() {
       if (envoyee === false) alerte = "echec";
       else if (alerteTransmise.current) alerte = "transmise";
 
+      // Attend le profil sola.db s'il n'est pas encore là (premier message).
+      const contexte = (await contexteCharge.current) ?? contexteRef.current;
+
       const reponse = await discuter(historique.current, {
         signal: controle.signal,
         onMorceau: (t) => {
@@ -571,7 +578,7 @@ export default function App() {
           ecrire(t);
           pousserVoix(t);
         },
-        contexte: contexteRef.current,
+        contexte,
         alerte,
         annoncer: envoyee === true && score >= 5 && score <= 8,
       });

@@ -119,8 +119,10 @@ retirez la ligne. Si vous en créez une, ajoutez-la. Une limite assumée et
 documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
 **Les limites ouvertes aujourd'hui :** aucune purge des mesures n'est
-implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
-il n'y écrit que les trames du bracelet —, le bracelet ne remplit que cinq
+implémentée, hors « Échange » l'écran 01 rejoue des scénarios scriptés — en
+« Échange », Sola lit un résumé de sola.db pour Lyam (R-0448) au démarrage,
+mais n'y écrit que les trames du bracelet et les remontées d'alerte ou de
+résumé —, le bracelet ne remplit que cinq
 tuiles de la fiche — un jour qu'il est seul à écrire, les autres reprennent leur
 dernière valeur, datée, alerte comprise —, son compteur de pas repart avec lui,
 pas à minuit, les pas du jour ne se jugent que le lendemain — tant que le

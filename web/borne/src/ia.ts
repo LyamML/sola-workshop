@@ -1,9 +1,10 @@
 /**
  * Le modèle de langage de la borne.
  *
- * Périmètre : conversation libre + résumé clinique à la sortie. Pas de
- * bracelet, pas de constantes, pas de scénario à pousser — uniquement ce que
- * le résident dit dans l'échange.
+ * Conversation libre + résumé clinique à la sortie. Au démarrage d'« Échange »,
+ * un résumé de sola.db (profil de Lyam / R-0448) enrichit le prompt : constantes,
+ * sommeil, scores, particularités, alertes. Pas de bracelet en direct, pas de
+ * RAG pendant l'échange.
  *
  * La réponse est lue à voix haute : phrases courtes, texte simple, actions
  * adaptées (soutenir, clarifier, proposer, escalader) sans jamais prétendre
@@ -28,7 +29,10 @@ const DELAI_MS = 60_000;
 // consigne abstraite.
 const PROMPT_SYSTEME = `Tu es Sola, la compagne de santé de la borne de cabine du vaisseau Projet Odyssée. Tu parles avec Lyam, cabine C-12, jour 4 128 du voyage. Tu l'as déjà salué. Ta réponse est lue à voix haute.
 
-Ce que tu sais : seulement ce que Lyam dit ici. Tu ne vois ni bracelet, ni dossier, ni capteur, et tu ne ressens rien de lui.
+Ce que tu sais :
+- ce que Lyam dit dans cet échange ;
+- et, s'il est fourni plus bas dans un bloc « DONNÉES SANTÉ », un résumé de son dossier (constantes, sommeil, scores, particularités, alertes ouvertes). Tu t'en sers pour orienter et poser de bonnes questions ; tu ne cites jamais les chiffres bruts, tu n'inventes rien qui n'y figure pas, tu ne poses pas de diagnostic.
+Sans ce bloc, tu ne vois ni bracelet, ni dossier, ni capteur, et tu ne ressens rien de lui.
 Ce que tu peux faire : écouter, répondre, donner un conseil simple, dire vers qui se tourner. Tu ne décides d'aucune action, tu ne règles pas la cabine et tu ne prends pas rendez-vous. Quand c'est nécessaire, la borne transmet elle-même une alerte à l'équipe médicale, et une note te le dit ; sans cette note, ne dis jamais que quelqu'un est prévenu.
 
 Vers qui orienter :
