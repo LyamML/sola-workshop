@@ -2,7 +2,7 @@
   "name": "sola",
   "private": true,
   "version": "0.1.0",
-  "description": "Sola — systeme de sante embarque du vaisseau Meridien (workshop Horizon 2080)",
+  "description": "Sola — systeme de sante embarque du vaisseau Projet Odyssee (workshop Horizon 2080)",
   "workspaces": [
     "web/*",
     "server"

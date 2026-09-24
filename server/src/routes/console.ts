@@ -196,7 +196,7 @@ export function lireCrew() {
   );
 
   return {
-    vaisseau: { nom: "Meridien", residents, jour_vol: a.jour_vol, synchro_at: synchro },
+    vaisseau: { nom: "Projet Odyssée", residents, jour_vol: a.jour_vol, synchro_at: synchro },
     ancre: a,
     depistage,
     serie,
