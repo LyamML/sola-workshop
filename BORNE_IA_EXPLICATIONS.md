@@ -85,7 +85,7 @@ ou qu'on recharge la page.
 
 Le prompt système (dans `ia.ts`) dit à Sola :
 
-- qui elle est (la compagne de santé du vaisseau *Méridien*) et à qui elle
+- qui elle est (la compagne de santé du vaisseau *Projet Odyssée*) et à qui elle
   parle (Lyam, cabine C-12, jour 4 128) ;
 - ce qu'elle **sait** (seulement ce que Lyam dit, pas de bracelet ni de
   dossier) et ce qu'elle **peut faire** (écouter, conseiller, orienter — rien

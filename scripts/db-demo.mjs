@@ -5,7 +5,7 @@
 //
 //  A lancer APRES `npm run db:load`. Le chargement pose les 13 residents
 //  scriptes (Lyam et la file de triage) ; ce script complete l'equipage
-//  jusqu'aux 1 240 personnes du Meridien.
+//  jusqu'aux 1 240 personnes du Projet Odyssee.
 //
 //  POURQUOI : tant que l'ecran 02 affiche "8,4 %" ecrit en dur dans un
 //  fichier TypeScript, personne ne peut verifier que le schema porte
@@ -186,9 +186,9 @@ const MDP_DEMO = "meridien-4128";
 //  locale, et c'est exactement ce qu'il ne faut pas deployer : sur une
 //  instance accessible a d'autres, supprimer cette ligne.
 const ADMINS = [
-  { prenom: "Root", nom: "Meridien", email: "root@root.com", mdp: "admin" },
-  { prenom: "George", nom: "Abadi", email: "george.abadi@meridien.vol" },
-  { prenom: "Alice", nom: "Rousseau", email: "alice.rousseau@meridien.vol" },
+  { prenom: "Root", nom: "Odyssée", email: "root@root.com", mdp: "admin" },
+  { prenom: "George", nom: "Abadi", email: "george.abadi@odyssee.vol" },
+  { prenom: "Alice", nom: "Rousseau", email: "alice.rousseau@odyssee.vol" },
 ];
 
 /** Ce qui n'est pas une personne : une equipe, donc pas de compte. */
@@ -287,7 +287,7 @@ try {
   // compte au lieu de recopier une chaine.
   const medecinParNom = new Map();
   MEDECINS.forEach((m, i) => {
-    const email = `${m.prenom}.${m.nom}@meridien.vol`.toLowerCase();
+    const email = `${m.prenom}.${m.nom}@odyssee.vol`.toLowerCase();
     const { lastInsertRowid } = insMedecin.run({ ...m, email, hash: EMPREINTES[i] });
     medecinParNom.set(`${m.titre} ${m.nom}`, Number(lastInsertRowid));
   });
@@ -1282,7 +1282,7 @@ console.log(
       colonne(
         "medecin",
         m.code,
-        `${m.prenom}.${m.nom}@meridien.vol`.toLowerCase(),
+        `${m.prenom}.${m.nom}@odyssee.vol`.toLowerCase(),
         MDP_DEMO,
       ),
     ).join("\n") +

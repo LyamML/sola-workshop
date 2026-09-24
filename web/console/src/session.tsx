@@ -120,7 +120,7 @@ function Connexion({
 
       <h1>Console médicale</h1>
       <p className="sous">
-        Méridien · J+4 128. Réservée aux soignants de bord : la fiche d'un résident
+        Projet Odyssée · J+4 128. Réservée aux soignants de bord : la fiche d'un résident
         n'est pas une page publique, et une note de dossier porte le nom de celui
         qui l'écrit.
       </p>
