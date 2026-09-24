@@ -45,7 +45,8 @@ dans un champ de formulaire**. Pour tester une route authentifiée, on passe par
 
 `npm run db:reset` détruit tout le contenu de `sola.db` et le régénère.
 **Demander avant de la lancer** : quelqu'un a peut-être une saisie de test en
-cours, et la veille d'une soutenance ce n'est pas le moment.
+cours, et la veille d'une soutenance ce n'est pas le moment. Sous Docker, c'est
+`docker compose down --volumes` qui efface la base du conteneur : même règle.
 
 `npm run db:sql` ouvre la base en **lecture seule**, volontairement. Pour écrire,
 il y a la console, qui valide ce qu'elle écrit et le signe, et `npm run compte`
@@ -134,8 +135,10 @@ bascule au clavier et le dit dans sa barre d'état —, Sola ne reconnaît sa pr
 voix que par le texte : un mot qu'elle vient de dire ne vaut pas réponse dans
 les deux secondes qui suivent, un geste clinique ne se défait pas — ni signal à
 rouvrir ou à réassigner, ni note à retirer —, aucun dossier ne se corrige à
-l'écran, et, serveur éteint, seule la fiche de R-0448 s'affiche — le repli ne
-contient qu'elle.
+l'écran, serveur éteint, seule la fiche de R-0448 s'affiche — le repli ne
+contient qu'elle —, et, sous Docker, le relais de la borne ne reconnaît plus le
+poste à son adresse : seule la publication de son port sur 127.0.0.1 l'empêche
+de prêter son jeton au réseau.
 
 ---
 
@@ -184,6 +187,9 @@ pas d'outils, et l'équipe travaille sous Windows.
 | **Bluetooth dans le panneau navigateur** | aucun bracelet n'y est joignable, et le premier clic est pris par le voile du micro | Remplacer `navigator.bluetooth` par un faux qui notifie des trames, cliquer « Appairer » en JavaScript. Tester l'envoi contre une copie de la base (`VACUUM INTO`) et un serveur sur un autre port : une trame écrite dans `sola.db` ne s'efface plus, faute de purge |
 | **Routes de la console** | `/residents/:id`, pas `/resident/:id` | Voir `web/console/src/App.tsx` |
 | **Port déjà pris** | un serveur resté d'une autre session tient le port : Vite refuse de démarrer (`strictPort`, dans chaque `vite.config.ts`) au lieu de glisser sur 5178, où plus rien ne correspond | `npm run dev` arrête un serveur Sola qui tient l'un de ses ports, et nomme le programme qui tient les autres. Un serveur d'essai prend un port hors de 5173–5177, et s'arrête avec son entrée de `.claude/launch.json` quand l'essai est fini |
+| **Docker et `npm run dev`** | ils publient les mêmes ports : le second lancé échoue, et `npm run dev` ne libère pas un port que tient Docker, il nomme le programme | `docker compose down` avant `npm run dev`, et l'inverse |
+| **Base du conteneur** | le serveur sous Docker n'ouvre pas `sola.db` mais le volume `sola_donnees` : `npm run db:sql` ne voit pas ce qu'on y a écrit | `docker compose exec server node scripts/db-sql.mjs "…"` ; `down --volumes` l'efface, voir le garde-fou 2 |
+| **Linux Rollup dans le lockfile** | `package-lock.json`, écrit sous Windows, n'a pas le binaire Linux de Rollup (npm/cli#4828) : `vite build` échoue dans l'image | Le `Dockerfile` l'installe à la version du lockfile, sans toucher au lockfile. Ne pas le « réparer » en le régénérant |
 
 **Vérifier avant d'annoncer.** `npm run typecheck` pour le code ; pour une
 modification visible, la mesurer dans le navigateur plutôt que supposer qu'elle
@@ -208,6 +214,7 @@ marche.
 | `npm run db:sql "…"` | interroge la base, en lecture seule | — |
 | `npm run compte -- liste \| medecin \| admin \| mdp <email>` | les comptes, au terminal | — |
 | `npm run typecheck` | tous les espaces de travail | — |
+| `docker compose --env-file server/.env up --build` | les quatre services sous Docker, aux mêmes adresses ; leur base vit dans le volume `sola_donnees`, pas dans `sola.db` | 5173–5177 |
 
 Espaces de travail npm : `web/*` et `server`. Fichier de base : `sola.db` à la
 racine, réglé par `DB_FILE`.
@@ -302,6 +309,18 @@ racine, réglé par `DB_FILE`.
 | Agrégats quotidiens — le serveur tient celui du jour à chaque trame, ce script recalcule un jour entier | `scripts/db-rollup.mjs`, jumeau de `SQL_JOUR` dans `server/src/routes/ingest.ts` |
 | Figer le repli de la console | `scripts/db-repli.mjs` |
 | Interroger la base au terminal | `scripts/db-sql.mjs` |
+
+### Docker
+
+| Ce que vous cherchez | Fichier |
+|---|---|
+| Les quatre services, leurs ports, ce que chacun reçoit de `server/.env` | `compose.yaml` |
+| Les images, une cible par service, et le binaire Linux de Rollup | `Dockerfile` |
+| La base du conteneur, créée au premier démarrage, jamais réécrite | `docker/serveur.mjs` |
+| La console et le backoffice en fichiers statiques, routes comprises | `docker/nginx.conf` |
+| Ce qui n'entre dans aucune image — `.env`, bases, `node_modules` | `.dockerignore` |
+| L'adresse d'écoute du serveur (`ECOUTE`), posée par `compose.yaml` seulement | `server/src/config.ts` |
+| Le relais de la borne en conteneur (`BORNE_CONTENEUR`, `OLLAMA_URL`) | `web/borne/vite.config.ts` |
 
 ### Le matériel et la documentation
 

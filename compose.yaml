@@ -1,0 +1,83 @@
+# Sola sous Docker : les quatre services de `npm run dev`, sur les mêmes ports.
+#
+#   docker compose --env-file server/.env up --build
+#
+# `--env-file` sert au jeton des bornes : Compose le lit dans server/.env et ne
+# le passe qu'à la borne. Le serveur, lui, reçoit tout le fichier.
+#
+# Chaque port est publié sur 127.0.0.1 : comme `npm run dev`, rien n'écoute
+# au-delà du poste. Seul 5177, le port réseau, s'ouvre au Wi-Fi : c'est son rôle.
+#
+# Aucun `depends_on` : la borne et la console savent tourner serveur éteint, et
+# un serveur qui refuse de démarrer — un jeton trop court — n'a pas à emporter
+# les trois autres.
+
+name: sola
+
+services:
+  server:
+    build:
+      context: .
+      target: server
+    env_file: server/.env
+    environment:
+      # Pas la base du poste : celle du conteneur vit dans le volume, créée et
+      # remplie au premier démarrage par docker/serveur.mjs.
+      DB_FILE: /data/sola.db
+      # 127.0.0.1 ne joint le conteneur que depuis lui-même : il écoute sur
+      # toutes ses interfaces, et c'est la publication ci-dessous qui le garde
+      # sur le poste.
+      ECOUTE: 0.0.0.0
+      # Les ports du conteneur ne suivent pas server/.env : ce sont ceux que
+      # `ports` publie.
+      PORT: "5175"
+      PORT_RESEAU: "5177"
+    ports:
+      - "127.0.0.1:5175:5175"
+      - "5177:5177"
+    volumes:
+      - donnees:/data
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5175/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      # Le premier démarrage génère le jeu de démonstration.
+      start_period: 2m
+
+  borne:
+    build:
+      context: .
+      target: borne
+    environment:
+      BORNE_TOKEN: ${BORNE_TOKEN:-}
+      BORD_URL: http://server:5175
+      # Ollama reste sur le poste, hors de Docker.
+      OLLAMA_URL: http://host.docker.internal:11434
+      # Dans un conteneur, tout arrive de la passerelle de Docker : le relais ne
+      # reconnaît plus le poste à son adresse. Ne va qu'avec la publication sur
+      # 127.0.0.1 juste en dessous ; publiée ailleurs, la borne prêterait son
+      # jeton à tout le réseau.
+      BORNE_CONTENEUR: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:5173:5173"
+    init: true
+
+  console:
+    build:
+      context: .
+      target: console
+    ports:
+      - "127.0.0.1:5174:80"
+
+  backoffice:
+    build:
+      context: .
+      target: backoffice
+    ports:
+      - "127.0.0.1:5176:80"
+
+volumes:
+  donnees:

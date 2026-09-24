@@ -41,10 +41,17 @@ if (!borneToken) {
  * un navigateur joint toujours `Origin` à un POST, même vers sa propre
  * origine. Sans cela, n'importe quel onglet ouvert sur la machine, ou avec
  * `--host` n'importe quel appareil du réseau, écrirait dans les dossiers.
+ *
+ * Dans un conteneur, tout arrive de la passerelle de Docker, le poste comme le
+ * reste : l'adresse ne dit plus rien. `BORNE_CONTENEUR=1` retire ce contrôle,
+ * et la publication du port sur 127.0.0.1, dans compose.yaml, le reprend.
  */
+const dansUnConteneur = process.env.BORNE_CONTENEUR === "1";
+
 function depuisLaBorne(req: IncomingMessage): boolean {
   const adresse = req.socket.remoteAddress ?? "";
-  const locale = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(adresse);
+  const locale =
+    dansUnConteneur || ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(adresse);
   let memeOrigine = false;
   try {
     memeOrigine = new URL(req.headers.origin ?? "").host === req.headers.host;
@@ -56,7 +63,9 @@ function depuisLaBorne(req: IncomingMessage): boolean {
 
 const ollama: Record<string, ProxyOptions> = {
   "/ollama": {
-    target: "http://127.0.0.1:11434",
+    // `OLLAMA_URL` vise le modèle d'un autre poste du réseau, ou celui de
+    // l'hôte quand la borne tourne dans un conteneur.
+    target: process.env.OLLAMA_URL ?? "http://127.0.0.1:11434",
     changeOrigin: true,
     rewrite: (chemin) => chemin.replace(/^\/ollama/, ""),
   },
