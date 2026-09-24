@@ -603,6 +603,16 @@ consoleApi.get("/equipage", (req, res, next) => {
               c.jour AS constantes_du,
               c.fc_repos_bpm, c.fc_moy_bpm, c.rmssd_ms, c.spo2_pct,
               c.resp_min, c.temp_c, c.pas,
+              -- La regle de la fiche (routes/direct.ts) : des minutes du
+              -- bracelet aujourd'hui, et la journee n'est pas finie. Le jeu
+              -- de demonstration n'en ecrit pas ce jour-la.
+              (c.jour = date('now') AND EXISTS (
+                 SELECT 1 FROM mesures
+                  WHERE resident_id = r.id AND mesure_at >= date('now')
+                    AND qualite IN ('good', 'fair'))) AS jour_en_cours,
+              -- La veille, finie : c'est elle qui juge une journee en cours.
+              (SELECT pas FROM mesures_jour
+                WHERE resident_id = r.id AND jour = date(c.jour, '-1 day')) AS pas_veille,
               n.nuit_du, n.sommeil_min,
               m.evalue_le, m.score_moral, m.phq9, m.gad7, m.isi
          FROM residents r

@@ -120,15 +120,22 @@ documentée est défendable en soutenance ; une limite cachée ne l'est pas.
 
 **Les limites ouvertes aujourd'hui :** aucune purge des mesures n'est
 implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la base —
-il n'y écrit que les trames du bracelet —, le bracelet ne remplit que trois
+il n'y écrit que les trames du bracelet —, le bracelet ne remplit que cinq
 tuiles de la fiche — un jour qu'il est seul à écrire, les autres reprennent leur
-dernière valeur, datée, alerte comprise —, le jour d'une mesure est le jour UTC,
-le port réseau parle HTTP en clair, avec un seul jeton pour tous les bracelets
+dernière valeur, datée, alerte comprise —, son compteur de pas repart avec lui,
+pas à minuit, les pas du jour ne se jugent que le lendemain — tant que le
+bracelet remplit la journée, c'est la veille qui décide de l'alerte —, le jour
+d'une mesure est le jour UTC,
+l'historique d'une constante ne garde que la moyenne de chaque minute — seule la
+carte « en direct » montre chaque lecture, dix minutes, et un redémarrage du
+serveur les lui fait oublier —, le port réseau parle HTTP en clair, avec un seul jeton pour tous les bracelets
 et celui de l'équipe nutrition, les moyennes transmises à cette équipe ne
 distinguent pas le sexe, que la base ne connaît pas,
 la borne ne transmet que servie par Vite, dont le relais porte le jeton, une
 partie de la trame est reçue sans être conservée — une chute comptée par le
-bracelet n'ouvre pas de signal —, la conversation libre de la borne exige Ollama
+firmware BLE n'ouvre pas de signal —, une chute du croquis Wi-Fi se date à sa
+réception et, le serveur redémarré pendant qu'elle est signalée, en rouvre un,
+la conversation libre de la borne exige Ollama
 sur la machine, le résumé clinique à la sortie d'« Échange » exige Ollama et le
 serveur de bord (sinon la barre d'état le dit), le modèle de Sola ne déclenche
 aucune action — seul le code de la borne transmet une alerte, sur mots-clés — et,
@@ -271,7 +278,8 @@ racine, réglé par `DB_FILE`.
 | La file « À traiter maintenant » de l'écran 02 | `src/components/FileTriage.tsx` |
 | L'écran 02 qui se recharge seul quand un signal s'ouvre, se prend ou se clôt — empreinte relue toutes les cinq secondes, onglet visible | `src/veille.ts`, `GET /api/crew/empreinte` dans `server/src/routes/console.ts` |
 | Le signal ouvert de la fiche : prendre, clore avec un motif | `src/components/SignalOuvert.tsx` |
-| La carte « en direct » de la fiche et sa ligne bracelet, relues toutes les dix secondes | `src/components/EnDirect.tsx`, `src/direct.ts`, `src/styles/direct.css` |
+| La carte « en direct » de la fiche — dernière lecture, courbe de dix minutes, température, pas, case « Chute » — et sa ligne bracelet, relues toutes les dix secondes | `src/components/EnDirect.tsx`, `src/direct.ts` (`etatDirect`), `src/styles/direct.css` |
+| Les tuiles SpO₂, variabilité, température et pas qui suivent la carte « en direct » tant que le bracelet envoie, et les pas d'une journée en cours jugés sur la veille | `src/adapt.ts` (`enDirect`, `enCours`, `suivreLeDirect`) |
 | Les tuiles de constantes, la courbe et les barres | `src/components/TuileConstante.tsx`, `src/components/Courbe.tsx`, `src/components/Barres.tsx` |
 | Les conversations remontées et les résumés de contexte | `src/components/Conversations.tsx` |
 | Les colonnes, tris et filtres de l'écran 04 | `src/pages/RegistrePage.tsx` (descripteurs `Colonne<T>`) |
@@ -296,8 +304,10 @@ racine, réglé par `DB_FILE`.
 | Backoffice — écrans ↔ requêtes, fraîcheur des flux, tables brutes, comptes | `src/routes/admin.ts` |
 | Ingestion depuis les bornes et les bracelets | `src/routes/ingest.ts` |
 | **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures`, puis la ligne du jour de `mesures_jour` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`, `SQL_JOUR`) |
-| La lecture seule d'un bracelet en Wi-Fi, et ce qu'une réponse dit des valeurs écartées | `src/validation.ts` (`lectureSchema`), `src/routes/ingest.ts` (`recevoirWifi`, `accuse`) |
-| La dernière minute du bracelet et l'heure écoulée — la carte « en direct » de l'écran 03 | `src/routes/direct.ts` |
+| La lecture seule d'un bracelet en Wi-Fi — température, pas, chute —, et ce qu'une réponse dit des valeurs écartées et d'une chute | `src/validation.ts` (`lectureSchema`), `src/routes/ingest.ts` (`recevoirWifi`, `recevoirLecture`, `accuse`) |
+| Une chute qui ouvre un signal critique, envoyée par la borne ou annoncée par le croquis Wi-Fi — seul le passage de `fall` à `true` compte | `src/routes/ingest.ts` (`enregistrerEvenement`, `chutesSignalees`) |
+| Une journée « en cours » — des minutes du bracelet aujourd'hui — et la veille qui juge ses pas | `src/routes/direct.ts` (`jour`), `src/routes/console.ts` (`jour_en_cours`, `pas_veille`) |
+| Les lectures des dix dernières minutes, la dernière minute et le jour — la carte « en direct » de l'écran 03 | `src/routes/direct.ts` ; les lectures, gardées en mémoire, dans `src/routes/ingest.ts` (`retenir`) |
 | **Les moyennes des bilans sanguins pour l'équipe nutrition** : quels marqueurs et pourquoi, le cycle de 14 jours, la règle des petits effectifs | `src/routes/partenaires.ts` |
 | Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
 | Hachage argon2id des mots de passe | `src/mdp.ts` |

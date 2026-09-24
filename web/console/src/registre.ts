@@ -45,6 +45,10 @@ export interface LigneEquipage {
   resp_min: number | null;
   temp_c: number | null;
   pas: number | null;
+  /** 1 quand le bracelet remplit encore la journée de `constantes_du` : ses pas ne sont pas finis. */
+  jour_en_cours: 0 | 1;
+  /** Les pas de la veille de `constantes_du`, qui jugent une journée en cours. */
+  pas_veille: number | null;
   nuit_du: string | null;
   sommeil_min: number | null;
   evalue_le: string | null;

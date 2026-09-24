@@ -2,6 +2,7 @@ import type {
   AnalyseApi,
   BilanApi,
   CrewApi,
+  MinuteApi,
   ResidentApi,
   SeveriteApi,
   StatutResident,
@@ -357,6 +358,17 @@ interface Descripteur {
   seuils: (base: number | null) => Seuil[] | null;
   /** Le seuil vient de la base : une tuile en vigilance la rappelle. */
   personnel?: boolean;
+  /**
+   * La même constante dans une lecture du bracelet : tant qu'il envoie, la
+   * tuile suit la carte « en direct ». Pas pour la FC de repos, qui est le bas
+   * de la journée, pas la FC du moment.
+   */
+  direct?: "spo2_pct" | "rmssd_ms" | "temp_c" | "pas";
+  /**
+   * La valeur du jour s'accumule jusqu'à minuit : tant que le bracelet
+   * remplit la journée, elle ne se juge pas à ses seuils.
+   */
+  cumul?: boolean;
   legendeSeuil?: string;
   marge?: number;
   formatY?: (v: number) => string;
@@ -384,6 +396,7 @@ const MESUREES: Descripteur[] = [
     decimalesBase: 0,
     seuils: (b) => (b === null ? null : [{ valeur: arrondi(b * 0.8), sens: "bas", nom: "seuil" }]),
     personnel: true,
+    direct: "rmssd_ms",
   },
   {
     cle: "hr",
@@ -408,6 +421,7 @@ const MESUREES: Descripteur[] = [
     fixe: false,
     decimalesBase: 0,
     seuils: () => [{ valeur: 95, sens: "bas", nom: "seuil" }],
+    direct: "spo2_pct",
   },
   {
     cle: "resp",
@@ -450,6 +464,7 @@ const MESUREES: Descripteur[] = [
     fixe: true,
     decimalesBase: 1,
     seuils: () => [],
+    direct: "temp_c",
   },
   {
     cle: "steps",
@@ -462,6 +477,8 @@ const MESUREES: Descripteur[] = [
     fixe: false,
     decimalesBase: 0,
     seuils: () => [{ valeur: 4000, sens: "bas", nom: "plancher" }],
+    direct: "pas",
+    cumul: true,
     marge: 50,
     formatY: entier,
   },
@@ -489,9 +506,10 @@ const plusRecent = <T extends { x: number }>(points: T[]) =>
  *
  * `bracelet` : le résident a une ligne ce jour-là. S'il en a une sans cette
  * constante, c'est un capteur qui ne la mesure pas — le bracelet réel
- * n'envoie que la FC et la SpO₂ —, et la tuile reprend sa dernière valeur en
- * disant de quel jour elle date. Sans ligne du tout, c'est un bracelet muet,
- * et la tuile reste vide : c'est l'absence qu'il faut voir.
+ * n'envoie ni la respiration ni l'activité électrodermale —, et la tuile
+ * reprend sa dernière valeur en disant de quel jour elle date. Sans ligne du
+ * tout, c'est un bracelet muet, et la tuile reste vide : c'est l'absence
+ * qu'il faut voir.
  *
  * Une valeur reprise garde son alerte. Une variabilité sous son seuil hier ne
  * remonte pas parce que le bracelet du jour ne la mesure pas, et éteindre
@@ -521,6 +539,20 @@ function constante(
   const date = dernier && dernier.x !== fin ? `dernière mesure le ${jv(dernier.x)}` : null;
 
   const franchi = (s: Seuil, v: number) => (s.sens === "haut" ? v > s.valeur : v < s.valeur);
+  const fleche = (s: Seuil) =>
+    `${s.sens === "bas" ? `▼ ${SOUS[s.nom]}` : `▲ ${DESSUS[s.nom]}`} ${f(s.valeur)}`;
+  const rappelBase = m.personnel && base !== null ? `base ${fb(base)}` : null;
+  // Ce que dit une valeur qui ne franchit rien, celle du jour comme celle du moment.
+  const norme =
+    seuils === null
+      ? "base personnelle indisponible"
+      : seuils.length === 0
+        ? base === null
+          ? "sans seuil"
+          : `sans seuil · base ${fb(base)}`
+        : seuils.length === 2
+          ? `dans la norme · ${f(seuils[0]!.valeur)}–${f(seuils[1]!.valeur)}`
+          : `dans la norme · ${seuils[0]!.nom} ${f(seuils[0]!.valeur)}`;
   const depasse = dernier && seuils?.find((s) => franchi(s, dernier.y));
 
   let ecart: string | null = null;
@@ -529,19 +561,49 @@ function constante(
     repere = points.length ? `— aucune mesure le ${jv(fin)}` : "— aucune mesure sur la fenêtre";
   } else if (depasse) {
     const n = depuis(points, dernier.x, (v) => franchi(depasse, v));
-    ecart = `${depasse.sens === "bas" ? `▼ ${SOUS[depasse.nom]}` : `▲ ${DESSUS[depasse.nom]}`} ${f(depasse.valeur)} depuis ${entier(n)} j`;
-    repere = date ?? (m.personnel && base !== null ? `base ${fb(base)}` : null);
+    ecart = `${fleche(depasse)} depuis ${entier(n)} j`;
+    repere = date ?? rappelBase;
   } else if (date) {
     repere = `— ${date}`;
-  } else if (seuils === null) {
-    repere = "— base personnelle indisponible";
-  } else if (seuils.length === 0) {
-    repere = base === null ? "— sans seuil" : `— sans seuil · base ${fb(base)}`;
-  } else if (seuils.length === 2) {
-    repere = `— dans la norme · ${f(seuils[0]!.valeur)}–${f(seuils[1]!.valeur)}`;
   } else {
-    repere = `— dans la norme · ${seuils[0]!.nom} ${f(seuils[0]!.valeur)}`;
+    repere = `— ${norme}`;
   }
+
+  // Un cumul ne se juge qu'une fois sa journée finie : à midi, 3 000 pas ne
+  // sont pas encore sous le plancher. Tant qu'elle court, le verdict est celui
+  // de la veille, finie : un résident resté sous le plancher hier ne remonte
+  // pas parce qu'aujourd'hui n'est pas fini. Sans alerte, les seuils restent
+  // écrits.
+  const veille = m.cumul && dernier ? points.find((p) => p.x === dernier.x - 1) : undefined;
+  const depasseVeille = veille && seuils?.find((s) => franchi(s, veille.y));
+  const ecartVeille =
+    veille && depasseVeille
+      ? `${fleche(depasseVeille)} depuis ${entier(depuis(points, veille.x, (v) => franchi(depasseVeille, v)))} j`
+      : null;
+  const seuilsEcrits = (seuils ?? []).map((s) => `${s.nom} ${f(s.valeur)}`);
+  const enCours = (origine: string[]) =>
+    ecartVeille
+      ? { alerte: true, ecart: ecartVeille, repere: [...origine, "journée en cours"].join(" · ") }
+      : { alerte: false, ecart: null, repere: `— ${[...origine, "journée en cours", ...seuilsEcrits].join(" · ")}` };
+
+  // Une lecture se juge comme la valeur du jour, à la même précision et aux
+  // mêmes seuils. Elle n'a pas d'histoire, donc pas de « depuis », et le
+  // repère dit d'où vient le chiffre. Celle d'un cumul compte la journée en
+  // cours : c'est la veille qui se juge.
+  const enDirect = m.direct && {
+    champ: m.direct,
+    lire: (brute: number) => {
+      const v = arrondi(brute, m.decimales);
+      if (m.cumul) return { valeur: f(v), ...enCours(["en direct"]) };
+      const hors = seuils?.find((s) => franchi(s, v));
+      return {
+        valeur: f(v),
+        alerte: Boolean(hors),
+        ecart: hors ? fleche(hors) : null,
+        repere: hors ? ["en direct", rappelBase].filter(Boolean).join(" · ") : `— en direct · ${norme}`,
+      };
+    },
+  };
 
   const alerte = Boolean(depasse);
   return {
@@ -552,6 +614,8 @@ function constante(
     alerte,
     ecart,
     repere,
+    enDirect,
+    enCours: m.cumul && dernier ? { x: dernier.x, ...enCours([]) } : undefined,
     courbe: {
       nom: m.serie,
       points,
@@ -730,6 +794,38 @@ function bilans(liste: BilanApi[]): BilanFiche[] {
       prochain: i === 0 ? prochaine(b.prochain_dans_j) : `bilan suivant le ${options[i - 1]}`,
       simule: b.source === "simule",
     };
+  });
+}
+
+/**
+ * Les tuiles pendant que le bracelet envoie : celles qu'il mesure à chaque
+ * lecture la prennent, les autres gardent leur jour. Une SpO₂ du jour sous
+ * une SpO₂ du moment, deux chiffres pour une même constante, se lirait comme
+ * une erreur. `mesure` à null : le bracelet s'est tu, tout revient au jour.
+ *
+ * `jourEnCours` : le jour que le bracelet remplit encore, s'il en remplit un.
+ * Un cumul y prend le verdict de la veille, bracelet muet compris : ses pas
+ * de midi ne sont pas ceux de la journée.
+ */
+export function suivreLeDirect(
+  constantes: Constante[],
+  mesure: MinuteApi | null,
+  jourEnCours: number | null,
+): Constante[] {
+  return constantes.map((c) => {
+    const enCours = c.enCours && c.enCours.x === jourEnCours ? c.enCours : null;
+    const jour = enCours
+      ? {
+          ...c,
+          alerte: enCours.alerte,
+          ecart: enCours.ecart,
+          repere: enCours.repere,
+          courbe: { ...c.courbe, alerte: enCours.alerte },
+        }
+      : c;
+    if (!mesure || !c.enDirect) return jour;
+    const v = mesure[c.enDirect.champ];
+    return v === null ? jour : { ...jour, ...c.enDirect.lire(v) };
   });
 }
 

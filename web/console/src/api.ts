@@ -335,8 +335,17 @@ export interface MinuteApi {
   fc_bpm: number | null;
   spo2_pct: number | null;
   rmssd_ms: number | null;
+  temp_c: number | null;
   activite_g: number | null;
+  /** Le compteur du bracelet : il repart de zéro quand le bracelet redémarre, pas à minuit. */
+  pas: number | null;
   qualite: "good" | "fair" | "poor" | "warmup";
+}
+
+/** Une lecture du bracelet : les champs d'une minute, et ce qu'elle dit d'une chute. */
+export interface LectureApi extends MinuteApi {
+  /** Null : l'émetteur ne dit rien des chutes. Le signal, lui, s'ouvre au serveur. */
+  chute: boolean | null;
 }
 
 /** La carte « en direct » de la fiche. */
@@ -346,9 +355,18 @@ export interface DirectApi {
   bracelet: { serie: string; batterie_pct: number | null; synchro_at: string | null } | null;
   /** La dernière minute des vingt-quatre dernières heures. Null : pas de carte. */
   derniere: MinuteApi | null;
-  /** L'heure écoulée, de la plus ancienne minute à la plus récente. */
+  /** Les dix dernières minutes, de la plus ancienne à la plus récente : chacune n'est qu'une moyenne. */
   minutes: MinuteApi[];
-  /** Le jour UTC en cours, sur les minutes exploitables : celui des tuiles. */
+  /**
+   * Les lectures des dix dernières minutes, à la seconde, dans l'ordre : les
+   * champs d'une minute, mais la valeur reçue. En mémoire du serveur : vide
+   * après son redémarrage, jusqu'à la lecture suivante.
+   */
+  lectures: LectureApi[];
+  /**
+   * Le jour UTC en cours, sur les minutes exploitables : celui des tuiles.
+   * Avec des minutes, il se remplit encore, et ses pas ne sont pas finis.
+   */
   jour: {
     /** Null tant que la ligne du jour n'est pas écrite. */
     jour_vol: number | null;
@@ -358,6 +376,10 @@ export interface DirectApi {
     fc_max: number | null;
     spo2_min: number | null;
     spo2_moy: number | null;
+    temp_min: number | null;
+    temp_max: number | null;
+    /** Le plus haut compteur du jour : la valeur de la tuile. */
+    pas: number | null;
   };
 }
 
