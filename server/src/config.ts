@@ -49,6 +49,9 @@ export const config = {
   // sans lui, le port reseau reste ferme et tout le serveur n'ecoute que sur
   // le poste. `||` et non `??` : la ligne vide du modele vaut « absent ».
   braceletToken: process.env.BRACELET_TOKEN || null,
+  // Donne a l'equipe nutrition, qui lit les moyennes des bilans sanguins sur
+  // le port reseau. Facultatif lui aussi : sans lui, sa route n'existe pas.
+  nutritionToken: process.env.NUTRITION_TOKEN || null,
   portReseau: entier("PORT_RESEAU", 5177),
   // Fichier SQLite du serveur de bord. Il se sauvegarde par copie.
   //
@@ -70,5 +73,16 @@ if (config.braceletToken !== null) {
   // bornes, un bracelet perdu ouvrirait toutes les routes d'ecriture.
   if (config.braceletToken === config.borneToken) {
     throw new Error("BRACELET_TOKEN doit differer de BORNE_TOKEN.");
+  }
+}
+
+if (config.nutritionToken !== null) {
+  if (config.nutritionToken.length < 32) {
+    throw new Error("NUTRITION_TOKEN doit faire au moins 32 caracteres.");
+  }
+  // Celui-ci part chez une autre equipe : s'il valait un jeton d'ecriture,
+  // elle pourrait ecrire dans les dossiers.
+  if (config.nutritionToken === config.borneToken || config.nutritionToken === config.braceletToken) {
+    throw new Error("NUTRITION_TOKEN doit differer de BORNE_TOKEN et de BRACELET_TOKEN.");
   }
 }

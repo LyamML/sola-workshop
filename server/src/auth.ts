@@ -69,6 +69,25 @@ export function authBracelet(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
+const jetonNutrition = config.nutritionToken ? Buffer.from(config.nutritionToken, "utf8") : null;
+
+/**
+ * Authentification de l'equipe nutrition, qui lit les moyennes des bilans
+ * sanguins depuis le reseau local.
+ *
+ * Un jeton plutot qu'un compte : c'est un programme qui appelle, et il n'a
+ * rien a signer. Un jeton a elle, parce qu'il se confie a une autre equipe :
+ * il n'ouvre que la lecture de /partenaires, et le changer dans server/.env
+ * lui retire l'acces sans toucher aux bornes ni aux bracelets.
+ */
+export function authNutrition(req: Request, res: Response, next: NextFunction): void {
+  if (!jetonNutrition || !porteurValide(req.header("authorization") ?? "", jetonNutrition)) {
+    res.status(401).json({ erreur: "Jeton de l'equipe nutrition invalide." });
+    return;
+  }
+  next();
+}
+
 /**
  * Le compte de la requete en cours.
  *

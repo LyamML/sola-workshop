@@ -1,6 +1,13 @@
 import { type NetworkInterfaceInfo, networkInterfaces } from "node:os";
 import express from "express";
-import { authBorne, authBracelet, exigeAdmin, exigeSoignant, session } from "./auth.js";
+import {
+  authBorne,
+  authBracelet,
+  authNutrition,
+  exigeAdmin,
+  exigeSoignant,
+  session,
+} from "./auth.js";
 import { config } from "./config.js";
 import { ping } from "./db.js";
 import { adminApi } from "./routes/admin.js";
@@ -8,6 +15,7 @@ import { authApi } from "./routes/auth.js";
 import { consoleApi } from "./routes/console.js";
 import { directApi } from "./routes/direct.js";
 import { ingest, recevoirWifi } from "./routes/ingest.js";
+import { partenairesApi } from "./routes/partenaires.js";
 
 /**
  * Serveur de bord de Sola.
@@ -19,10 +27,11 @@ import { ingest, recevoirWifi } from "./routes/ingest.js";
  *   GET  /health     supervision
  *
  * Tout cela n'ecoute que sur le poste (localhost). Seul le port reseau
- * (PORT_RESEAU, 5177) se joint depuis le Wi-Fi, et il ne sert que deux routes :
+ * (PORT_RESEAU, 5177) se joint depuis le Wi-Fi, et il ne sert que trois routes :
  *
- *   POST /ingest/bracelet   trames ou lecture seule      (jeton bracelet)
- *   GET  /health            supervision
+ *   POST /ingest/bracelet               trames ou lecture seule   (jeton bracelet)
+ *   GET  /partenaires/nutrition/bilans  moyennes des bilans       (jeton nutrition)
+ *   GET  /health                        supervision
  *
  * Le service ne sert pas les interfaces : la borne et la console restent deux
  * applications distinctes, servies separement. Ce serveur n'est qu'un dos.
@@ -99,6 +108,11 @@ app.get("/", (_req, res) => {
       "GET /admin/ecrans": "chaque bloc de la console, sa source et ce qu'elle renvoie",
       "GET /admin/comptes": "soignants et administrateurs, sans adresse ni empreinte",
       "PATCH /admin/comptes/:role/:id": "activer ou desactiver un compte",
+    },
+    partenaires: {
+      "GET /partenaires/nutrition/bilans":
+        "moyennes des bilans sanguins sur un cycle de 14 jours, ?au=AAAA-MM-JJ pour une periode " +
+        "passee — port reseau seulement, jeton de l'equipe nutrition",
     },
     supervision: { "GET /health": "etat du service et de la base" },
   });
@@ -186,6 +200,9 @@ app.listen(config.port, "::1").on("error", (e: NodeJS.ErrnoException) => {
  * Des comptes et le motif d'un refus, jamais une valeur mesuree.
  */
 function journal(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  // Lu tout de suite : une route montee sous un prefixe, /partenaires, le
+  // retire de `req.path` le temps de repondre.
+  const chemin = req.path;
   const json = res.json.bind(res);
   res.json = (corps?: unknown) => {
     res.locals.corps = corps;
@@ -199,6 +216,8 @@ function journal(req: express.Request, res: express.Response, next: express.Next
           minutes?: number;
           ecartees?: Record<string, number[]>;
           detail?: { path: (string | number)[]; message: string }[];
+          periode?: { du: string; au: string };
+          preleves?: number;
         }
       | undefined;
     const probleme = c?.detail?.[0];
@@ -211,11 +230,13 @@ function journal(req: express.Request, res: express.Response, next: express.Next
       c?.trames !== undefined
         ? ` · ${c.trames} trame${c.trames > 1 ? "s" : ""}, ${c.minutes} min` +
           (horsPlage ? ` · ${horsPlage} hors plage` : "")
-        : c?.erreur
-          ? ` · ${c.erreur}${probleme ? ` (${probleme.path.join(".")} : ${probleme.message})` : ""}`
-          : "";
+        : c?.periode !== undefined
+          ? ` · ${c.periode.du} au ${c.periode.au}, ${c.preleves} residents`
+          : c?.erreur
+            ? ` · ${c.erreur}${probleme ? ` (${probleme.path.join(".")} : ${probleme.message})` : ""}`
+            : "";
     const origine = (req.socket.remoteAddress ?? "?").replace(/^::ffff:/, "");
-    console.log(`[reseau] ${req.method} ${req.path} ${res.statusCode} · ${origine}${suite}`);
+    console.log(`[reseau] ${req.method} ${chemin} ${res.statusCode} · ${origine}${suite}`);
   });
   next();
 }
@@ -235,11 +256,30 @@ function adressesLocales(): string[] {
     .map((i) => i.address);
 }
 
+/**
+ * L'equipe nutrition peut lire depuis une page web comme depuis un programme.
+ * `*` ne prete rien ici : sans cookie a porter, une page qui n'a pas le jeton
+ * recoit un 401 comme tout le monde.
+ */
+function corsPartenaires(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Authorization");
+  res.header("Access-Control-Allow-Methods", "GET");
+  // Avant d'envoyer l'en-tete Authorization, le navigateur demande la
+  // permission, et cette question ne porte jamais le jeton : elle passe avant
+  // la garde.
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+}
+
 // Une seconde application plutot qu'un filtre sur la premiere : ce qui n'est
 // pas monte ici n'existe pas pour le reseau, quoi qu'on ajoute plus tard a
-// l'autre. Pas d'en-tetes CORS : un bracelet n'est pas un navigateur, et une
-// page ouverte sur le reseau n'a rien a lire ici.
-if (config.braceletToken) {
+// l'autre. Chaque route n'y existe qu'avec son jeton. Pas d'en-tetes CORS hors
+// de /partenaires : un bracelet n'est pas un navigateur.
+if (config.braceletToken || config.nutritionToken) {
   const reseau = express();
   reseau.disable("x-powered-by");
   // Le journal avant le lecteur de JSON : un corps illisible doit laisser sa
@@ -247,7 +287,8 @@ if (config.braceletToken) {
   reseau.use(journal);
   reseau.use(express.json({ limit: "2mb" }));
   reseau.get("/health", sante);
-  reseau.post("/ingest/bracelet", authBracelet, recevoirWifi);
+  if (config.braceletToken) reseau.post("/ingest/bracelet", authBracelet, recevoirWifi);
+  if (config.nutritionToken) reseau.use("/partenaires", corsPartenaires, authNutrition, partenairesApi);
   reseau.use(routeInconnue);
   reseau.use(jsonIllisible);
   reseau.use(erreurInterne);
@@ -258,9 +299,15 @@ if (config.braceletToken) {
       console.log(`[sola] port reseau ${config.portReseau} ouvert, mais aucun reseau trouve`);
     }
     for (const ip of adresses) {
-      console.log(`[sola] bracelet en Wi-Fi : POST http://${ip}:${config.portReseau}/ingest/bracelet`);
+      const base = `http://${ip}:${config.portReseau}`;
+      if (config.braceletToken) console.log(`[sola] bracelet en Wi-Fi : POST ${base}/ingest/bracelet`);
+      if (config.nutritionToken) {
+        console.log(`[sola] equipe nutrition : GET ${base}/partenaires/nutrition/bilans`);
+      }
     }
+    if (!config.braceletToken) console.log("[sola] bracelet en Wi-Fi ferme : BRACELET_TOKEN absent");
+    if (!config.nutritionToken) console.log("[sola] equipe nutrition fermee : NUTRITION_TOKEN absent");
   });
 } else {
-  console.log("[sola] port reseau ferme : BRACELET_TOKEN absent de server/.env");
+  console.log("[sola] port reseau ferme : ni BRACELET_TOKEN ni NUTRITION_TOKEN dans server/.env");
 }

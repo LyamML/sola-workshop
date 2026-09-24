@@ -29,8 +29,9 @@ proposer autre chose plutôt que de les contourner.
 
 ### 1. Les secrets ne sortent jamais du disque
 
-`server/.env` contient `BORNE_TOKEN`, et `BRACELET_TOKEN` pour les bracelets en
-Wi-Fi. On ne les recopie **nulle part** : ni dans un fichier, ni dans un
+`server/.env` contient `BORNE_TOKEN`, `BRACELET_TOKEN` pour les bracelets en
+Wi-Fi et `NUTRITION_TOKEN` pour l'équipe nutrition. On ne les recopie
+**nulle part** : ni dans un fichier, ni dans un
 message, ni dans un commentaire, ni dans une URL, ni dans un commit. Même règle
 pour un mot de passe de compte, y compris celui d'un compte de démonstration
 créé à la main. `.env` et `*.db` sont dans `.gitignore` — ne les en sortez pas.
@@ -90,7 +91,9 @@ La console et le backoffice passent par des comptes : `medecins`, `admins`,
 `sessions`, mot de passe haché en **argon2id**, session de douze heures dans un
 cookie `httpOnly`. `/api` exige une session, `/admin` exige en plus le rôle
 administrateur, `/ingest` garde son jeton porteur parce qu'une borne est une
-machine. La borne de cabine reste accessible à tous.
+machine, et `/partenaires` le sien parce que l'équipe nutrition appelle depuis
+un programme — il ne sert que des moyennes, jamais une ligne de dossier. La
+borne de cabine reste accessible à tous.
 
 Une note de particularité écrite depuis la console porte `auteur_id`. Ne
 rouvrez pas une route d'écriture sans session, et ne servez jamais `mdp_hash` :
@@ -119,7 +122,9 @@ implémentée, l'écran 01 rejoue des scénarios scriptés au lieu de lire la ba
 il n'y écrit que les trames du bracelet —, le bracelet ne remplit que trois
 tuiles de la fiche — un jour qu'il est seul à écrire, les autres reprennent leur
 dernière valeur, datée, alerte comprise —, le jour d'une mesure est le jour UTC,
-le port réseau des bracelets parle HTTP en clair avec un seul jeton pour tous,
+le port réseau parle HTTP en clair, avec un seul jeton pour tous les bracelets
+et celui de l'équipe nutrition, les moyennes transmises à cette équipe ne
+distinguent pas le sexe, que la base ne connaît pas,
 la borne ne transmet que servie par Vite, dont le relais porte le jeton, une
 partie de la trame est reçue sans être conservée — une chute comptée par le
 bracelet n'ouvre pas de signal —, la conversation libre de la borne exige Ollama
@@ -200,7 +205,7 @@ marche.
 | `npm run dev` | les quatre services dans un terminal, journaux préfixés, Ctrl+C arrête tout ; libère d'abord un port qu'un ancien serveur Sola tient encore, finit par la liste des adresses — `scripts/dev.mjs` ; `npm run dev -- console server` pour un sous-ensemble | 5173–5177 |
 | `npm run dev:borne` | écran 01 — la borne de cabine | 5173 |
 | `npm run dev:console` | écrans 02 à 04 — la console médicale | 5174 |
-| `npm run dev:server` | le serveur de bord (API) ; avec `BRACELET_TOKEN`, aussi le port réseau des bracelets en Wi-Fi | 5175, 5177 |
+| `npm run dev:server` | le serveur de bord (API) ; avec `BRACELET_TOKEN` ou `NUTRITION_TOKEN`, aussi le port réseau — bracelets en Wi-Fi, équipe nutrition | 5175, 5177 |
 | `npm run dev:backoffice` | le backoffice | 5176 |
 | `npm run db:reset` | recharge schéma + vues + jeu de démonstration | — |
 | `npm run db:demo` | régénère seulement les données | — |
@@ -270,7 +275,7 @@ racine, réglé par `DB_FILE`.
 
 | Ce que vous cherchez | Fichier |
 |---|---|
-| Montage des routes, CORS, liste des routes sur `/`, le port réseau des bracelets en Wi-Fi | `src/index.ts` |
+| Montage des routes, CORS, liste des routes sur `/`, le port réseau — bracelets en Wi-Fi, équipe nutrition | `src/index.ts` |
 | Lecture de la console — écrans 02, 03, 04 | `src/routes/console.ts` |
 | Les gestes de la console : note signée, prise et clôture d'un signal | `src/routes/console.ts` (`ajouterParticularite`, `PATCH /signaux/:id`) |
 | Backoffice — écrans ↔ requêtes, fraîcheur des flux, tables brutes, comptes | `src/routes/admin.ts` |
@@ -278,10 +283,11 @@ racine, réglé par `DB_FILE`.
 | **Le contrat d'une trame du bracelet**, et comment une minute de trames devient une ligne de `mesures`, puis la ligne du jour de `mesures_jour` | `src/validation.ts` (`trameSchema`), `src/routes/ingest.ts` (`resumerMinute`, `SQL_JOUR`) |
 | La lecture seule d'un bracelet en Wi-Fi, et ce qu'une réponse dit des valeurs écartées | `src/validation.ts` (`lectureSchema`), `src/routes/ingest.ts` (`recevoirWifi`, `accuse`) |
 | La dernière minute du bracelet et l'heure écoulée — la carte « en direct » de l'écran 03 | `src/routes/direct.ts` |
+| **Les moyennes des bilans sanguins pour l'équipe nutrition** : quels marqueurs et pourquoi, le cycle de 14 jours, la règle des petits effectifs | `src/routes/partenaires.ts` |
 | Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
 | Hachage argon2id des mots de passe | `src/mdp.ts` |
 | Ouverture, lecture et purge des sessions, cookie | `src/sessions.ts` |
-| Jetons porteurs des bornes et des bracelets, exigences de rôle | `src/auth.ts` |
+| Jetons porteurs des bornes, des bracelets et de l'équipe nutrition, exigences de rôle | `src/auth.ts` |
 | Ouverture SQLite, `requete`, `ecrire`, `transaction` | `src/db.ts` |
 | Variables d'environnement | `src/config.ts`, modèle dans `.env.example` |
 | Schémas de validation | `src/validation.ts` |

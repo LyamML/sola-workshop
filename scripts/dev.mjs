@@ -41,11 +41,14 @@ function lireEnv() {
     base: lire("DB_FILE") ?? "sola.db",
     port: Number(lire("PORT") ?? 5175),
     portReseau: Number(lire("PORT_RESEAU") ?? 5177),
-    reseau: lire("BRACELET_TOKEN") !== undefined,
+    bracelet: lire("BRACELET_TOKEN") !== undefined,
+    nutrition: lire("NUTRITION_TOKEN") !== undefined,
   };
 }
 
 const SERVEUR = lireEnv();
+// Le port reseau s'ouvre avec l'un ou l'autre jeton, comme dans server/src/index.ts.
+const RESEAU = SERVEUR.bracelet || SERVEUR.nutrition;
 
 // Les ports ne sont pas passes d'ici : chaque interface fixe le sien dans son
 // vite.config.ts, sans droit d'en changer, et le serveur lit les siens dans
@@ -58,7 +61,7 @@ const SERVICES = [
   {
     nom: "server",
     espace: "server",
-    ports: SERVEUR.reseau ? [SERVEUR.port, SERVEUR.portReseau] : [SERVEUR.port],
+    ports: RESEAU ? [SERVEUR.port, SERVEUR.portReseau] : [SERVEUR.port],
     role: "l'API, pas une page",
     couleur: "green",
   },
@@ -400,16 +403,17 @@ if (!arret) {
     else if (!etat) rang(service.nom, "ne repond pas : voir ses lignes plus haut");
     else {
       rang(service.nom, `http://localhost:${service.ports[0]}`, service.role);
-      // Le second port du serveur, celui qu'un bracelet joint depuis le Wi-Fi.
-      if (service === serveur && SERVEUR.reseau) {
+      // Le second port du serveur, celui que le bracelet et l'equipe nutrition
+      // joignent depuis le Wi-Fi.
+      if (service === serveur && RESEAU) {
         const ips = adressesReseau();
-        if (ips.length === 0) rang("bracelet", `port ${SERVEUR.portReseau}, mais aucun reseau trouve`);
+        if (ips.length === 0) rang("reseau", `port ${SERVEUR.portReseau}, mais aucun reseau trouve`);
         for (const ip of ips) {
-          rang(
-            "bracelet",
-            `http://${ip}:${SERVEUR.portReseau}/ingest/bracelet`,
-            "le meme serveur, depuis le Wi-Fi",
-          );
+          const base = `http://${ip}:${SERVEUR.portReseau}`;
+          if (SERVEUR.bracelet) rang("bracelet", `${base}/ingest/bracelet`, "le meme serveur, depuis le Wi-Fi");
+          if (SERVEUR.nutrition) {
+            rang("nutrition", `${base}/partenaires/nutrition/bilans`, "moyennes des bilans, pour l'autre equipe");
+          }
         }
       }
     }
