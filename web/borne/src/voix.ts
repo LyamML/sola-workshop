@@ -182,6 +182,98 @@ export function motDEveil(phrase: string): string | null {
   return null;
 }
 
+/**
+ * Les voix françaises, de la plus humaine à la plus mécanique.
+ *
+ * Les voix de Windows — Hortense, Julie, Paul — sont locales et toujours là,
+ * mais elles sonnent comme un répondeur, et la borne les prenait d'office.
+ * Chrome fournit « Google français », Edge ses voix « Natural » : distantes,
+ * elles demandent le réseau, mais sonnent nettement moins mécaniques.
+ */
+function rang(v: SpeechSynthesisVoice): number {
+  if (/natural/i.test(v.name)) return 0;
+  if (/^google/i.test(v.name)) return 1;
+  return v.localService ? 3 : 2;
+}
+
+export interface VoixChoisies {
+  /** Celle qui parle d'ordinaire. */
+  principale: SpeechSynthesisVoice | null;
+  /** Une voix locale, quand la principale ne l'est pas : elle prend le relais
+   *  si le service distant ne répond pas. */
+  reserve: SpeechSynthesisVoice | null;
+}
+
+/** Le français de France d'abord : une voix d'ailleurs ne sert qu'à défaut. */
+export function choisirVoix(toutes: readonly SpeechSynthesisVoice[]): VoixChoisies {
+  const fr = toutes.filter((v) => v.lang.toLowerCase().startsWith("fr"));
+  const france = fr.filter((v) => /^fr[-_]fr$/i.test(v.lang));
+  // `sort` est stable : à rang égal, l'ordre du navigateur départage.
+  const liste = [...(france.length ? france : fr)].sort((a, b) => rang(a) - rang(b));
+  const principale = liste[0] ?? null;
+  const reserve =
+    principale && !principale.localService ? (liste.find((v) => v.localService) ?? null) : null;
+  return { principale, reserve };
+}
+
+/**
+ * Chrome coupe une voix distante au bout d'une quinzaine de secondes de parole
+ * (bogue Chromium 679437), sans toujours le signaler : Sola resterait « en
+ * train de parler », la phrase à moitié dite. Elle dit donc ses répliques
+ * phrase par phrase, et une phrase trop longue se recoupe à sa dernière
+ * virgule. 150 caractères sont une marge choisie, pas une mesure.
+ */
+const MORCEAU_MAX = 150;
+
+/** Découpe une réplique en morceaux qu'une voix Google dira jusqu'au bout. */
+export function morceaux(texte: string): string[] {
+  return texte
+    .split(/(?<=[.!?…])\s+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .flatMap(recouper);
+}
+
+function recouper(phrase: string): string[] {
+  const parts: string[] = [];
+  let reste = phrase;
+  while (reste.length > MORCEAU_MAX) {
+    let coupe = 0;
+    for (const m of reste.slice(0, MORCEAU_MAX).matchAll(/[,;:]\s/g)) coupe = m.index + 1;
+    // Sans pause où couper, la phrase part entière : mieux vaut risquer une
+    // voix coupée qu'un mot coupé.
+    if (!coupe) break;
+    parts.push(reste.slice(0, coupe).trim());
+    reste = reste.slice(coupe).trim();
+  }
+  parts.push(reste);
+  return parts;
+}
+
+/**
+ * Le temps qu'a une voix distante pour se mettre à parler. Quand son service
+ * ne répond pas, Chrome ne dit rien — ni `start`, ni `error` — et attend : le
+ * morceau repart alors avec la voix locale. Deux secondes et demie sont une
+ * marge choisie, pas une mesure — à revoir après l'essai dans Chrome.
+ */
+const DEMARRAGE_MAX = 2500;
+
+/**
+ * Après une panne de la voix distante, la voix locale parle seule une minute :
+ * sans ce répit, chaque réplique attendrait `DEMARRAGE_MAX` en silence avant
+ * de partir.
+ */
+const REPIT_PANNE = 60_000;
+
+/**
+ * La réplique en cours de diction. Son identité suffit à reconnaître les
+ * événements qui lui appartiennent ; `mot` retient l'énoncé qui se dit, que
+ * Chrome oublierait sinon, et ses événements avec.
+ */
+interface Diction {
+  mot?: SpeechSynthesisUtterance;
+}
+
 export interface Voix {
   /** Ce navigateur sait écouter. */
   dispo: boolean;
@@ -215,7 +307,9 @@ export function useVoix(
   const moteur = useRef<Reconnaissance | null>(null);
   const voulue = useRef(false); // on veut écouter (≠ le micro est ouvert)
   const enParole = useRef(false);
-  const enCours = useRef<SpeechSynthesisUtterance | null>(null);
+  const enCours = useRef<Diction | null>(null);
+  // Instant de la dernière panne de la voix distante.
+  const panne = useRef(-Infinity);
   const rappel = useRef(onPhrase);
   rappel.current = onPhrase;
   const auVol = useRef(onAuVol);
@@ -359,13 +453,12 @@ export function useVoix(
 
   // La liste des voix arrive de façon asynchrone au premier chargement : on la
   // relit à `voiceschanged` plutôt que de figer un choix trop tôt.
-  const voixFr = useRef<SpeechSynthesisVoice | null>(null);
+  const voixFr = useRef<VoixChoisies>({ principale: null, reserve: null });
   useEffect(() => {
     const synth = window.speechSynthesis;
     if (!synth) return;
     const choisir = () => {
-      const liste = synth.getVoices().filter((v) => v.lang.toLowerCase().startsWith("fr"));
-      voixFr.current = liste.find((v) => v.localService) ?? liste[0] ?? null;
+      voixFr.current = choisirVoix(synth.getVoices());
     };
     choisir();
     synth.addEventListener("voiceschanged", choisir);
@@ -376,6 +469,9 @@ export function useVoix(
     (texte: string) => {
       const synth = window.speechSynthesis;
       if (!synth) return;
+      // La réplique précédente cède sa place avant d'être annulée : ce qu'elle
+      // émettra encore en s'arrêtant ne doit plus rien relancer.
+      enCours.current = null;
       synth.cancel();
       // La réplique interrompue par celle-ci ne finira jamais d'elle-même : on
       // la date ici, et on oublie ce qui ne peut plus résonner.
@@ -388,17 +484,14 @@ export function useVoix(
       enParole.current = true;
       setParle(true);
 
-      const mot = new SpeechSynthesisUtterance(texte);
-      mot.lang = "fr-FR";
-      if (voixFr.current) mot.voice = voixFr.current;
-      mot.rate = 0.98;
-      mot.pitch = 1.06;
+      const diction: Diction = {};
+      enCours.current = diction;
       const fini = () => {
         // Une réplique coupée par la suivante termine quand même, en retard.
         // Sans ce garde-fou elle déclarerait Sola muette pendant qu'elle dit
         // la suivante : plus d'interruption possible, et deux secondes plus
         // tard l'écho de la nouvelle réplique ne serait plus reconnu.
-        if (enCours.current !== mot) return;
+        if (enCours.current !== diction) return;
         enParole.current = false;
         clore(recentes.current);
         setParle(false);
@@ -407,10 +500,51 @@ export function useVoix(
           window.setTimeout(ouvrir, 160);
         }
       };
-      mot.onend = fini;
-      mot.onerror = fini;
-      enCours.current = mot;
-      synth.speak(mot);
+
+      const parts = morceaux(texte);
+      const { principale, reserve } = voixFr.current;
+
+      // Un morceau après l'autre, plutôt que tous dans la file de Chrome : si
+      // la voix distante lâche, la suite de la réplique change de voix.
+      const dire = (i: number, voix: SpeechSynthesisVoice | null) => {
+        if (enCours.current !== diction) return;
+        if (i >= parts.length) {
+          fini();
+          return;
+        }
+        const mot = new SpeechSynthesisUtterance(parts[i]);
+        mot.lang = "fr-FR";
+        if (voix) mot.voice = voix;
+        mot.rate = 0.98;
+        diction.mot = mot;
+
+        const lacher = () => {
+          if (enCours.current !== diction) return;
+          mot.onstart = mot.onend = mot.onerror = null;
+          synth.cancel();
+          panne.current = performance.now();
+          if (reserve) dire(i, reserve);
+          else fini();
+        };
+        const distante = voix !== null && !voix.localService;
+        const garde = distante ? window.setTimeout(lacher, DEMARRAGE_MAX) : undefined;
+        mot.onstart = () => window.clearTimeout(garde);
+        mot.onend = () => {
+          window.clearTimeout(garde);
+          dire(i + 1, voix);
+        };
+        mot.onerror = (e) => {
+          window.clearTimeout(garde);
+          // Annulé par `taire` ou par la réplique suivante : rien à reprendre.
+          if (e.error === "interrupted" || e.error === "canceled") return;
+          if (distante) lacher();
+          else fini();
+        };
+        synth.speak(mot);
+      };
+
+      const enPanne = performance.now() - panne.current < REPIT_PANNE;
+      dire(0, enPanne && reserve ? reserve : principale);
     },
     [ouvrir],
   );
