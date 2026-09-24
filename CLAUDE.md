@@ -130,8 +130,10 @@ règles ne sont que des consignes données au modèle, la détection d'urgence n
 repose que sur des mots-clés, les bilans sanguins du jeu de démonstration sont
 simulés (`source = 'simule'`, et la fiche le dit), la reconnaissance vocale de
 la borne n'existe que dans les navigateurs à moteur Chromium — ailleurs elle
-bascule au clavier et le dit dans sa barre d'état —, Sola ne reconnaît sa propre
-voix que par le texte : un mot qu'elle vient de dire ne vaut pas réponse dans
+bascule au clavier et le dit dans sa barre d'état —, dans Chrome, Sola parle
+avec la voix distante de Google — ce qu'elle dit part chez Google ; hors ligne,
+une voix de Windows reprend —, Sola ne reconnaît sa propre voix que par le
+texte : un mot qu'elle vient de dire ne vaut pas réponse dans
 les deux secondes qui suivent, un geste clinique ne se défait pas — ni signal à
 rouvrir ou à réassigner, ni note à retirer —, aucun dossier ne se corrige à
 l'écran, et, serveur éteint, seule la fiche de R-0448 s'affiche — le repli ne
