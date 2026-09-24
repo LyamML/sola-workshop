@@ -37,6 +37,10 @@ function entier(nom: string, defaut: number): number {
 
 export const config = {
   port: entier("PORT", 5175),
+  // Adresse d'ecoute de ce port. Absente, ce sont les deux boucles locales : le
+  // poste seulement. Seul compose.yaml la pose, a 0.0.0.0 : dans server/.env,
+  // elle ouvrirait la connexion et le backoffice au Wi-Fi.
+  ecoute: process.env.ECOUTE || null,
   jourVol: entier("JOUR_VOL", 4128),
   consoleOrigin: process.env.CONSOLE_ORIGIN ?? "http://localhost:5174",
   backofficeOrigin: process.env.BACKOFFICE_ORIGIN ?? "http://localhost:5176",

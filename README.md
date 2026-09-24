@@ -43,6 +43,7 @@ Les transcriptions n'arrivent jamais à la console médicale parce qu'elles **n'
 | `server` | Service d'ingestion + API de la console et du backoffice |
 | `db` | Les deux schémas, tous deux SQLite : `db/serveur` et `db/borne` — [pourquoi deux bases](db/README.md) |
 | `scripts` | Chargement du schéma, génération du jeu de test, agrégation quotidienne |
+| `docker` | Démarrage du serveur et service des fichiers statiques sous Docker ; `Dockerfile` et `compose.yaml` sont à la racine — voir [Avec Docker](#avec-docker) |
 
 **Stack** — React 18 · TypeScript 5 · Vite 5 (espaces de travail npm) · Express + SQLite (`node:sqlite`, Node 24) · ESP32 Arduino + NimBLE · Web Bluetooth.
 
@@ -138,6 +139,57 @@ démonstration sinon — en le disant dans son en-tête. Sans `server/.env`,
 
 Une commande par bloc : l'équipe est sous Windows PowerShell, qui ne connaît
 pas l'enchaînement `&&`.
+
+### Avec Docker
+
+Les quatre services tournent aussi sous Docker, aux mêmes adresses, sans
+`npm install` sur le poste. Il faut Docker — Docker Desktop sous Windows,
+démarré — et `server/.env`, rempli comme plus haut :
+
+```bash
+docker compose --env-file server/.env up --build
+```
+
+Le premier lancement construit les images et crée la base. Ctrl+C arrête
+tout ; `docker compose down` retire ensuite les conteneurs, sans toucher à la
+base.
+
+`--env-file` ne sert qu'au jeton des bornes : Compose le lit dans `server/.env`
+et ne le passe qu'à la borne, quand le serveur reçoit tout le fichier. Sans
+cette option, la borne démarre sans jeton et le dit dans son journal : résumés
+et trames ne partent plus.
+
+Ce qui change par rapport à `npm run dev` :
+
+- **La base n'est pas `sola.db`.** Celle du serveur vit dans le volume
+  `sola_donnees`, créée au premier démarrage avec le même jeu de démonstration
+  et les mêmes comptes que `npm run db:reset`, puis gardée d'un lancement à
+  l'autre. `npm run db:sql` et `npm run compte` ne la voient pas ; les mêmes
+  scripts tournent dans le conteneur :
+
+  ```bash
+  docker compose exec server node scripts/db-sql.mjs "SELECT COUNT(*) FROM signaux"
+  ```
+
+  ```bash
+  docker compose exec server node scripts/db-compte.mjs liste
+  ```
+
+  `docker compose down --volumes` l'efface, comme `npm run db:reset` efface
+  `sola.db` : même précaution, on demande avant.
+- **La borne est servie par `vite preview`**, sur son build : c'est ce qui lui
+  garde son relais, le même, lu dans `web/borne/vite.config.ts`. Ollama reste
+  sur le poste, et la borne le joint par `host.docker.internal`. La console et
+  le backoffice sont des fichiers statiques, servis par nginx.
+- **Les ports sont publiés sur `127.0.0.1`**, comme `npm run dev` n'écoute que
+  sur le poste. Seul 5177, le port réseau, s'ouvre au Wi-Fi : c'est son rôle.
+  Le journal du serveur y annonce les adresses du conteneur, que le Wi-Fi ne
+  joint pas : c'est celle du poste qu'on écrit dans le bracelet. Sous Windows,
+  le pare-feu doit alors laisser passer Docker Desktop sur ce réseau, comme il
+  laissait passer Node.
+
+Docker et `npm run dev` publient les mêmes ports : arrêter l'un
+(`docker compose down`) avant de lancer l'autre.
 
 ### Qui entre, et comment
 
@@ -444,6 +496,7 @@ La fiche, elle, ne fait pas la différence, et c'est voulu : dans le jeu de dém
 - **Les bilans sanguins du jeu de démonstration sont simulés.** Les 29 marqueurs, leurs bornes de référence et leurs unités sont ceux d'un bilan réel, mais les valeurs sont tirées par le générateur : chaque bilan porte `source = 'simule'` et la fiche l'affiche.
 - **Un geste clinique ne se défait pas, et un dossier ne se corrige plus à l'écran.** Le backoffice n'écrit que l'état d'un compte. Un signal pris ne passe pas à un autre soignant, un signal clos ne se rouvre pas, une note de particularité erronée ne se retire pas, et le poste ou la cabine d'un résident ne se modifient plus depuis une interface.
 - **Serveur éteint, seule la fiche de R-0448 s'affiche.** Le repli de la console ne contient que les deux réponses figées par `npm run db:repli`, l'écran 02 et cette fiche. Celle d'un autre résident dit qu'elle est indisponible, plutôt que de montrer R-0448 sous un autre nom.
+- **Sous Docker, la borne ne reconnaît plus le poste à son adresse.** Dans un conteneur, toute requête arrive de la passerelle de Docker : le relais ne vérifie plus que la méthode et l'origine (`BORNE_CONTENEUR=1`), et c'est la publication de son port sur `127.0.0.1`, dans `compose.yaml`, qui garde le poste. Publiée sur une autre adresse, la borne prêterait son jeton de `/ingest` à tout le réseau.
 - **Les données sont synthétiques.** Elles sont calibrées pour être vraisemblables et cohérentes entre elles, pas pour être vraies. Aucun chiffre de ce dépôt ne dit quoi que ce soit d'une population réelle.
 
 ## Le serveur de bord

@@ -1,0 +1,24 @@
+# Ce qui n'entre dans aucune image.
+
+# Les secrets et les bases d'abord. Une image se partage, et un fichier copié
+# dans une couche y reste, même effacé par la couche suivante.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/secrets.h
+
+# Ce que la construction refait elle-même. Un tsbuildinfo venu du poste ferait
+# croire à tsc que tout est déjà compilé, et il n'écrirait rien.
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+
+# Ce qu'aucun des quatre services n'utilise.
+.git
+.claude
+docs
+firmware
+medical-space-rag

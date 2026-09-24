@@ -167,16 +167,22 @@ app.use(erreurInterne);
 // Les deux boucles locales, et non « localhost » : ce nom ne met a l'ecoute
 // qu'une adresse (::1 sous Windows), et le relais de la borne, qui appelle
 // 127.0.0.1, trouverait porte close.
-app.listen(config.port, "127.0.0.1", () => {
+//
+// Dans un conteneur, ECOUTE les remplace par une seule adresse : ses boucles
+// ne se joignent que de lui-meme. La publication du port sur 127.0.0.1, dans
+// compose.yaml, garde alors le poste.
+app.listen(config.port, config.ecoute ?? "127.0.0.1", () => {
   console.log(`[sola] serveur de bord sur http://localhost:${config.port}`);
   console.log(`[sola] origines autorisees : ${[...ORIGINES].join(", ")}`);
 });
-app.listen(config.port, "::1").on("error", (e: NodeJS.ErrnoException) => {
-  // Un poste sans IPv6 n'a pas de ::1 ; 127.0.0.1 suffit alors. Toute autre
-  // erreur — un port deja pris — doit arreter le serveur, comme sans ce
-  // gestionnaire.
-  if (e.code !== "EADDRNOTAVAIL") throw e;
-});
+if (config.ecoute === null) {
+  app.listen(config.port, "::1").on("error", (e: NodeJS.ErrnoException) => {
+    // Un poste sans IPv6 n'a pas de ::1 ; 127.0.0.1 suffit alors. Toute autre
+    // erreur — un port deja pris — doit arreter le serveur, comme sans ce
+    // gestionnaire.
+    if (e.code !== "EADDRNOTAVAIL") throw e;
+  });
+}
 
 // ---------------------------------------------------------------- port reseau -
 
