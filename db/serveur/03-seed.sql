@@ -8,9 +8,11 @@
 --
 --  Les dates sont relatives a date('now') : la demonstration est toujours
 --  "aujourd'hui", quel que soit le jour de la soutenance. Le jour de vol
---  courant est 4128. Les heures du jour, elles, partent de datetime('now')
---  moins N minutes : jamais dans le futur, quel que soit l'instant ou la
---  base est generee — comme l'horloge de scripts/db-demo.mjs.
+--  courant est 4128. Les heures du jour, elles, partent de
+--  datetime('now','localtime') moins N minutes : jamais dans le futur, a
+--  l'heure de bord (comme scripts/db-demo.mjs et server/src/db.ts
+--  heureDeBord). Pas datetime('now') seul : SQLite y ecrit l'UTC, et la
+--  console afficherait 14 h pour une alerte de 16 h.
 -- =============================================================================
 
 PRAGMA foreign_keys = ON;
@@ -198,25 +200,25 @@ INSERT INTO conversations
    actions_proposees, actions_acceptees, remontee_auto, resident_notifie_at)
 VALUES
   ((SELECT id FROM residents WHERE code='R-0448'),
-   datetime('now','-48 minutes'), 4128, 11, 'surveillance',
+   datetime('now','localtime','-48 minutes'), 4128, 11, 'surveillance',
    'Dernière nuit à 5 h 18, la cinquième sous 5 h 30 en quatorze jours. Attribue les réveils à un bruit de ventilation dans le module C — demande de contrôle acoustique transmise à la maintenance. Ton irritable, phrases courtes, plusieurs ruptures de conversation. Dépistage d''idéation suicidaire négatif (C-SSRS, items 1-2). Lumière de cabine avancée et contact social proposés, acceptés.',
-   2, 2, 1, datetime('now','-47 minutes')),
+   2, 2, 1, datetime('now','localtime','-47 minutes')),
   ((SELECT id FROM residents WHERE code='R-0448'),
-   datetime('now','-3 days','-82 minutes'), 4125, 6, 'info',
+   datetime('now','localtime','-3 days','-82 minutes'), 4125, 6, 'info',
    'Demande spontanée de conseils d''endormissement. Exercice de respiration 4-7-8 proposé et suivi jusqu''au bout. Aucun marqueur d''humeur basse sur l''échange.',
    1, 1, 0, NULL),
   ((SELECT id FROM residents WHERE code='R-0448'),
-   datetime('now','-9 days','-165 minutes'), 4119, 19, 'surveillance',
+   datetime('now','localtime','-9 days','-165 minutes'), 4119, 19, 'surveillance',
    'Évoque un sentiment d''inutilité après l''incident du bac 7 (J+4 117). Décline le repas collectif pour la 3e fois de la semaine. Sola a proposé un appel à l''équipe hydroponie — refusé à deux reprises. Repli verbal marqué en fin d''échange.',
-   3, 0, 1, datetime('now','-9 days','-164 minutes')),
+   3, 0, 1, datetime('now','localtime','-9 days','-164 minutes')),
   ((SELECT id FROM residents WHERE code='R-0448'),
-   datetime('now','-32 days','-150 minutes'), 4096, 41, 'info',
+   datetime('now','localtime','-32 days','-150 minutes'), 4096, 41, 'info',
    'Anniversaire du départ de la Terre. Évoque longuement les proches restés au sol ; a passé la soirée avec sa sœur. Échange apaisé, marqueurs prosodiques en nette amélioration en fin de conversation. Aucune action nécessaire — note pour anticiper la même date l''an prochain.',
    0, 0, 0, NULL),
   ((SELECT id FROM residents WHERE code='R-0912'),
-   datetime('now','-1 days','-12 minutes'), 4127, 17, 'critique',
+   datetime('now','localtime','-1 days','-12 minutes'), 4127, 17, 'critique',
    'Verbalisation de désespoir, sentiment d''être un poids pour l''équipe de maintenance. Dépistage C-SSRS positif (items 1 à 3) : alerte immédiate au médecin de garde. Échange maintenu jusqu''au relais humain.',
-   1, 1, 1, datetime('now','-1 days','-11 minutes'));
+   1, 1, 1, datetime('now','localtime','-1 days','-11 minutes'));
 
 -- Un seul vocabulaire : les six motifs de l'ecran 02, plus deux etiquettes de
 -- contexte hors de la fenetre de 30 jours. Les durees servent de cle, faute
@@ -241,24 +243,24 @@ INSERT INTO signaux (resident_id, severite, motif, origine, ouvert_at, assigne_a
 VALUES
   ((SELECT id FROM residents WHERE code='R-0912'),'critique',
    'Verbalisation de désespoir détectée en conversation · dépistage C-SSRS positif',
-   'conversation', datetime('now','-6 minutes'), NULL, 'ouvert'),
+   'conversation', datetime('now','localtime','-6 minutes'), NULL, 'ouvert'),
   ((SELECT id FROM residents WHERE code='R-1147'),'critique',
    'SpO₂ à 88 % au repos pendant 6 min · antécédent BPCO',
-   'physio', datetime('now','-14 minutes'), 'Dr. Oyelaran', 'en_cours'),
+   'physio', datetime('now','localtime','-14 minutes'), 'Dr. Oyelaran', 'en_cours'),
   ((SELECT id FROM residents WHERE code='R-0233'),'critique',
    'Chute détectée par l''accéléromètre · aucune réponse à la borne après 90 s',
-   'chute', datetime('now','-22 minutes'), 'Équipe d''intervention', 'en_cours'),
+   'chute', datetime('now','localtime','-22 minutes'), 'Équipe d''intervention', 'en_cours'),
   ((SELECT id FROM residents WHERE code='R-0448'),'surveillance',
    'RMSSD sous le seuil personnel depuis 6 jours · 5 nuits sur 14 sous 5 h 30',
-   'physio', datetime('now','-35 minutes'), 'Dr. Ferreira', 'en_cours'),
+   'physio', datetime('now','localtime','-35 minutes'), 'Dr. Ferreira', 'en_cours'),
   ((SELECT id FROM residents WHERE code='R-0781'),'surveillance',
    'Retrait social depuis 12 jours · 4 invitations déclinées · activité -48 %',
-   'conversation', datetime('now','-52 minutes'), NULL, 'ouvert'),
+   'conversation', datetime('now','localtime','-52 minutes'), NULL, 'ouvert'),
   ((SELECT id FROM residents WHERE code='R-1003'),'info',
    'Usage du compagnon 9 h 40 / jour (+180 % en 3 semaines) · 2 interactions humaines / semaine',
-   'usage', datetime('now','-68 minutes'), 'Dr. Ferreira', 'en_cours');
+   'usage', datetime('now','localtime','-68 minutes'), 'Dr. Ferreira', 'en_cours');
 
 INSERT INTO evenements (resident_id, type, survenu_at, intensite_g, acquitte_at)
 VALUES
   ((SELECT id FROM residents WHERE code='R-0233'),'chute',
-   datetime('now','-23 minutes'), 3.4, NULL);
+   datetime('now','localtime','-23 minutes'), 3.4, NULL);
