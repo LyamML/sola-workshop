@@ -4,12 +4,14 @@
 
 Dans le scénario **« Échange »** de la borne (écran 01), Sola ne récite plus
 de répliques écrites à l'avance. Chaque phrase du résident est envoyée à un
-**modèle de langage qui tourne sur ton PC** (`qwen3:8b`, servi par Ollama), et
+**modèle de langage qui tourne sur ton PC** (`qwen3:14b`, servi par Ollama), et
 Sola lit sa réponse à voix haute.
 
-Ça a été vérifié dans le navigateur le 23/09/2026 :
+Les temps ci-dessous ont été mesurés le 23/09/2026 sur le laptop de développement
+(RTX 4050, 6 Go) avec `qwen3:8b`. La cible de déploiement est un PC avec
+**RTX 5080** et `qwen3:14b` (modèle entier en GPU, réponses plus rapides).
 
-| Test | Résultat |
+| Test | Résultat (laptop 4050 / qwen3:8b) |
 |---|---|
 | Premier chargement du modèle (à froid) | 11,3 s |
 | Réponse, modèle déjà chargé | premier mot en 0,5 à 0,6 s, réponse complète en 4,3 à 4,6 s |
@@ -157,7 +159,8 @@ arrière-plan, pour que la première vraie réponse n'attende pas le chargement.
    ```powershell
    ollama list
    ```
-   `qwen3:8b` doit apparaître. Sinon : `ollama pull qwen3:8b`.
+   `qwen3:14b` doit apparaître (PC RTX 5080). Sinon : `ollama pull qwen3:14b`.
+   Sur le laptop : ne pas tirer le 14B — `.env.local` force déjà `qwen3:8b`.
    Si `ollama list` renvoie une erreur de connexion, lance l'application
    Ollama (ou `ollama serve` dans un terminal que tu laisses ouvert).
 
@@ -175,7 +178,8 @@ arrière-plan, pour que la première vraie réponse n'attende pas le chargement.
      ta phrase, puis Entrée.
 
 5. **Arrêter** : `Ctrl + C` dans le terminal de la borne. Pour libérer tout de
-   suite la carte graphique : `ollama stop qwen3:8b`.
+   suite la carte graphique : `ollama stop qwen3:14b` (ou `qwen3:8b` sur le
+   laptop de développement, via `.env.local`).
 
 ---
 
@@ -184,9 +188,9 @@ arrière-plan, pour que la première vraie réponse n'attende pas le chargement.
 | Ce que tu vois | Cause probable | Quoi faire |
 |---|---|---|
 | « IA locale injoignable » dans la barre d'état | Ollama n'est pas lancé | Lancer l'application Ollama ou `ollama serve` |
-| Message « Modèle qwen3:8b absent » | Le modèle n'est pas téléchargé | `ollama pull qwen3:8b` |
+| Message « Modèle qwen3:14b absent » | Le modèle n'est pas téléchargé | Sur le PC 5080 : `ollama pull qwen3:14b` ; sur le laptop : garder `web/borne/.env.local` avec `VITE_OLLAMA_MODEL=qwen3:8b` |
 | La première réponse met une dizaine de secondes | Chargement du modèle en mémoire, normal | Attendre ; les suivantes sont rapides |
-| Toutes les réponses sont lentes | Le modèle déborde de la carte graphique (6 Go) | Passer à un modèle plus petit (ci-dessous) |
+| Toutes les réponses sont lentes | Le modèle déborde de la carte graphique | Sur un poste faible, rester en `qwen3:8b` ou `qwen3:4b` (ci-dessous) ; sur RTX 5080, vérifier `ollama ps` (viser 100 % GPU) |
 | « Micro refusé » ou « Micro indisponible » | Navigateur autre que Chrome/Edge, ou permission refusée | Utiliser le champ texte, ou autoriser le micro dans Chrome |
 
 **Changer de modèle** : créer le fichier `web/borne/.env.local` contenant :
@@ -204,11 +208,12 @@ puis `ollama pull qwen3:4b` et relancer `npm run dev:borne`.
 - **Sola ne déclenche aucune action** (maintenance, lumière, message à un
   voisin) — hors priorité pour l'instant.
 - **Hors garde-fous du code, ses règles ne sont que des consignes.** Au banc
-  d'essai, `qwen3:8b` donne encore parfois un conseil incongru (« un drap sur
-  les écrans »), fait une faute de français ou suppose ce que Lyam n'a pas dit.
-  C'est la limite d'un modèle de 8 milliards de paramètres qui déborde d'une
-  carte de 6 Go. `qwen3.5:4b`, essayé le même jour, répond en 2 secondes au
-  lieu de 4 à 7 mais invente nettement plus : il n'est pas retenu.
+  d'essai sur le laptop (`qwen3:8b`), le modèle donnait encore parfois un conseil
+  incongru (« un drap sur les écrans »), une faute de français ou une
+  supposition. Le dépôt cible désormais `qwen3:14b` sur RTX 5080 ; le prompt
+  guide, le code tranche les urgences. Sur un poste faible, rester en 8B via
+  `.env.local` (ne pas y tirer le 14B). `qwen3.5:4b`, essayé le même jour,
+  répond plus vite mais invente nettement plus : il n'est pas retenu.
 - **La détection d'urgence repose sur des mots-clés.** Une formulation
   inconnue passe au modèle, qui n'a plus que sa consigne.
 - **La borne lit désormais sola.db** pour enrichir Sola au démarrage de la

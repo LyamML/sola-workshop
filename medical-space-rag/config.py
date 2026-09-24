@@ -30,7 +30,7 @@ if not DB_PATH.is_absolute():
     DB_PATH = ROOT_DIR / DB_PATH
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "YOUR_MEDICAL_ENGLISH_MODEL")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:14b")
 # Prompt + answer must fit in num_ctx, otherwise Ollama silently drops the
 # start of the conversation (the system prompt).
 OLLAMA_NUM_CTX = _int("OLLAMA_NUM_CTX", 8192)

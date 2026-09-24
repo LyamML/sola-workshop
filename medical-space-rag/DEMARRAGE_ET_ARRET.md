@@ -13,11 +13,14 @@ l'arrêter proprement quand l'appel au LLM (Ollama) prend trop de temps.
 ollama list
 ```
 
-`qwen3:8b` doit apparaître. Sinon :
+`qwen3:14b` doit apparaître (PC de déploiement RTX 5080). Sinon :
 
 ```powershell
-ollama pull qwen3:8b
+ollama pull qwen3:14b
 ```
+
+Sur le laptop de développement (VRAM limitée), ne pas tirer le 14B : garder
+`qwen3:8b` dans `config.env` et dans `web/borne/.env.local`.
 
 Si `ollama list` répond une erreur de connexion, lancer le serveur dans un
 **terminal séparé** (et le laisser ouvert) :
@@ -71,10 +74,12 @@ python rag_system.py
 
 ## 2. Combien de temps attendre ?
 
-Sur ce PC (RTX 4050 Laptop, 6 Go de VRAM), `qwen3:8b` ne tient pas entièrement
-dans la carte graphique : environ 30 % tourne sur le CPU. Mesuré : environ
-**3 min 20 s par appel**. `test_rag.py` en fait 5, donc compter **15 à 20 minutes**
-pour le test complet. Pendant ce temps, le terminal n'affiche rien : c'est normal.
+Sur le PC de déploiement (RTX 5080), `qwen3:14b` tient entièrement en GPU —
+viser `100% GPU` dans `ollama ps`. Sur le laptop de développement (RTX 4050,
+6 Go de VRAM), rester en `qwen3:8b` : il ne tient pas entièrement dans la carte
+(~30 % CPU). Mesuré avec le 8B : environ **3 min 20 s par appel** RAG.
+`test_rag.py` en fait 5, donc compter **15 à 20 minutes** pour le test complet
+sur ce laptop. Pendant ce temps, le terminal n'affiche rien : c'est normal.
 
 Pour voir où tourne le modèle pendant un appel, dans un **autre terminal** :
 
@@ -125,7 +130,8 @@ Même après l'arrêt du script, Ollama peut finir de générer la réponse et
 garde le modèle en mémoire ~5 minutes. Pour le décharger tout de suite :
 
 ```powershell
-ollama stop qwen3:8b
+ollama stop qwen3:14b
+# ou, sur le laptop : ollama stop qwen3:8b
 ollama ps          # doit afficher une liste vide
 ```
 
@@ -209,4 +215,4 @@ Pour l'arrêter : `Ctrl + C` dans son terminal.
 | Voir CPU/GPU du modèle | `ollama ps` |
 | Interrompre le script | `Ctrl + C` |
 | Forcer l'arrêt de Python | `Stop-Process -Name python -Force` |
-| Décharger le modèle | `ollama stop qwen3:8b` |
+| Décharger le modèle | `ollama stop qwen3:14b` (ou `qwen3:8b` sur laptop) |

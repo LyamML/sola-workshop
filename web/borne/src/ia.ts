@@ -15,7 +15,7 @@ export interface Tour {
   content: string;
 }
 
-export const MODELE: string = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:8b";
+export const MODELE: string = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:14b";
 
 /** Assez de fil pour coller au sujet sans noyer le modèle. */
 const TOURS_MAX = 14;
@@ -23,7 +23,7 @@ const TOURS_MAX = 14;
 /** Silence toléré entre deux morceaux. Inclut le chargement à froid. */
 const DELAI_MS = 60_000;
 
-// Les exemples comptent plus que les règles : un modèle de 8 milliards de
+// Les exemples comptent plus que les règles : un modèle de 14 milliards de
 // paramètres imite le ton qu'on lui montre bien mieux qu'il n'applique une
 // consigne abstraite.
 const PROMPT_SYSTEME = `Tu es Sola, la compagne de santé de la borne de cabine du vaisseau Projet Odyssée. Tu parles avec Lyam, cabine C-12, jour 4 128 du voyage. Tu l'as déjà salué. Ta réponse est lue à voix haute.
@@ -178,7 +178,7 @@ function elaguerNuitCollante(reponse: string, dernierUser: string): string {
 }
 
 /*
- * Urgences : décidées par le code, pas par le modèle. Au banc d'essai, qwen3:8b
+ * Urgences : décidées par le code, pas par le modèle. Au banc d'essai, qwen3:14b
  * répondait « Tu as appelé l'infirmerie ? » à une douleur thoracique et ne
  * proposait aucune aide à une idée de disparaître. Une réponse écrite et relue
  * vaut mieux qu'une improvisation sur ces deux cas. Un faux positif coûte une
