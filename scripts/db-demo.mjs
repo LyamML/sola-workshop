@@ -209,7 +209,9 @@ const HEURE_DEMO = MAINTENANT.getHours() * 60 + MAINTENANT.getMinutes();
 
 /** Date ISO (AAAA-MM-JJ) a J moins `n` jours. */
 function jour(n) {
-  return new Date(AUJOURDHUI.getTime() - n * MS_JOUR).toISOString().slice(0, 10);
+  const d = new Date(AUJOURDHUI.getTime() - n * MS_JOUR);
+  const p = (x) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 /** Horodatage SQLite d'aujourd'hui, a `m` minutes apres minuit. */
 function aujourdhuiA(m) {
@@ -777,7 +779,7 @@ try {
 
   // Fenetre d'ouverture : les deux heures qui precedent l'horloge, jamais
   // dans le futur. Les six signaux scriptes du seed sont eux aussi dans ce
-  // passe recent (datetime('now', '-N minutes')).
+  // passe recent (datetime('now','localtime','-N minutes')).
   const finSignaux = Math.max(HEURE_DEMO - 2, 0);
   const DEBUT_SIGNAUX = Math.max(0, finSignaux - 120);
 

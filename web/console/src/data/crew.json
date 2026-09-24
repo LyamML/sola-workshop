@@ -3,7 +3,7 @@
     "nom": "Projet Odyssée",
     "residents": 1240,
     "jour_vol": 4128,
-    "synchro_at": "2026-09-24 12:22:00"
+    "synchro_at": "2026-09-24 16:40:00"
   },
   "ancre": {
     "jour": "2026-09-24",
@@ -388,7 +388,7 @@
       "nom": "Ibarra",
       "cabine": "E-20",
       "age": 36,
-      "ouvert_at": "2026-09-24 12:21:00",
+      "ouvert_at": "2026-09-24 16:39:00",
       "ouvert_jour_vol": 4128,
       "assigne_a": null,
       "assigne_id": null
@@ -404,7 +404,7 @@
       "nom": "Engel",
       "cabine": "D-102",
       "age": 34,
-      "ouvert_at": "2026-09-24 12:21:00",
+      "ouvert_at": "2026-09-24 16:39:00",
       "ouvert_jour_vol": 4128,
       "assigne_a": "Dr. Nakamura",
       "assigne_id": 3
@@ -420,7 +420,7 @@
       "nom": "Ximenes",
       "cabine": "B-65",
       "age": 37,
-      "ouvert_at": "2026-09-24 12:20:00",
+      "ouvert_at": "2026-09-24 16:38:00",
       "ouvert_jour_vol": 4128,
       "assigne_a": null,
       "assigne_id": null
@@ -436,7 +436,7 @@
       "nom": "Thorne",
       "cabine": "D-44",
       "age": 26,
-      "ouvert_at": "2026-09-24 12:19:00",
+      "ouvert_at": "2026-09-24 16:37:00",
       "ouvert_jour_vol": 4128,
       "assigne_a": null,
       "assigne_id": null
@@ -452,7 +452,23 @@
       "nom": "Okonkwo",
       "cabine": "E-27",
       "age": 50,
-      "ouvert_at": "2026-09-24 12:18:00",
+      "ouvert_at": "2026-09-24 16:36:00",
+      "ouvert_jour_vol": 4128,
+      "assigne_a": null,
+      "assigne_id": null
+    },
+    {
+      "id": 1,
+      "severite": "critique",
+      "origine": "conversation",
+      "motif": "Verbalisation de désespoir détectée en conversation · dépistage C-SSRS positif",
+      "statut": "ouvert",
+      "resident": "R-0912",
+      "prenom": "Nour",
+      "nom": "Belkacem",
+      "cabine": "C-14",
+      "age": 34,
+      "ouvert_at": "2026-09-24 16:35:30",
       "ouvert_jour_vol": 4128,
       "assigne_a": null,
       "assigne_id": null
@@ -468,7 +484,7 @@
       "nom": "Bergstrom",
       "cabine": "C-85",
       "age": 46,
-      "ouvert_at": "2026-09-24 12:17:00",
+      "ouvert_at": "2026-09-24 16:35:00",
       "ouvert_jour_vol": 4128,
       "assigne_a": null,
       "assigne_id": null
@@ -484,26 +500,10 @@
       "nom": "Doric",
       "cabine": "A-13",
       "age": 44,
-      "ouvert_at": "2026-09-24 12:17:00",
+      "ouvert_at": "2026-09-24 16:35:00",
       "ouvert_jour_vol": 4128,
       "assigne_a": null,
       "assigne_id": null
-    },
-    {
-      "id": 23,
-      "severite": "info",
-      "origine": "usage",
-      "motif": "Usage du compagnon en forte hausse, interactions humaines en baisse",
-      "statut": "en_cours",
-      "resident": "R-0177",
-      "prenom": "Sofia",
-      "nom": "Dubois",
-      "cabine": "B-137",
-      "age": 39,
-      "ouvert_at": "2026-09-24 12:15:00",
-      "ouvert_jour_vol": 4128,
-      "assigne_a": "Dr. Ferreira",
-      "assigne_id": 2
     }
   ],
   "compteurs": {
