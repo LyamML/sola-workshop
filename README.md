@@ -118,7 +118,7 @@ est la liste des adresses :
 | Console — écrans 02 à 04 | <http://localhost:5174> |
 | Serveur de bord — l'API | <http://localhost:5175> |
 | Backoffice | <http://localhost:5176> |
-| Serveur de bord, côté Wi-Fi — pour le bracelet | `http://<adresse du poste>:5177`, ouvert seulement si `BRACELET_TOKEN` est renseigné — voir [En Wi-Fi, sans borne](#en-wi-fi-sans-borne) |
+| Serveur de bord, côté Wi-Fi — pour le bracelet et l'équipe nutrition | `http://<adresse du poste>:5177`, ouvert seulement si `BRACELET_TOKEN` ou `NUTRITION_TOKEN` est renseigné — voir [En Wi-Fi, sans borne](#en-wi-fi-sans-borne) et [L'équipe nutrition](#léquipe-nutrition) |
 
 Sola n'ouvre que ces cinq ports, et aucun ne bouge : un port déjà pris fait
 échouer son service au lieu de le décaler au suivant — une console servie
@@ -211,6 +211,11 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 refuse de démarrer sinon. Il est écrit dans le code du bracelet, et un bracelet
 se perd plus facilement qu'une borne ; il n'ouvre donc que l'envoi des trames,
 sur un port à part — voir [En Wi-Fi, sans borne](#en-wi-fi-sans-borne).
+
+**L'équipe nutrition** porte un troisième jeton de machine, `NUTRITION_TOKEN`,
+distinct des deux autres. Il se confie à une autre équipe : il n'ouvre que la
+lecture des moyennes des bilans sanguins, sur le même port, et le changer lui
+retire l'accès — voir [L'équipe nutrition](#léquipe-nutrition).
 
 **Les soignants et les administrateurs** ont un compte : une adresse, un mot de
 passe haché en **argon2id** (paramètres OWASP : 19 MiB, 2 passes), et une
@@ -432,7 +437,7 @@ npm run db:sql "SELECT mesure_at, fc_bpm, rmssd_ms, spo2_pct, qualite FROM mesur
 
 ### En Wi-Fi, sans borne
 
-Un bracelet qui a le Wi-Fi peut envoyer lui-même, sans borne ni Bluetooth. Avec `BRACELET_TOKEN` dans `server/.env`, le serveur de bord ouvre un second port, `PORT_RESEAU` (5177 par défaut), joignable depuis le réseau local. Ce port ne sert que `POST /ingest/bracelet`, avec ce jeton, et `GET /health` ; la console, le backoffice et la connexion n'écoutent que sur le poste. Au démarrage, le journal du serveur donne l'adresse à écrire dans le bracelet.
+Un bracelet qui a le Wi-Fi peut envoyer lui-même, sans borne ni Bluetooth. Avec `BRACELET_TOKEN` dans `server/.env`, le serveur de bord ouvre un second port, `PORT_RESEAU` (5177 par défaut), joignable depuis le réseau local. Ce port ne sert que `POST /ingest/bracelet`, avec ce jeton, `GET /health` et, avec le sien, [la lecture de l'équipe nutrition](#léquipe-nutrition) ; la console, le backoffice et la connexion n'écoutent que sur le poste. Au démarrage, le journal du serveur donne l'adresse à écrire dans le bracelet.
 
 Le bracelet y envoie le même lot que la borne, ou une lecture seule, que le serveur horodate à l'arrivée — c'est ce que fait un croquis Arduino sans horloge. `resident`, `bracelet` et `bpm` sont obligatoires ; un `rmssd` absent vaut zéro, une qualité absente vaut `fair` :
 
@@ -485,7 +490,8 @@ La fiche, elle, ne fait pas la différence, et c'est voulu : dans le jeu de dém
 - **La détection d'urgence repose sur des mots-clés.** Elle reconnaît les formulations courantes (« douleur dans la poitrine », « du mal à respirer », « plus envie de vivre »…) ; une formulation qu'elle ne connaît pas passe au modèle, qui n'a plus alors que sa consigne. Elle préfère le faux positif : une phrase de trop coûte moins qu'une urgence manquée.
 - **Le bracelet ne remplit que trois tuiles de la fiche.** Chaque trame reçue recalcule la ligne de son jour dans `mesures_jour`, que lisent la fiche et le registre, mais la trame ne porte ni la respiration, ni la température cutanée, ni l'activité électrodermale, ni les pas : restent la FC de repos, la SpO₂ et la variabilité, qu'un croquis Arduino n'envoie souvent pas. Les autres constantes gardent la valeur du jeu de démonstration ; un jour que le bracelet est seul à écrire, leur tuile reprend la dernière valeur connue, datée, alerte comprise.
 - **Le jour d'une mesure est le jour UTC.** `mesures` est horodatée en UTC : une minute reçue peu après minuit, heure locale, compte encore pour la veille.
-- **Le port réseau parle HTTP en clair, avec un seul jeton pour tous les bracelets.** Qui écoute le Wi-Fi lit le jeton, et ce jeton dit qu'un envoi vient d'un bracelet de Sola, pas duquel : le serveur vérifie seulement que le bracelet nommé est bien celui du résident nommé. À bord, ce port passerait en TLS, avec un secret par bracelet.
+- **Le port réseau parle HTTP en clair, avec un seul jeton pour tous les bracelets.** Qui écoute le Wi-Fi lit le jeton, et ce jeton dit qu'un envoi vient d'un bracelet de Sola, pas duquel : le serveur vérifie seulement que le bracelet nommé est bien celui du résident nommé. Le jeton de l'équipe nutrition y passe en clair lui aussi : il n'ouvre que des moyennes, mais qui l'a lu les lit. À bord, ce port passerait en TLS, avec un secret par bracelet.
+- **Les moyennes de l'équipe nutrition ne distinguent pas le sexe.** La base ne le connaît pas, et chaque marqueur y a les mêmes bornes pour tous, alors qu'au laboratoire celles de l'hémoglobine et de la ferritine en dépendent : une part sous la borne compte tout l'équipage contre les mêmes seuils.
 - **La borne ne transmet que servie par Vite.** C'est son serveur de développement qui ajoute le jeton de `/ingest`. Publiée en fichiers statiques, elle n'aurait plus de relais, et ce rôle reviendrait au serveur de bord ou à un service de la cabine. Sa file d'attente vit en mémoire : une heure au plus, perdue si l'on recharge la page.
 - **Une partie de la trame est reçue sans être conservée.** `tst`, `waso`, `hrRest`, `fall`, `shake`, `beats` et `amp` sont validées puis écartées : aucune table ne les attend encore. En particulier, une chute comptée par le bracelet n'ouvre pas de signal. Seul `POST /ingest/evenement` en ouvre un, et la borne ne l'appelle pas.
 - **La borne n'est pas branchée sur la base pour le résumé IA.** L'écran 01 ne connaît du résident que ce que son prompt lui dit. Un problème physique n'entre dans le résumé que s'il a été dit à l'oral.
@@ -523,6 +529,7 @@ La fiche, elle, ne fait pas la différence, et c'est voulu : dans le jeu de dém
 | `POST /auth/deconnexion` | la console, le backoffice | ferme la session et efface le cookie |
 | `GET /admin/…` | le backoffice | correspondance écran ↔ requête, fraîcheur des flux, lignes brutes des tables, comptes |
 | `PATCH /admin/comptes/:role/:id` | le backoffice | activer ou désactiver un compte — sa seule écriture |
+| `GET /partenaires/nutrition/bilans` | l'équipe nutrition, sur le port réseau | moyennes des bilans sanguins sur un cycle de quatorze jours — [le contrat](#léquipe-nutrition) |
 
 L'ingestion demande un jeton porteur, comparé à temps constant : une borne est une machine. Tout `/api` exige une session ouverte, tout `/admin` exige en plus le rôle administrateur. Une note de particularité écrite depuis la console porte désormais l'identifiant du médecin connecté, et la fiche affiche sa signature ; un signal pris ou clos porte de même le nom de qui l'a fait — c'est ce qui manquait, et c'est ce qui rend le dossier défendable. La connexion est freinée après trois échecs, avec un délai qui double, et une adresse inconnue coûte le même temps de calcul qu'une adresse connue : sans cela, la durée de la réponse dirait lesquelles existent. Toutes les requêtes sont préparées avec des paramètres nommés — **aucune concaténation SQL nulle part**, y compris pour le tri : le nom de colonne envoyé par l'écran 04 passe par une table de correspondance, et une clé inconnue retombe sur le tri par défaut au lieu d'atteindre le SQL.
 
@@ -544,6 +551,73 @@ $ curl -X POST .../ingest/conversation -d '{"...","transcript":[…]}'
 ```
 
 C'est la promesse du projet rendue exécutable : l'architecture ne se contente pas de ne pas transmettre le verbatim, elle est incapable de l'accepter.
+
+## L'équipe nutrition
+
+Une autre équipe du workshop adapte les cultures du *Méridien* aux carences de l'équipage. Elle lit les bilans sanguins de Sola **en moyennes, jamais en dossiers** : une requête quand elle veut, aussi souvent qu'elle veut, et l'historique se tient chez elle.
+
+```bash
+curl.exe -H "Authorization: Bearer <NUTRITION_TOKEN>" "http://<adresse du poste>:5177/partenaires/nutrition/bilans"
+```
+
+`curl` hors de Windows. La route n'existe qu'avec `NUTRITION_TOKEN` dans `server/.env`, et au démarrage le journal du serveur donne son adresse. Une page web peut l'appeler aussi : les en-têtes CORS sont ouverts, le jeton reste exigé. `?au=AAAA-MM-JJ` rejoue une période passée.
+
+**Une réponse, un cycle de prélèvement.** Chaque résident a un bilan tous les quatorze jours, à une date qui lui est propre. La réponse couvre les quatorze jours qui finissent au jour courant de la console, et ne garde que le dernier bilan de chacun : tout l'équipage y compte, une fois. Appelée chaque jour, la fenêtre glisse ; tous les quatorze jours, les périodes se suivent sans se chevaucher.
+
+**La moyenne ne part jamais seule.** Une ferritine moyenne de 170 µg/L, en pleine plage de référence, cache 6,1 % de l'équipage sous la borne basse. Chaque marqueur donne donc aussi la part des résidents hors bornes, chaque résultat comparé aux bornes écrites avec lui. Sur moins de 11 résidents, l'effectif reste mais les valeurs partent à `null` : c'est la règle du CASD pour les données de santé du PMSI, aucune case ne concerne moins de 11 patients.
+
+```json
+{
+  "periode": { "du": "2026-09-10", "au": "2026-09-23", "jours": 14, "jour_vol_du": 4115, "jour_vol_au": 4128 },
+  "equipage": 1240,
+  "preleves": 1240,
+  "source": "simule",
+  "effectif_min": 11,
+  "marqueurs": [
+    { "cle": "hemoglobine", "libelle": "Hémoglobine", "groupe": "carence", "unite": "g/dL",
+      "ref_bas": 13, "ref_haut": 17, "n": 1240, "moyenne": 15.01, "ecart_type": 1.38,
+      "pct_bas": 7.4, "pct_haut": 6.6 },
+    { "cle": "ferritine", "libelle": "Ferritine", "groupe": "carence", "unite": "µg/L",
+      "ref_bas": 30, "ref_haut": 300, "n": 1240, "moyenne": 170.07, "ecart_type": 87.68,
+      "pct_bas": 6.1, "pct_haut": 7.1 }
+  ]
+}
+```
+
+| Champ | Sens |
+|---|---|
+| `periode` | premier et dernier jour, inclus, en dates et en jours de vol |
+| `preleves`, `equipage` | résidents comptés, résidents à bord |
+| `source` | `analyse`, `simule` — le jeu de démonstration — ou `mixte` |
+| `n` | résidents dont le marqueur est dosé sur la période |
+| `moyenne`, `ecart_type` | dans l'unité du marqueur |
+| `pct_bas`, `pct_haut` | part des résidents sous la borne basse, au-dessus de la borne haute, en % |
+
+**Douze marqueurs sur vingt-neuf** : ceux dont le taux sanguin suit ce que l'on mange. Pour le groupe `carence`, c'est `pct_bas` qui compte les manques ; pour `equilibre`, `pct_haut`, sauf pour le HDL.
+
+| `cle` | Marqueur | Groupe | Ce qu'il dit de la ration |
+|---|---|---|---|
+| `hemoglobine` | Hémoglobine | carence | l'anémie, que cause souvent un manque de fer, de B12 ou de folates |
+| `ferritine` | Ferritine | carence | les réserves de fer ; elle monte aussi avec une inflammation, qui peut masquer un manque |
+| `fer_serique` | Fer sérique | carence | le fer qui circule, plus variable d'un jour à l'autre |
+| `vitamine_d` | Vitamine D | carence | sans soleil, elle ne vient plus que de l'assiette ou de lampes UV |
+| `vitamine_b12` | Vitamine B12 | carence | aucune plante n'en fait : produits animaux, ou cultures bactériennes |
+| `folates` | Folates | carence | légumes verts à feuilles, légumineuses |
+| `glycemie` | Glycémie à jeun | equilibre | la régulation du sucre, le matin |
+| `hba1c` | HbA1c | equilibre | la glycémie moyenne des deux à trois derniers mois |
+| `cholesterol_total` | Cholestérol total | equilibre | suit en partie les graisses de la ration |
+| `ldl` | LDL | equilibre | monte avec les graisses saturées |
+| `hdl` | HDL | equilibre | protège : c'est le bas qui compte, et il n'a pas de borne haute |
+| `triglycerides` | Triglycérides | equilibre | sucres rapides, alcool, excès de calories |
+
+Les dix-sept autres restent à bord :
+
+- **sodium, potassium, calcium** — le rein et les hormones tiennent leur taux sanguin quel que soit l'apport, qui se lit dans les urines ou les os. La vitamine D, transmise, règle l'absorption du calcium ;
+- **TSH, T4 libre** — l'iode y joue, une maladie de la thyroïde bien davantage ; l'iode d'une population se dose dans les urines ;
+- **hématocrite** — il redit l'hémoglobine, en suivant l'hydratation ;
+- **leucocytes, plaquettes, ALAT, ASAT, créatinine, débit de filtration glomérulaire, CRP, vitesse de sédimentation, recherche d'agent infectieux, cortisol, DHEA-S** — infection, foie, reins, stress : aucun ne dit un nutriment.
+
+Le choix des marqueurs vit dans `server/src/routes/partenaires.ts`, au même endroit que la requête.
 
 ## Le backoffice
 

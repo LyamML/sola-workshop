@@ -20,7 +20,7 @@ export const consoleApi = Router();
 
 type Origine = "physio" | "conversation" | "chute" | "usage" | "manuel";
 
-interface Ancre {
+export interface Ancre {
   jour: string;
   jour_vol: number;
 }
@@ -35,7 +35,7 @@ interface Ancre {
  * vieillissait des residents dont aucune donnee n'avait bouge. Sans aucune
  * mesure en base, on retombe sur le jour du poste et sur `JOUR_VOL`.
  */
-function ancre(): Ancre {
+export function ancre(): Ancre {
   return (
     requete<Ancre>("SELECT jour, jour_vol FROM v_jour_courant")[0] ?? {
       jour: requete<{ j: string }>("SELECT date('now') AS j")[0]!.j,
