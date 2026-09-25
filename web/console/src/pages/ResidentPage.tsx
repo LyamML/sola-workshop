@@ -260,7 +260,7 @@ function Fiche({
         <SignalFerme key={c.signal.id} clos={c} />
       ))}
 
-      {direct && <EnDirect direct={direct} />}
+      {direct && <EnDirect direct={direct} closes={clos.map((c) => c.signal.id)} />}
 
       <div className="mk-row">
         <section className="mk-card">

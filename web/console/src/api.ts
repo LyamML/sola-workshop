@@ -390,6 +390,12 @@ export interface DirectApi {
     /** Le plus haut compteur du jour : la valeur de la tuile. */
     pas: number | null;
   };
+  /**
+   * Le signal de la dernière chute, ouvert au passage de `fall` à true. Null :
+   * aucune chute signalée. Clos, la case « Chute » cesse d'alerter, même si le
+   * croquis la signale encore.
+   */
+  signal_chute: { id: number; statut: StatutSignal } | null;
 }
 
 export interface StatsSignauxApi {
