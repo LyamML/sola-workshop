@@ -74,6 +74,21 @@ directApi.get("/residents/:code/direct", (req, res, next) => {
       { id },
     )[0]!;
 
+    // Le signal de la derniere chute, ouvert au passage de `fall` a true
+    // (routes/ingest.ts) : clos par un medecin, la case « Chute » cesse
+    // d'alerter, meme si le croquis la signale encore. Le dernier seulement :
+    // une chute plus ancienne a son propre signal, que la fiche affiche deja.
+    // L'identifiant plutot que ouvert_at : le serveur ecrit ses signaux dans
+    // l'ordre ou il les ouvre, et ouvert_at n'a pas toujours ete a l'heure de
+    // bord.
+    const signalChute =
+      requete(
+        `SELECT id, statut FROM signaux
+          WHERE resident_id = :id AND origine = 'chute'
+          ORDER BY id DESC LIMIT 1`,
+        { id },
+      )[0] ?? null;
+
     res.json({
       maintenant: new Date().toISOString(),
       bracelet,
@@ -81,6 +96,7 @@ directApi.get("/residents/:code/direct", (req, res, next) => {
       minutes,
       lectures: lecturesDe(id),
       jour,
+      signal_chute: signalChute,
     });
   } catch (e) {
     next(e);

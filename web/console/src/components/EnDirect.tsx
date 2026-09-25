@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ligneBracelet } from "../adapt";
-import type { ChampMesure, DirectApi, LectureApi } from "../api";
+import type { ChampMesure, DirectApi } from "../api";
 import { FENETRE_MIN, SILENCE_S, etatDirect, type Direct, type EtatDirect } from "../direct";
 import { duree, entier, fr, frMax, jv, pluriel } from "../format";
 import "../styles/direct.css";
@@ -165,29 +165,49 @@ function Trace({ donnees: d, champ, maintenant }: { donnees: DirectApi; champ: C
  * Ce que le croquis dit des chutes sur les dix minutes : « signalée » dès
  * qu'une lecture en signale une, avec l'heure où il a commencé à la dire, que
  * le bracelet envoie encore ou non. Le signal critique s'est ouvert au serveur
- * à cette lecture-là (routes/ingest.ts) : la carte ne fait que la montrer. Une
- * chute signalée depuis la première lecture de la fenêtre a commencé avant
- * elle, et son heure est celle du signal. « Aucune », seulement si la
- * dernière lecture le dit : la trame BLE compte les chutes sans les dire, et
- * une minute n'en garde rien.
+ * à cette lecture-là (routes/ingest.ts) : la carte ne fait que la montrer, et
+ * cesse d'alerter une fois ce signal clos — le croquis peut dire `fall` bien
+ * après une chute que le médecin a vue. Une chute signalée depuis la première
+ * lecture de la fenêtre a commencé avant elle, et son heure est celle du
+ * signal. « Aucune », seulement si la dernière lecture le dit : la trame BLE
+ * compte les chutes sans les dire, et une minute n'en garde rien.
  */
-function Chute({ etat, lectures, maintenant }: { etat: EtatDirect; lectures: LectureApi[]; maintenant: number }) {
+function Chute({
+  etat,
+  donnees: d,
+  closes,
+  maintenant,
+}: {
+  etat: EtatDirect;
+  donnees: DirectApi;
+  closes: number[];
+  maintenant: number;
+}) {
   const debut = maintenant - FENETRE_MIN * 60_000;
-  const dites = lectures.filter((l) => l.chute !== null && Date.parse(l.at) >= debut);
+  const dites = d.lectures.filter((l) => l.chute !== null && Date.parse(l.at) >= debut);
   let depuis: string | null = null;
   for (let i = 1; i < dites.length; i++) {
     if (dites[i]!.chute && !dites[i - 1]!.chute) depuis = dites[i]!.at;
   }
   const signalee = dites.some((l) => l.chute);
+  // Clos pendant la visite, le signal l'est avant que la relecture suivante
+  // le dise : la case suit le geste du médecin sans attendre dix secondes. Un
+  // serveur d'avant ce champ ne l'envoie pas : la case alerte, comme avant.
+  const s = d.signal_chute ?? null;
+  const alerte = signalee && !(s !== null && (s.statut === "clos" || closes.includes(s.id)));
   const aucune = etat.vivant && etat.lecture?.chute === false;
   return (
-    <div className={`dl-v mot${signalee ? " chute" : ""}`}>
+    <div className={`dl-v mot${alerte ? " chute" : ""}`}>
       <span className="l">Chute</span>
-      {signalee || aucune ? (
+      {alerte ? (
         <span className="v">
-          {signalee ? "signalée" : "aucune"}
+          signalée
           {depuis && <small>à {heureLocale(depuis, maintenant, true)}</small>}
         </span>
+      ) : aucune ? (
+        <span className="v">aucune</span>
+      ) : signalee ? (
+        <span className="v">signal clos</span>
       ) : (
         <span className="v etat indisponible">{ETATS.indisponible}</span>
       )}
@@ -200,9 +220,9 @@ function Chute({ etat, lectures, maintenant }: { etat: EtatDirect; lectures: Lec
  * les dix minutes qui la précèdent, et ce que la journée en a retenu. Toujours
  * là, toutes ses cases comprises, même quand le bracelet ne dit rien : chaque
  * case dit alors pourquoi elle est vide. Une carte qui disparaît laisse croire
- * à une panne de la console.
+ * à une panne de la console. `closes` : les signaux clos pendant la visite.
  */
-export function EnDirect({ direct }: { direct: Direct }) {
+export function EnDirect({ direct, closes }: { direct: Direct; closes: number[] }) {
   useSeconde();
   const etat = etatDirect(direct);
   const { donnees: d, panne } = direct;
@@ -283,7 +303,7 @@ export function EnDirect({ direct }: { direct: Direct }) {
               </div>
             );
           })}
-          <Chute etat={etat} lectures={d.lectures} maintenant={maintenant} />
+          <Chute etat={etat} donnees={d} closes={closes} maintenant={maintenant} />
         </div>
         {jour && <p className="dl-jour">{jour}</p>}
       </section>
