@@ -278,7 +278,7 @@ racine, réglé par `DB_FILE`.
 | La file « À traiter maintenant » de l'écran 02 | `src/components/FileTriage.tsx` |
 | L'écran 02 qui se recharge seul quand un signal s'ouvre, se prend ou se clôt — empreinte relue toutes les cinq secondes, onglet visible | `src/veille.ts`, `GET /api/crew/empreinte` dans `server/src/routes/console.ts` |
 | Le signal ouvert de la fiche : prendre, clore avec un motif | `src/components/SignalOuvert.tsx` |
-| La carte « en direct » de la fiche — dernière lecture, courbe de dix minutes, température, pas, case « Chute » — et sa ligne bracelet, relues toutes les dix secondes | `src/components/EnDirect.tsx`, `src/direct.ts` (`etatDirect`), `src/styles/direct.css` |
+| La carte « en direct » de la fiche — dernière lecture, courbe de dix minutes, sept cases toujours affichées, « donnée indisponible » ou « calibrage… » faute de valeur — et sa ligne bracelet, relues toutes les dix secondes | `src/components/EnDirect.tsx` (`ETATS`, `lire`), `src/direct.ts` (`etatDirect`), `src/styles/direct.css` |
 | Les tuiles SpO₂, variabilité, température et pas qui suivent la carte « en direct » tant que le bracelet envoie, et les pas d'une journée en cours jugés sur la veille | `src/adapt.ts` (`enDirect`, `enCours`, `suivreLeDirect`) |
 | Les tuiles de constantes, la courbe et les barres | `src/components/TuileConstante.tsx`, `src/components/Courbe.tsx`, `src/components/Barres.tsx` |
 | Les conversations remontées et les résumés de contexte | `src/components/Conversations.tsx` |
@@ -307,7 +307,7 @@ racine, réglé par `DB_FILE`.
 | La lecture seule d'un bracelet en Wi-Fi — température, pas, chute —, et ce qu'une réponse dit des valeurs écartées et d'une chute | `src/validation.ts` (`lectureSchema`), `src/routes/ingest.ts` (`recevoirWifi`, `recevoirLecture`, `accuse`) |
 | Une chute qui ouvre un signal critique, envoyée par la borne ou annoncée par le croquis Wi-Fi — seul le passage de `fall` à `true` compte | `src/routes/ingest.ts` (`enregistrerEvenement`, `chutesSignalees`) |
 | Une journée « en cours » — des minutes du bracelet aujourd'hui — et la veille qui juge ses pas | `src/routes/direct.ts` (`jour`), `src/routes/console.ts` (`jour_en_cours`, `pas_veille`) |
-| Les lectures des dix dernières minutes, la dernière minute et le jour — la carte « en direct » de l'écran 03 | `src/routes/direct.ts` ; les lectures, gardées en mémoire, dans `src/routes/ingest.ts` (`retenir`) |
+| Les lectures des dix dernières minutes, avec les champs que portait chaque trame, la dernière minute et le jour — la carte « en direct » de l'écran 03 | `src/routes/direct.ts` ; les lectures, gardées en mémoire, dans `src/routes/ingest.ts` (`retenir`, `envoyesDe`) |
 | **Les moyennes des bilans sanguins pour l'équipe nutrition** : quels marqueurs et pourquoi, le cycle de 14 jours, la règle des petits effectifs | `src/routes/partenaires.ts` |
 | Connexion, déconnexion, freinage après échecs | `src/routes/auth.ts` |
 | Hachage argon2id des mots de passe | `src/mdp.ts` |

@@ -140,9 +140,11 @@ export const lotTramesSchema = z
 /**
  * Une lecture seule, du bracelet qui envoie lui-meme en Wi-Fi : la trame sans
  * `at`, puisque rien ne l'horodate avant le serveur, et avec son adresse. Un
- * croquis Arduino n'a souvent ni `rmssd` ni indice de qualite : zero veut deja
- * dire « pas de valeur », et une lecture sans qualite passe pour `fair` — les
- * bornes physiologiques ecartent toujours ce qui est aberrant.
+ * croquis Arduino n'a souvent ni `rmssd` ni indice de qualite. Un `rmssd`
+ * absent compte comme zero, qui veut deja dire « pas de valeur », mais il reste
+ * absent ici : la carte « en direct » doit savoir que le croquis ne l'envoie
+ * pas (recevoirLecture le complete). Une lecture sans qualite passe pour
+ * `fair` — les bornes physiologiques ecartent toujours ce qui est aberrant.
  *
  * `fall` n'y compte pas les chutes comme dans la trame BLE : il dit si le
  * croquis en detecte une. Absent, le croquis ne dit rien des chutes.
@@ -152,7 +154,7 @@ export const lectureSchema = trameSchema
   .extend({
     resident: codeResident,
     bracelet: numeroBracelet,
-    rmssd: z.number().min(0).default(0),
+    rmssd: z.number().min(0).optional(),
     q: z.enum(["good", "fair", "poor", "warmup"]).default("fair"),
     fall: z.boolean().optional(),
   })
