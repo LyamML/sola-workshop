@@ -342,10 +342,19 @@ export interface MinuteApi {
   qualite: "good" | "fair" | "poor" | "warmup";
 }
 
+/** Les constantes qu'une minute, ou une lecture, peut porter. */
+export type ChampMesure = Exclude<keyof MinuteApi, "at" | "qualite">;
+
 /** Une lecture du bracelet : les champs d'une minute, et ce qu'elle dit d'une chute. */
 export interface LectureApi extends MinuteApi {
   /** Null : l'émetteur ne dit rien des chutes. Le signal, lui, s'ouvre au serveur. */
   chute: boolean | null;
+  /**
+   * Les champs que la trame portait, valeur retenue ou non : un champ envoyé
+   * sans valeur est un capteur qui n'en a pas encore de fiable ; un champ
+   * absent, un capteur que l'émetteur n'a pas.
+   */
+  envoyes: ChampMesure[];
 }
 
 /** La carte « en direct » de la fiche. */
@@ -353,7 +362,7 @@ export interface DirectApi {
   /** L'horloge du serveur : l'âge d'une trame se compte sur elle, pas sur celle du poste. */
   maintenant: string;
   bracelet: { serie: string; batterie_pct: number | null; synchro_at: string | null } | null;
-  /** La dernière minute des vingt-quatre dernières heures. Null : pas de carte. */
+  /** La dernière minute des vingt-quatre dernières heures. Null : rien reçu depuis. */
   derniere: MinuteApi | null;
   /** Les dix dernières minutes, de la plus ancienne à la plus récente : chacune n'est qu'une moyenne. */
   minutes: MinuteApi[];

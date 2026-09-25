@@ -358,6 +358,23 @@ function braceletDuResident(
 /** La largeur de la carte « en direct » : assez courte pour qu'une tendance s'y dessine en quelques minutes. */
 export const FENETRE_MIN = 10;
 
+/** Le champ de la trame dont chaque colonne d'une lecture est tiree. */
+const CHAMPS = {
+  fc_bpm: "bpm",
+  spo2_pct: "spo2",
+  rmssd_ms: "rmssd",
+  temp_c: "temperature",
+  activite_g: "act",
+  pas: "steps",
+} as const satisfies Record<string, keyof Trame>;
+
+type ChampLecture = keyof typeof CHAMPS;
+
+/** Les colonnes dont la trame portait le champ, qu'il ait donne une valeur ou non. */
+function envoyesDe(t: Partial<Pick<Trame, (typeof CHAMPS)[ChampLecture]>>): ChampLecture[] {
+  return (Object.keys(CHAMPS) as ChampLecture[]).filter((c) => t[CHAMPS[c]] !== undefined);
+}
+
 /**
  * Une seconde de bracelet, dans les colonnes de `mesures` : la carte les lit
  * comme ses minutes. Plus la chute, que `mesures` ne garde pas : elle va a
@@ -374,6 +391,13 @@ export interface Lecture {
   qualite: Trame["q"];
   /** Ce que le croquis Wi-Fi dit d'une chute ; null quand l'emetteur n'en dit rien. */
   chute: boolean | null;
+  /**
+   * Les colonnes que la trame remplissait, valeur retenue ou non. Un null seul
+   * ne dit pas pourquoi : un champ envoye sans valeur — zero, hors bornes, lu
+   * sans contact — est un capteur qui cherche encore ; un champ absent, un
+   * capteur que l'emetteur n'a pas.
+   */
+  envoyes: ChampLecture[];
 }
 
 /**
@@ -387,8 +411,17 @@ const lecturesRecentes = new Map<number, Lecture[]>();
 
 const limiteFenetre = () => Date.now() - FENETRE_MIN * 60_000;
 
-/** A appeler une fois les minutes ecrites : une lecture refusee n'a rien a montrer. */
-function retenir(resident: number, trames: Trame[], chute: boolean | null = null): void {
+/**
+ * A appeler une fois les minutes ecrites : une lecture refusee n'a rien a
+ * montrer. `envoyes`, quand le schema a complete la trame : ses champs ne
+ * disent plus ce que l'emetteur a vraiment envoye.
+ */
+function retenir(
+  resident: number,
+  trames: Trame[],
+  chute: boolean | null = null,
+  envoyes?: ChampLecture[],
+): void {
   // Les filtres de la minute, sur une seule seconde : zero et hors BORNES ne
   // sont pas des valeurs, l'optique et la temperature ne valent que sur good
   // et fair.
@@ -404,6 +437,7 @@ function retenir(resident: number, trames: Trame[], chute: boolean | null = null
       pas: compteur([t.steps]),
       qualite: t.q,
       chute,
+      envoyes: envoyes ?? envoyesDe(t),
     };
   });
   // Rangees par instant, sans doublon : la borne reemet ce qu'elle n'a pas pu
@@ -525,7 +559,7 @@ function recevoirLecture(req: Request, res: Response, next: NextFunction): void 
       minute = { debut, trames: [] };
       minutesEnCours.set(braceletId, minute);
     }
-    const trame: Trame = { ...valeurs, at: new Date(maintenant).toISOString() };
+    const trame: Trame = { ...valeurs, rmssd: valeurs.rmssd ?? 0, at: new Date(maintenant).toISOString() };
     minute.trames.push(trame);
     const resume = resumerMinute(new Date(debut).toISOString(), minute.trames);
     const chute = fall === true && chutesSignalees.get(braceletId) !== true;
@@ -538,7 +572,7 @@ function recevoirLecture(req: Request, res: Response, next: NextFunction): void 
     // Une fois la chute ecrite seulement : si l'ecriture a echoue, la lecture
     // suivante doit encore l'ouvrir.
     if (fall !== undefined) chutesSignalees.set(braceletId, fall);
-    retenir(id, [trame], fall ?? null);
+    retenir(id, [trame], fall ?? null, envoyesDe(valeurs));
 
     // Les ecarts de cette lecture-ci, pas de toute la minute : chaque reponse
     // parle de ce que l'emetteur vient d'envoyer.

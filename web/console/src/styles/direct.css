@@ -14,10 +14,32 @@
   }
 }
 
+/* Quatre colonnes, comme les tuiles de constantes (.vt-g), mais deux plus
+   tôt qu'elles : une valeur y partage sa case avec sa courbe. Sept cases
+   toujours là : la dernière, celle des chutes, finit sa ligne plutôt que d'y
+   laisser un trou — les constantes, puis le mouvement. */
 .dl-g {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+.dl-g > :last-child {
+  grid-column: span 2;
+}
+@media (max-width: 1100px) {
+  .dl-g {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* Une seule colonne : une valeur et sa courbe ne tiennent pas dans une
+   moitié d'écran de téléphone. */
+@media (max-width: 600px) {
+  .dl-g {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dl-g > :last-child {
+    grid-column: auto;
+  }
 }
 
 /* Le gabarit des tuiles de constantes (.vt), sans le bouton : une valeur en
@@ -74,23 +96,46 @@
   font-size: 22px;
 }
 
-/* Plus rien n'arrive : les valeurs restent, mais ne se donnent plus pour
-   vivantes. */
-.direct.fige .dl-v .v {
-  color: var(--ink-2);
+/* Une case sans valeur (ETATS, dans EnDirect.tsx) : du texte, pas un chiffre,
+   à la hauteur d'une valeur, pour que la case ne saute pas quand elle
+   arrive. Sur deux lignes quand une courbe partage la case, pour lui laisser
+   sa place. */
+.dl-v:has(.dl-sp) .v.etat {
+  width: min-content;
 }
+.dl-v .v.etat {
+  min-height: 30px;
+  display: flex;
+  align-items: flex-end;
+  font: 600 13px/1.15 var(--ui);
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+.dl-v .v.calibrage {
+  color: var(--ink-2);
+  animation: dl-calibre 1.6s ease-in-out infinite;
+}
+.dl-v .v.contact {
+  color: var(--watch);
+}
+@keyframes dl-calibre {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Plus rien n'arrive : la courbe reste, mais ne se donne plus pour vivante. */
 .direct.fige .dl-sp path {
   stroke: var(--ink-3);
 }
 
-/* Après la règle du bracelet muet, et au-dessus d'elle : une chute signalée
-   reste ce qu'il faut voir, qu'il envoie encore ou non. */
+/* Une chute signalée reste ce qu'il faut voir, que le bracelet envoie encore
+   ou non. */
 .dl-v.chute {
   border-color: var(--crit);
   background: var(--crit-soft);
 }
-.dl-v.chute .v,
-.direct.fige .dl-v.chute .v {
+.dl-v.chute .v {
   color: var(--crit);
 }
 

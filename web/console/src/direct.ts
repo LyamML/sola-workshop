@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ErreurApi, api, type DirectApi, type MinuteApi } from "./api";
+import { ErreurApi, api, type DirectApi, type LectureApi, type MinuteApi } from "./api";
 
 /** Le bracelet envoie toutes les dix secondes : relire plus souvent ne montrerait rien de neuf. */
 const PERIODE_MS = 10_000;
@@ -24,12 +24,14 @@ export interface Direct {
 
 /** Ce que la carte et les tuiles lisent d'une relecture. */
 export interface EtatDirect {
-  /** La dernière valeur reçue du bracelet. */
-  mesure: MinuteApi;
+  /** La dernière valeur reçue du bracelet ; null quand rien n'est arrivé depuis vingt-quatre heures. */
+  mesure: MinuteApi | null;
+  /** La même, quand c'est une lecture : elle seule dit quels champs la trame portait. */
+  lecture: LectureApi | null;
   /** C'est la moyenne d'une minute : le serveur a redémarré depuis la dernière lecture et l'a oubliée. */
   moyenne: boolean;
-  /** Secondes depuis le dernier envoi reçu, à l'horloge du serveur. */
-  silence: number;
+  /** Secondes depuis le dernier envoi reçu, à l'horloge du serveur ; null quand le bracelet n'a jamais rien envoyé. */
+  silence: number | null;
   /** Le bracelet envoie encore, et la relecture qui le dit vient de réussir. */
   vivant: boolean;
 }
@@ -39,16 +41,23 @@ export interface EtatDirect {
  * seulement quand elle est plus récente : `mesures` n'en garde que la moyenne,
  * et une valeur qui change en cours de minute ne s'y lit qu'à moitié.
  */
-export function etatDirect(direct: Direct): EtatDirect | null {
+export function etatDirect(direct: Direct): EtatDirect {
   const d = direct.donnees;
-  const lecture = d.lectures.at(-1);
-  const recente = lecture !== undefined && (!d.derniere || Date.parse(lecture.at) >= Date.parse(d.derniere.at));
-  const mesure = recente ? lecture : d.derniere;
-  if (!mesure) return null;
+  const derniere = d.lectures.at(-1);
+  const lecture =
+    derniere !== undefined && (!d.derniere || Date.parse(derniere.at) >= Date.parse(d.derniere.at)) ? derniere : null;
+  const mesure = lecture ?? d.derniere;
   // `synchro_at` bouge à chaque envoi reçu, même quand rien n'en est retenu :
   // un contact faible reste un bracelet qui parle.
-  const silence = (Date.now() + direct.decalage - Date.parse(d.bracelet?.synchro_at ?? mesure.at)) / 1000;
-  return { mesure, moyenne: !recente, silence, vivant: direct.panne === null && silence <= SILENCE_S };
+  const depuis = d.bracelet?.synchro_at ?? mesure?.at;
+  const silence = depuis ? (Date.now() + direct.decalage - Date.parse(depuis)) / 1000 : null;
+  return {
+    mesure,
+    lecture,
+    moyenne: mesure !== null && lecture === null,
+    silence,
+    vivant: direct.panne === null && silence !== null && silence <= SILENCE_S,
+  };
 }
 
 /**
